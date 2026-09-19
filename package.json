@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
+    "start:render": "prisma migrate deploy && node prisma/bootstrap.mjs && next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts"
   },
