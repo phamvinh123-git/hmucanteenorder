@@ -1,0 +1,81 @@
+// Client-safe copy of the cancellation-deadline rule (no @prisma/client import,
+// so this can be bundled into "use client" components).
+
+export const LUNCH_CUTOFF_HOUR = 8;
+export const DINNER_CUTOFF_HOUR = 14;
+export const LOW_MEAL_THRESHOLD = 2;
+
+export type MealType = "LUNCH" | "DINNER";
+export type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+function startOfDayLocal(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/**
+ * "YYYY-MM-DD" using the LOCAL calendar day (never `toISOString()`, which is
+ * UTC and drifts a day off in timezones like Asia/Ho_Chi_Minh, especially in
+ * the early-morning hours).
+ */
+export function localDateKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function cancelCutoff(sessionDate: Date, mealType: MealType) {
+  const cutoff = startOfDayLocal(sessionDate);
+  cutoff.setHours(mealType === "LUNCH" ? LUNCH_CUTOFF_HOUR : DINNER_CUTOFF_HOUR, 0, 0, 0);
+  return cutoff;
+}
+
+/**
+ * The same-day cutoff rule (lunch before 8:00, dinner before 14:00) applies
+ * symmetrically to cancelling a scheduled meal and to undoing a cancellation
+ * — both are "can the kitchen still adjust for this slot" checks.
+ */
+function withinCutoffWindow(
+  date: Date,
+  mealType: MealType,
+  now: Date,
+  pastLabel: string,
+): { ok: boolean; reason?: string } {
+  const today = startOfDayLocal(now);
+  const sessionDay = startOfDayLocal(date);
+
+  if (sessionDay < today) {
+    return { ok: false, reason: pastLabel };
+  }
+  if (sessionDay.getTime() === today.getTime()) {
+    const cutoff = cancelCutoff(date, mealType);
+    if (now >= cutoff) {
+      const label = mealType === "LUNCH" ? "8:00 sáng" : "14:00";
+      return { ok: false, reason: `Đã quá giờ (${label}) cho bữa ăn hôm nay.` };
+    }
+  }
+  return { ok: true };
+}
+
+export function canCancelSession(
+  session: { date: Date; mealType: MealType; status: SessionStatus },
+  now: Date = new Date(),
+): { ok: boolean; reason?: string } {
+  if (session.status !== "SCHEDULED") {
+    return { ok: false, reason: "Buổi ăn này không còn ở trạng thái có thể hủy." };
+  }
+  return withinCutoffWindow(session.date, session.mealType, now, "Buổi ăn đã qua, không thể hủy.");
+}
+
+/** Undoing a cancellation is only allowed within the same window that would have allowed cancelling it. */
+export function canRestoreSession(
+  session: { date: Date; mealType: MealType; status: SessionStatus },
+  now: Date = new Date(),
+): { ok: boolean; reason?: string } {
+  if (session.status !== "CANCELLED") {
+    return { ok: false, reason: "Buổi ăn này không ở trạng thái đã hủy." };
+  }
+  return withinCutoffWindow(session.date, session.mealType, now, "Buổi ăn đã qua, không thể khôi phục.");
+}

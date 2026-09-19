@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  SALES
+  STUDENT
+}
+
+enum MealPattern {
+  LUNCH
+  DINNER
+  BOTH
+}
+
+enum MealType {
+  LUNCH
+  DINNER
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                String   @id @default(cuid())
+  phone             String   @unique
+  name              String
+  passwordHash      String
+  role              Role
+  mustChangePassword Boolean @default(false)
+  active            Boolean  @default(true)
+  /// Fixed sequential number for a STUDENT, shown on printed meal lists.
+  /// Cleared in bulk by Sales/Manager at the start of each term and
+  /// auto-assigned (max existing + 1) when a brand-new student is created.
+  orderCode         Int?     @unique
+  /// Class group ("Tổ") for a STUDENT, e.g. "Tổ 1". Purely informational.
+  group             String?
+  createdAt         DateTime @default(now())
+
+  registrations     MealRegistration[] @relation("StudentRegistrations")
+  createdRegistrations MealRegistration[] @relation("CreatedByUser")
+  sessions          MealSession[] @relation("StudentSessions")
+  logs              ActivityLog[]
+}
+
+model MealRegistration {
+  id            String       @id @default(cuid())
+  studentId     String
+  student       User         @relation("StudentRegistrations", fields: [studentId], references: [id])
+  startDate     DateTime
+  totalSessions Int
+  mealPattern   MealPattern
+  pricePerMeal  Int
+  note          String?
+  createdById   String
+  createdBy     User         @relation("CreatedByUser", fields: [createdById], references: [id])
+  createdAt     DateTime     @default(now())
+
+  sessions      MealSession[]
+}
+
+model MealSession {
+  id             String            @id @default(cuid())
+  registrationId String
+  registration   MealRegistration  @relation(fields: [registrationId], references: [id])
+  studentId      String
+  student        User              @relation("StudentSessions", fields: [studentId], references: [id])
+  date           DateTime
+  mealType       MealType
+  status         SessionStatus     @default(SCHEDULED)
+  price          Int
+  note           String?
+  pickedUp       Boolean           @default(false)
+  pickedUpAt     DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime          @default(now())
+
+  /// The cancelled session this one was auto-created to compensate for.
+  /// Lets a student's cancellation be undone: delete this session and put
+  /// the original back to SCHEDULED, instead of leaving them with an extra
+  /// meal. Null for the initial sessions of a registration.
+  compensationForId String?      @unique
+  compensationFor   MealSession? @relation("SessionCompensation", fields: [compensationForId], references: [id])
+  compensatedBy     MealSession? @relation("SessionCompensation")
+
+  @@index([studentId, date])
+  @@index([registrationId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
