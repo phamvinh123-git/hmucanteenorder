@@ -48,7 +48,7 @@ export default function AppShell({
               alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
               width={44}
               height={44}
-              className="h-11 w-11 flex-shrink-0"
+              className="h-11 w-11 flex-shrink-0 animate-logo-glow logo-spin-hover"
             />
             <div>
               <p className="font-semibold text-slate-800 text-sm">Căng tin Phân hiệu ĐHYHN Thanh Hóa</p>

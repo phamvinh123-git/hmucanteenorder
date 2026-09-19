@@ -56,6 +56,55 @@ body {
   animation-fill-mode: both;
 }
 
+/* --- Logo motion: gentle float + red glow pulse, spin on hover in header --- */
+@keyframes logo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes logo-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 4px 6px rgba(220, 38, 38, 0.15));
+  }
+  50% {
+    filter: drop-shadow(0 10px 16px rgba(220, 38, 38, 0.4));
+  }
+}
+
+.animate-logo-float {
+  animation:
+    logo-float 3.6s ease-in-out infinite,
+    logo-glow 3.6s ease-in-out infinite;
+}
+
+.animate-logo-glow {
+  animation: logo-glow 3.6s ease-in-out infinite;
+}
+
+.logo-spin-hover {
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.logo-spin-hover:hover {
+  transform: rotate(360deg) scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-logo-float,
+  .animate-logo-glow {
+    animation: none;
+  }
+  .logo-spin-hover:hover {
+    transform: none;
+  }
+}
+
 /* --- Buttons -------------------------------------------------------------
    All buttons in this app get a consistent tactile transition: a light lift
    on hover, a press-down on click, and they fade/rise into place when the

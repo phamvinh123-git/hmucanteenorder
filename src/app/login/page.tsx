@@ -28,7 +28,7 @@ export default async function LoginPage() {
             width={96}
             height={96}
             priority
-            className="mx-auto mb-4 h-24 w-24 animate-pop-in"
+            className="mx-auto mb-4 h-24 w-24 animate-logo-float"
           />
           <h1 className="text-xl font-bold text-slate-800">
             Căng tin Phân hiệu Đại học Y Hà Nội
