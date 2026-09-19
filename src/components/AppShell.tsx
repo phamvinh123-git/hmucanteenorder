@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import LogoutButton from "./LogoutButton";
 import { Role } from "@prisma/client";
 
@@ -42,9 +43,13 @@ export default function AppShell({
       <header className="bg-white border-b-2 border-red-600 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-red-200">
-              <span className="text-white text-xs font-bold">HN</span>
-            </div>
+            <Image
+              src="/logo.webp"
+              alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
+              width={44}
+              height={44}
+              className="h-11 w-11 flex-shrink-0"
+            />
             <div>
               <p className="font-semibold text-slate-800 text-sm">Căng tin Phân hiệu ĐHYHN Thanh Hóa</p>
               <nav className="flex gap-1 mt-1 -ml-2">

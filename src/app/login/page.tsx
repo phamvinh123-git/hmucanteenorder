@@ -1,6 +1,7 @@
 import { getSession, homePathForRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import LoginForm from "./LoginForm";
 
 export default async function LoginPage() {
@@ -21,9 +22,14 @@ export default async function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-red-50 px-4">
       <div className="w-full max-w-sm animate-rise-in">
         <div className="text-center mb-8">
-          <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg shadow-red-200 animate-pop-in">
-            <span className="text-white text-xl font-bold">HN</span>
-          </div>
+          <Image
+            src="/logo.webp"
+            alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
+            width={96}
+            height={96}
+            priority
+            className="mx-auto mb-4 h-24 w-24 animate-pop-in"
+          />
           <h1 className="text-xl font-bold text-slate-800">
             Căng tin Phân hiệu Đại học Y Hà Nội
           </h1>

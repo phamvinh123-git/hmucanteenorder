@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Đặt suất ăn - Căng tin ĐHYHN Thanh Hóa",
   description: "Hệ thống đặt suất ăn căng tin Phân hiệu Đại học Y Hà Nội tại Thanh Hóa",
+  icons: { icon: "/logo.webp" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
