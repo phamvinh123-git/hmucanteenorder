@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   title: "Đặt suất ăn - Căng tin ĐHYHN Thanh Hóa",
   description: "Hệ thống đặt suất ăn căng tin Phân hiệu Đại học Y Hà Nội tại Thanh Hóa",
   icons: { icon: "/logo.webp" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#dc2626",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

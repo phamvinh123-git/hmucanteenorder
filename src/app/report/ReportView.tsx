@@ -128,7 +128,7 @@ export default function ReportView() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm theo tên, ngành hoặc lớp..."
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-full sm:w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
         />
         <button
           onClick={() => window.print()}

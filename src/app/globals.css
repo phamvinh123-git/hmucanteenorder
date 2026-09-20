@@ -139,3 +139,36 @@ button:not(:disabled) {
 button:not(:disabled):active {
   transform: scale(0.97);
 }
+
+/* --- Mobile compatibility ------------------------------------------------ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: clip;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+button,
+a,
+select {
+  touch-action: manipulation;
+}
+
+select,
+input {
+  max-width: 100%;
+}

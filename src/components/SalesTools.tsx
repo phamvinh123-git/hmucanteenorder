@@ -536,7 +536,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tên hoặc số điện thoại..."
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-64 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-full sm:w-64 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
             />
           </div>
         </div>
