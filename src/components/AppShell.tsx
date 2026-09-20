@@ -17,6 +17,7 @@ const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "ADMIN", href: "/manager/stats", label: "Thống kê" },
   { role: "ADMIN", href: "/report", label: "Báo cáo" },
   { role: "ADMIN", href: "/admin", label: "Tài khoản" },
+  { role: "ADMIN", href: "/admin/archives", label: "Lưu trữ" },
   { role: "ADMIN", href: "/admin/logs", label: "Nhật ký" },
 ];
 

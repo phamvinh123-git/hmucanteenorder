@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
+import ConfirmModal from "@/components/ConfirmModal";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 
@@ -67,7 +68,12 @@ const emptyForm = {
   note: "",
 };
 
-export default function SalesTools() {
+export default function SalesTools({ canResetAll = false }: { canResetAll?: boolean }) {
+  const [showResetAll, setShowResetAll] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
+  const [resetAllError, setResetAllError] = useState<string | null>(null);
+  const [resetAllMessage, setResetAllMessage] = useState<string | null>(null);
+
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -191,6 +197,30 @@ export default function SalesTools() {
     if (res.ok) {
       setEditingClassId(null);
       loadStudents(search);
+    }
+  }
+
+  async function resetAllStudents() {
+    setResettingAll(true);
+    setResetAllError(null);
+    try {
+      const res = await fetch("/api/students/reset-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "RESET" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResetAllError(data.error ?? "Không thể reset.");
+        return;
+      }
+      setShowResetAll(false);
+      setResetAllMessage(
+        `Đã reset: ${data.studentCount} sinh viên và ${data.sessionCount} buổi ăn được chuyển vào bản lưu trữ (Admin có thể khôi phục).`,
+      );
+      loadStudents(search);
+    } finally {
+      setResettingAll(false);
     }
   }
 
@@ -397,6 +427,19 @@ export default function SalesTools() {
             >
               {backfilling ? "Đang gán..." : "Gán mã cho SV chưa có mã"}
             </button>
+            {canResetAll && (
+              <button
+                onClick={() => {
+                  setResetAllError(null);
+                  setResetAllMessage(null);
+                  setShowResetAll(true);
+                }}
+                className="text-xs px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                title="Chuyển toàn bộ sinh viên vào bản lưu trữ để bắt đầu lại (Admin có thể khôi phục)"
+              >
+                Reset toàn bộ sinh viên
+              </button>
+            )}
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -406,6 +449,9 @@ export default function SalesTools() {
           </div>
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
+        {resetAllMessage && (
+          <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
+        )}
         <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
           {loadingList && <p className="p-4 text-sm text-slate-400">Đang tải...</p>}
           {!loadingList && students.length === 0 && (
@@ -595,6 +641,27 @@ export default function SalesTools() {
           ))}
         </div>
       </section>
+
+      {showResetAll && (
+        <ConfirmModal
+          title="Reset toàn bộ sinh viên?"
+          confirmWord="RESET"
+          confirmLabel="Reset toàn bộ"
+          busy={resettingAll}
+          error={resetAllError}
+          onConfirm={resetAllStudents}
+          onClose={() => setShowResetAll(false)}
+        >
+          <p>
+            Toàn bộ <b>tài khoản sinh viên, đăng ký và lịch ăn</b> sẽ bị gỡ khỏi hệ thống. Sinh viên sẽ không đăng nhập
+            được nữa.
+          </p>
+          <p>
+            Dữ liệu được <b>lưu vào bản lưu trữ</b>, Admin có thể khôi phục lại ở mục &quot;Lưu trữ&quot;. Tài khoản nhân
+            sự và nhật ký không bị ảnh hưởng.
+          </p>
+        </ConfirmModal>
+      )}
     </div>
   );
 }

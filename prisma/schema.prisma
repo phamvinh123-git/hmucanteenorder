@@ -99,6 +99,20 @@ model MealSession {
   @@index([registrationId])
 }
 
+/// Snapshot of all student data taken by "reset all students" (or right
+/// before a restore), so it can be brought back later. `data` holds
+/// { users, registrations, sessions } as JSON.
+model StudentArchive {
+  id           String   @id @default(cuid())
+  label        String
+  createdAt    DateTime @default(now())
+  createdById  String?
+  createdByName String
+  studentCount Int
+  sessionCount Int
+  data         Json
+}
+
 model ActivityLog {
   id        String   @id @default(cuid())
   userId    String?
