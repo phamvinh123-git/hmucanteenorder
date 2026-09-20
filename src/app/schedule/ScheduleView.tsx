@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import WeekMealGrid, { startOfWeekMonday } from "@/components/WeekMealGrid";
 import { localDateKey } from "@/lib/client-session-rules";
@@ -82,12 +83,7 @@ export default function ScheduleView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold text-slate-800">Lịch tuần</h1>
-        <p className="text-sm text-slate-500">
-          Tổng quan số suất ăn Trưa/Tối mỗi ngày. Nhấp vào 1 ô để xem danh sách, tích đã lấy đồ ăn, hoặc in danh sách.
-        </p>
-      </div>
+      <PageHeader title="Lịch tuần" subtitle="Tổng quan số suất ăn Trưa/Tối mỗi ngày. Nhấp vào 1 ô để xem danh sách, tích đã lấy đồ ăn, hoặc in danh sách." />
 
       <WeekMealGrid
         title="Số suất ăn theo tuần"
@@ -132,7 +128,7 @@ export default function ScheduleView() {
       {loading && <p className="text-sm text-slate-400">Đang tải dữ liệu...</p>}
 
       {selectedCell && (
-        <div className="bg-white border border-red-200 rounded-xl p-4 animate-rise-in">
+        <div className="bg-white border border-red-200 rounded-2xl shadow-sm p-4 animate-rise-in">
           <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
             <div>
               <p className="text-sm font-medium text-slate-800">

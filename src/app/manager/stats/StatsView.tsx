@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 import {
@@ -90,10 +91,7 @@ export default function StatsView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-bold text-slate-800">Thống kê</h1>
-        <p className="text-sm text-slate-500">Số suất ăn và doanh thu theo thời gian.</p>
-      </div>
+      <PageHeader title="Thống kê" subtitle="Số suất ăn và doanh thu theo thời gian." />
 
       <div className="flex flex-wrap items-center gap-3 animate-rise-in">
         <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
@@ -138,28 +136,28 @@ export default function StatsView() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div
-              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
               style={{ animationDelay: "0ms" }}
             >
               <p className="text-xs text-slate-500">Tổng suất ăn</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalMeals}</p>
             </div>
             <div
-              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
               style={{ animationDelay: "40ms" }}
             >
               <p className="text-xs text-slate-500">Bữa trưa</p>
               <p className="text-xl font-bold text-amber-600">{data.summary.lunchMeals}</p>
             </div>
             <div
-              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
               style={{ animationDelay: "80ms" }}
             >
               <p className="text-xs text-slate-500">Bữa tối</p>
               <p className="text-xl font-bold text-indigo-600">{data.summary.dinnerMeals}</p>
             </div>
             <div
-              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
               style={{ animationDelay: "120ms" }}
             >
               <p className="text-xs text-slate-500">Doanh thu</p>
@@ -167,7 +165,7 @@ export default function StatsView() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 animate-rise-in" style={{ animationDelay: "160ms" }}>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "160ms" }}>
             <p className="text-sm font-semibold text-slate-700 mb-3">{chartTitle}</p>
             {isSingleDay ? (
               // A single day has exactly one data point, so a day-over-day
@@ -214,7 +212,7 @@ export default function StatsView() {
             )}
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 animate-rise-in" style={{ animationDelay: "200ms" }}>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "200ms" }}>
             <p className="text-sm font-semibold text-slate-700 mb-3">Chi tiết theo ngày</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

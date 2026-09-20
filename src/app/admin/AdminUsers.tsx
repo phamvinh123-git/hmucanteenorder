@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 
 type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT";
@@ -84,16 +85,13 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-lg font-bold text-slate-800">Quản lý tài khoản</h1>
-        <p className="text-sm text-slate-500">Toàn quyền tạo, khóa và phân quyền tài khoản trong hệ thống.</p>
-      </div>
+      <PageHeader title="Quản lý tài khoản" subtitle="Toàn quyền tạo, khóa và phân quyền tài khoản trong hệ thống." />
 
       <section>
         <h2 className="text-sm font-semibold text-slate-700 mb-2">Tạo tài khoản nhân sự mới</h2>
         <form
           onSubmit={onCreate}
-          className="bg-white border border-slate-200 border-t-4 border-t-red-500 rounded-xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise-in"
+          className="bg-white border border-slate-200 border-t-4 border-t-red-500 rounded-2xl shadow-sm p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 animate-rise-in"
         >
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Tên</label>
@@ -162,7 +160,7 @@ export default function AdminUsers() {
             <option value="STUDENT">Sinh viên</option>
           </select>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
           {loading && <p className="p-4 text-sm text-slate-400">Đang tải...</p>}
           {!loading && visible.length === 0 && <p className="p-4 text-sm text-slate-400">Không có tài khoản.</p>}
           {visible.map((u, i) => (

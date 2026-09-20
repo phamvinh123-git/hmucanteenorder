@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -67,16 +68,11 @@ export default function ArchivesView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold text-slate-800">Lưu trữ sinh viên</h1>
-        <p className="text-sm text-slate-500">
-          Mỗi lần reset toàn bộ sinh viên, dữ liệu được lưu lại ở đây. Bạn có thể khôi phục bất cứ lúc nào.
-        </p>
-      </div>
+      <PageHeader title="Lưu trữ sinh viên" subtitle="Mỗi lần reset toàn bộ sinh viên, dữ liệu được lưu lại ở đây. Bạn có thể khôi phục bất cứ lúc nào." />
 
       {message && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 animate-pop-in">{message}</p>}
 
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 animate-rise-in">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100 animate-rise-in">
         {loading && <p className="p-4 text-sm text-slate-400">Đang tải...</p>}
         {!loading && archives.length === 0 && <p className="p-4 text-sm text-slate-400">Chưa có bản lưu trữ nào.</p>}
         {archives.map((a) => (

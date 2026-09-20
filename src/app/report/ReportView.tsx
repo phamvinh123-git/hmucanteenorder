@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 
@@ -76,10 +77,7 @@ export default function ReportView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-bold text-slate-800">Báo cáo</h1>
-        <p className="text-sm text-slate-500">Số suất đã đặt và đã ăn của từng sinh viên theo thời gian.</p>
-      </div>
+      <PageHeader title="Báo cáo" subtitle="Số suất đã đặt và đã ăn của từng sinh viên theo thời gian." />
 
       <div className="flex flex-wrap items-center gap-3 animate-rise-in">
         <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
@@ -129,21 +127,21 @@ export default function ReportView() {
       {data && !loading && (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in">
+            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in">
               <p className="text-xs text-slate-500">Số sinh viên</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalStudents}</p>
             </div>
-            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in" style={{ animationDelay: "40ms" }}>
+            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "40ms" }}>
               <p className="text-xs text-slate-500">Tổng suất đã đặt</p>
               <p className="text-xl font-bold text-red-600">{data.summary.totalBooked}</p>
             </div>
-            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-xl p-4 animate-rise-in" style={{ animationDelay: "80ms" }}>
+            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "80ms" }}>
               <p className="text-xs text-slate-500">Tổng suất đã ăn</p>
               <p className="text-xl font-bold text-green-600">{data.summary.totalEaten}</p>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 animate-rise-in" style={{ animationDelay: "120ms" }}>
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "120ms" }}>
             <p className="text-sm text-slate-500 mb-3">
               {dateFmt.format(new Date(data.start))} – {dateFmt.format(new Date(data.end))}
             </p>

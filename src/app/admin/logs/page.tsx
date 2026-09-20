@@ -1,3 +1,4 @@
+import PageHeader from "@/components/PageHeader";
 import { requireUser } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import AppShell from "@/components/AppShell";
@@ -42,11 +43,8 @@ export default async function LogsPage() {
   return (
     <AppShell role={user.role} name={user.name}>
       <div className="space-y-4">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800">Nhật ký hoạt động</h1>
-          <p className="text-sm text-slate-500">300 hoạt động gần nhất trong hệ thống.</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 animate-rise-in">
+        <PageHeader title="Nhật ký hoạt động" subtitle="300 hoạt động gần nhất trong hệ thống." />
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100 animate-rise-in">
           {logs.length === 0 && <p className="p-4 text-sm text-slate-400">Chưa có hoạt động nào.</p>}
           {logs.map((log) => (
             <div

@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
@@ -273,10 +274,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
 
   return (
     <div className="space-y-8">
+      <PageHeader title="Bán hàng" subtitle="Đăng ký suất ăn cho sinh viên và quản lý danh sách sinh viên." />
+
       <section>
         <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm animate-rise-in">
           <div className="flex items-center gap-3 bg-gradient-to-r from-red-600 to-red-500 px-5 py-4 text-white">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl shadow-sm bg-white/20">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v6M10 3v7a3 3 0 0 1-3 3M17 21V3c-2.5 1.5-4 4.5-4 8h4" />
               </svg>
@@ -541,7 +544,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         {resetAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
         )}
-        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
           {loadingList && <p className="p-4 text-sm text-slate-400">Đang tải...</p>}
           {!loadingList && students.length === 0 && (
             <p className="p-4 text-sm text-slate-400">Chưa có sinh viên nào.</p>
