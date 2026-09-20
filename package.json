@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "start:render": "prisma migrate deploy && node prisma/bootstrap.mjs && next start",
+    "start:render": "prisma migrate deploy && node prisma/bootstrap.mjs && node prisma/import-roster.mjs && next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts"
   },
