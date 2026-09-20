@@ -96,6 +96,14 @@ export function canCancelSession(
   return withinCutoffWindow(session.date, session.mealType, now, "Buổi ăn đã qua, không thể hủy.");
 }
 
+/** Booking a slot follows the same cutoff as cancelling one: not in the past, and before 8:00 / 14:00 on the day itself. */
+export function canBookSlot(
+  slot: { date: Date; mealType: MealType },
+  now: Date = new Date(),
+): { ok: boolean; reason?: string } {
+  return withinCutoffWindow(slot.date, slot.mealType, now, "Không thể chọn ngày đã qua.");
+}
+
 /** Undoing a cancellation is only allowed within the same window that would have allowed cancelling it. */
 export function canRestoreSession(
   session: { date: Date; mealType: MealType; status: SessionStatus },

@@ -1,7 +1,14 @@
 import { startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
-import { MealPattern } from "@prisma/client";
-import { canCancelSession, canRestoreSession, compareSlots, generateSessionPlan, nextSlot } from "@/lib/session-rules";
+import { MealPattern, MealType } from "@prisma/client";
+import {
+  canBookSlot,
+  canCancelSession,
+  canRestoreSession,
+  compareSlots,
+  generateSessionPlan,
+  nextSlot,
+} from "@/lib/session-rules";
 
 export {
   LUNCH_CUTOFF_HOUR,
@@ -147,6 +154,65 @@ export async function restoreSession(sessionId: string, opts: { bypassDeadline?:
   ]);
 
   return { restored, removedCompensationId: compensation.id };
+}
+
+/**
+ * Lets a student pick the day/meal for a compensation session (the one the
+ * system appended at the end after a cancellation) instead of keeping the
+ * automatic slot. Same cutoff rules as cancelling/booking: the current slot
+ * must still be changeable and the new slot must still be bookable.
+ */
+export async function moveCompensationSession(
+  sessionId: string,
+  target: { date: Date; mealType: MealType },
+  opts: { bypassDeadline?: boolean } = {},
+) {
+  const session = await prisma.mealSession.findUniqueOrThrow({
+    where: { id: sessionId },
+    include: { registration: true },
+  });
+
+  if (session.status !== "SCHEDULED" || session.pickedUp) {
+    throw new Error("Buổi ăn này không còn ở trạng thái có thể đổi.");
+  }
+  if (!session.compensationForId) {
+    throw new Error("Chỉ đổi được buổi bù (buổi được thêm sau khi bạn hủy một buổi).");
+  }
+
+  const day = startOfDay(target.date);
+  if (!opts.bypassDeadline) {
+    const current = canCancelSession(session);
+    if (!current.ok) throw new Error(current.reason ?? "Không thể đổi buổi ăn này.");
+    const next = canBookSlot({ date: day, mealType: target.mealType });
+    if (!next.ok) throw new Error(next.reason ?? "Không thể chọn buổi này.");
+  }
+
+  const pattern = session.registration.mealPattern;
+  if (pattern !== "BOTH" && pattern !== target.mealType) {
+    throw new Error(
+      pattern === "LUNCH" ? "Gói của bạn chỉ có bữa trưa." : "Gói của bạn chỉ có bữa tối.",
+    );
+  }
+
+  if (session.date.getTime() === day.getTime() && session.mealType === target.mealType) {
+    throw new Error("Đây đang là buổi bù hiện tại của bạn, hãy chọn ngày khác.");
+  }
+
+  const clash = await prisma.mealSession.findFirst({
+    where: { studentId: session.studentId, date: day, mealType: target.mealType, id: { not: sessionId } },
+  });
+  if (clash) {
+    throw new Error(
+      clash.status === "CANCELLED"
+        ? "Bạn đã hủy buổi này trước đó, hãy dùng nút Khôi phục thay vì chọn lại."
+        : "Bạn đã có buổi ăn vào bữa này rồi.",
+    );
+  }
+
+  return prisma.mealSession.update({
+    where: { id: sessionId },
+    data: { date: day, mealType: target.mealType },
+  });
 }
 
 /** Remaining (not yet consumed, not cancelled) meal count for a student. */

@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { canCancelSession, canRestoreSession, localDateKey, LOW_MEAL_THRESHOLD } from "@/lib/client-session-rules";
+import {
+  canBookSlot,
+  canCancelSession,
+  canRestoreSession,
+  localDateKey,
+  LOW_MEAL_THRESHOLD,
+} from "@/lib/client-session-rules";
 import WeekMealGrid from "@/components/WeekMealGrid";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
@@ -26,6 +32,9 @@ type SessionDTO = {
   pickedUp: boolean;
   note: string | null;
   price: number;
+  /** Auto-added after a cancellation; the only kind a student can move to another day. */
+  isCompensation: boolean;
+  mealPattern: MealPattern;
 };
 
 const MEAL_LABEL: Record<MealType, string> = { LUNCH: "Trưa", DINNER: "Tối" };
@@ -72,10 +81,12 @@ export default function StudentDashboard({
   const [sessions, setSessions] = useState(initialSessions);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [moveDate, setMoveDate] = useState("");
+  const [moveMeal, setMoveMeal] = useState<MealType>("LUNCH");
 
   const remaining = sessions.filter((s) => s.status === "SCHEDULED").length;
   const lowMeal = remaining < LOW_MEAL_THRESHOLD;
@@ -107,6 +118,7 @@ export default function StudentDashboard({
         return;
       }
       setSessions((prev) => {
+        const source = prev.find((s) => s.id === id);
         const next = prev.map((s) => (s.id === id ? { ...s, status: "CANCELLED" as SessionStatus } : s));
         next.push({
           id: data.newSession.id,
@@ -116,12 +128,107 @@ export default function StudentDashboard({
           pickedUp: false,
           note: null,
           price: data.newSession.price,
+          isCompensation: true,
+          mealPattern: source?.mealPattern ?? "BOTH",
         });
         return next;
       });
     } finally {
       setBusyId(null);
     }
+  }
+
+  function startMove(s: SessionDTO) {
+    setMovingId(s.id);
+    setMoveDate("");
+    setMoveMeal(s.mealPattern === "DINNER" ? "DINNER" : "LUNCH");
+    setError(null);
+  }
+
+  async function submitMove(s: SessionDTO) {
+    if (!moveDate) {
+      setError("Hãy chọn ngày muốn ăn.");
+      return;
+    }
+    const [y, m, d] = moveDate.split("-").map(Number);
+    const check = canBookSlot({ date: new Date(y, m - 1, d), mealType: moveMeal });
+    if (!check.ok) {
+      setError(check.reason ?? "Không thể chọn buổi này.");
+      return;
+    }
+    setBusyId(s.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/sessions/${s.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: moveDate, mealType: moveMeal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Không thể đổi buổi ăn.");
+        return;
+      }
+      setSessions((prev) =>
+        prev.map((x) => (x.id === s.id ? { ...x, date: data.date, mealType: data.mealType } : x)),
+      );
+      setMovingId(null);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function renderMover(s: SessionDTO) {
+    if (!s.isCompensation || s.status !== "SCHEDULED" || s.pickedUp) return null;
+    const canMove = canCancelSession({ date: new Date(s.date), mealType: s.mealType, status: s.status });
+    if (movingId !== s.id) {
+      return (
+        <button
+          onClick={() => startMove(s)}
+          disabled={busyId === s.id || !canMove.ok}
+          title={canMove.ok ? "Chọn ngày ăn bù khác" : canMove.reason}
+          className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Đổi ngày ăn bù
+        </button>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-2 animate-pop-in">
+        <input
+          type="date"
+          value={moveDate}
+          min={localDateKey(new Date())}
+          onChange={(e) => setMoveDate(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+        />
+        {s.mealPattern === "BOTH" ? (
+          <select
+            value={moveMeal}
+            onChange={(e) => setMoveMeal(e.target.value as MealType)}
+            className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          >
+            <option value="LUNCH">Bữa trưa</option>
+            <option value="DINNER">Bữa tối</option>
+          </select>
+        ) : (
+          <span className="text-sm text-slate-600">Bữa {MEAL_LABEL[moveMeal]}</span>
+        )}
+        <button
+          onClick={() => submitMove(s)}
+          disabled={busyId === s.id}
+          className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+        >
+          Xác nhận đổi
+        </button>
+        <button
+          onClick={() => setMovingId(null)}
+          className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50"
+        >
+          Thôi
+        </button>
+      </div>
+    );
   }
 
   async function restoreSession(id: string) {
@@ -140,23 +247,6 @@ export default function StudentDashboard({
           .filter((s) => s.id !== data.removedCompensationId)
           .map((s) => (s.id === id ? { ...s, status: "SCHEDULED" as SessionStatus } : s)),
       );
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function saveNote(id: string) {
-    const note = noteDrafts[id] ?? "";
-    setBusyId(id);
-    try {
-      const res = await fetch(`/api/sessions/${id}/note`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
-      });
-      if (res.ok) {
-        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, note } : s)));
-      }
     } finally {
       setBusyId(null);
     }
@@ -263,7 +353,6 @@ export default function StudentDashboard({
                 }`}
               >
                 <p className="font-semibold">{statusLabel(s)}</p>
-                {s.note && <p className="truncate mt-0.5 opacity-70">{s.note}</p>}
               </button>
             );
           }}
@@ -287,21 +376,7 @@ export default function StudentDashboard({
 
             {selectedSession.status === "SCHEDULED" && (
               <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Ghi chú bữa ăn (vd: không hành, ăn chay...)"
-                  defaultValue={selectedSession.note ?? ""}
-                  onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [selectedSession.id]: e.target.value }))}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                />
                 <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => saveNote(selectedSession.id)}
-                    disabled={busyId === selectedSession.id}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                  >
-                    Lưu ghi chú
-                  </button>
                   {(() => {
                     const check = canCancelSession({
                       date: new Date(selectedSession.date),
@@ -338,7 +413,11 @@ export default function StudentDashboard({
                       </button>
                     );
                   })()}
+                  {renderMover(selectedSession)}
                 </div>
+                {selectedSession.isCompensation && selectedSession.status === "SCHEDULED" && (
+                  <span className="text-xs text-slate-400">Đây là buổi bù sau khi bạn hủy, bạn có thể đổi sang ngày khác.</span>
+                )}
               </div>
             )}
             {selectedSession.status === "CANCELLED" &&
@@ -379,9 +458,6 @@ export default function StudentDashboard({
                   </div>
                 );
               })()}
-            {selectedSession.status !== "SCHEDULED" && selectedSession.note && (
-              <p className="mt-2 text-sm text-slate-500 italic">Ghi chú: {selectedSession.note}</p>
-            )}
           </div>
         )}
       </section>
@@ -403,22 +479,14 @@ export default function StudentDashboard({
                   <span className={`inline-block mt-0.5 text-xs px-2 py-0.5 rounded-full ${statusStyle(s)}`}>
                     Bữa {MEAL_LABEL[s.mealType]}
                   </span>
+                  {s.isCompensation && (
+                    <span className="ml-1 inline-block mt-0.5 text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                      Buổi bù
+                    </span>
+                  )}
                 </div>
-                <input
-                  type="text"
-                  placeholder="Ghi chú bữa ăn (vd: không hành, ăn chay...)"
-                  defaultValue={s.note ?? ""}
-                  onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                />
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => saveNote(s.id)}
-                    disabled={busyId === s.id}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                  >
-                    Lưu ghi chú
-                  </button>
+                <div className="flex flex-wrap gap-2 flex-shrink-0 sm:ml-auto">
+                  {renderMover(s)}
                   {confirmingId === s.id ? (
                     <>
                       <button
@@ -473,7 +541,6 @@ export default function StudentDashboard({
                   <span className={`px-2 py-0.5 rounded-full text-xs ${statusStyle(s)}`}>
                     Bữa {MEAL_LABEL[s.mealType]} &middot; {statusLabel(s)}
                   </span>
-                  {s.note && <span className="text-slate-400 italic flex-1 min-w-0 truncate">{s.note}</span>}
                   {restoreCheck &&
                     (confirmingId === s.id ? (
                       <span className="ml-auto flex gap-2">

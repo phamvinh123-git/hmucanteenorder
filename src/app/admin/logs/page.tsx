@@ -10,6 +10,7 @@ const ACTION_LABEL: Record<string, string> = {
   CREATE_REGISTRATION: "Đăng ký suất ăn",
   CANCEL_SESSION: "Hủy buổi ăn",
   RESTORE_SESSION: "Khôi phục buổi ăn",
+  MOVE_SESSION: "Đổi ngày buổi bù",
   CREATE_USER: "Tạo tài khoản nhân sự",
   UPDATE_USER: "Cập nhật tài khoản",
   UPDATE_ORDER_CODE: "Sửa mã thứ tự",
