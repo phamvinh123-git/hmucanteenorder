@@ -39,7 +39,7 @@ export default function AppShell({
   const items = NAV_ITEMS.filter((i) => i.role === role);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-red-50/40">
+    <div className="min-h-screen">
       <header className="bg-white border-b-2 border-red-600 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">

@@ -13,9 +13,27 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(to bottom, #ffffff, #fef2f2) fixed;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* School logo as a faint watermark behind every page. Fixed and behind
+   content (z-index -1), so it never intercepts clicks or covers text. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url("/logo.webp") center / min(75vmin, 640px) no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+@media print {
+  body::before {
+    display: none;
+  }
 }
 
 /* --- Entrance animations ------------------------------------------------ */
