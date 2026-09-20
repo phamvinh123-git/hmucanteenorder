@@ -367,8 +367,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    readOnly={!!known}
-                    className={`${inputCls} ${known ? "bg-slate-50 text-slate-500" : ""}`}
+                    className={inputCls}
                     placeholder="Nguyễn Văn A"
                   />
                 </div>
@@ -401,8 +400,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                         className: classLevelsFor(major).includes(form.className) ? form.className : "",
                       });
                     }}
-                    disabled={!!known}
-                    className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-500`}
+                    className={inputCls}
                   >
                     <option value="">Chọn ngành (tùy chọn)</option>
                     {MAJORS.map((m) => (
@@ -417,7 +415,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <select
                     value={form.className}
                     onChange={(e) => setForm({ ...form, className: e.target.value })}
-                    disabled={!form.major || !!known}
+                    disabled={!form.major}
                     className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`}
                   >
                     <option value="">{form.major ? "Chọn lớp (tùy chọn)" : "Chọn ngành trước"}</option>

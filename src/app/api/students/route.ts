@@ -73,7 +73,17 @@ export async function POST(req: NextRequest) {
   }
 
   let student = existing;
-  if (!student) {
+  if (student) {
+    // Returning student: keep the account, but apply any corrected name/major/class from the form.
+    const changes: { name?: string; major?: string | null; className?: string | null } = {};
+    if (data.name.trim() && data.name.trim() !== student.name) changes.name = data.name.trim();
+    if (major !== student.major) changes.major = major;
+    if (className !== student.className) changes.className = className;
+    if (Object.keys(changes).length > 0) {
+      student = await prisma.user.update({ where: { id: student.id }, data: changes });
+      await logActivity(session.userId, "UPDATE_STUDENT_INFO", `Cập nhật thông tin ${student.name} (${student.phone}) khi gia hạn: ${JSON.stringify(changes)}`);
+    }
+  } else {
     const passwordHash = await hashPassword(DEFAULT_STUDENT_PASSWORD);
     // Retry once on a rare order-code race between two concurrent creations.
     for (let attempt = 0; attempt < 2 && !student; attempt++) {
