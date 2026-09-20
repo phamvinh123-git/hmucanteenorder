@@ -41,7 +41,7 @@ export default function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b-2 border-red-600 shadow-sm">
+      <header className="print:hidden bg-white border-b-2 border-red-600 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image

@@ -77,9 +77,20 @@ export default function ReportView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Báo cáo" subtitle="Số suất đã đặt và đã ăn của từng sinh viên theo thời gian." />
+      <div className="print:hidden">
+        <PageHeader title="Báo cáo" subtitle="Số suất đã đặt và đã ăn của từng sinh viên theo thời gian." />
+      </div>
+      <div className="hidden print:block text-center">
+        <p className="text-sm">Đại học Y Hà Nội – Phân hiệu Thanh Hóa</p>
+        <h1 className="text-xl font-bold uppercase">Báo cáo suất ăn căng tin</h1>
+        {data && (
+          <p className="text-sm">
+            Từ {dateFmt.format(new Date(data.start))} đến {dateFmt.format(new Date(data.end))}
+          </p>
+        )}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3 animate-rise-in">
+      <div className="flex flex-wrap items-center gap-3 animate-rise-in print:hidden">
         <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
           {(["day", "week", "month", "custom"] as Range[]).map((r) => (
             <button
@@ -119,6 +130,13 @@ export default function ReportView() {
           placeholder="Tìm theo tên, ngành hoặc lớp..."
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
         />
+        <button
+          onClick={() => window.print()}
+          disabled={!data || loading}
+          className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+        >
+          In báo cáo
+        </button>
       </div>
 
       {customError && <p className="text-sm text-red-600 animate-pop-in">{customError}</p>}
@@ -126,7 +144,7 @@ export default function ReportView() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 print:gap-2">
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in">
               <p className="text-xs text-slate-500">Số sinh viên</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalStudents}</p>
@@ -141,14 +159,14 @@ export default function ReportView() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "120ms" }}>
-            <p className="text-sm text-slate-500 mb-3">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0" style={{ animationDelay: "120ms" }}>
+            <p className="text-sm text-slate-500 mb-3 print:hidden">
               {dateFmt.format(new Date(data.start))} – {dateFmt.format(new Date(data.end))}
             </p>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm print:text-xs print:[&_td]:border print:[&_th]:border print:[&_td]:border-slate-400 print:[&_th]:border-slate-400 print:[&_td]:px-2 print:[&_th]:px-2">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-100">
+                  <tr className="text-left text-slate-500 border-b border-slate-100 print:text-black">
                     <th className="py-2 pr-4">STT</th>
                     <th className="py-2 pr-4">Họ và tên</th>
                     <th className="py-2 pr-4">Ngành</th>
