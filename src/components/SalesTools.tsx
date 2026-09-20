@@ -1,7 +1,7 @@
 "use client";
 
 import PageHeader from "@/components/PageHeader";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -93,6 +93,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [resetAllMessage, setResetAllMessage] = useState<string | null>(null);
 
   const [form, setForm] = useState(emptyForm);
+  const [known, setKnown] = useState<{ orderCode: number | null; remaining: number } | null>(null);
+  const lookupSeq = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -136,6 +138,30 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     return () => clearTimeout(t);
   }, [search]);
 
+  // An existing phone number pulls the stored name/major/class so a returning student is re-registered, not re-typed.
+  async function onPhoneChange(raw: string) {
+    const phone = raw.replace(/[^0-9]/g, "");
+    setForm((f) => ({ ...f, phone }));
+    const seq = ++lookupSeq.current;
+    if (phone.length < 9) {
+      setKnown(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/students/lookup?phone=${phone}`);
+      const data = await res.json();
+      if (seq !== lookupSeq.current) return;
+      if (res.ok && data.found) {
+        setKnown({ orderCode: data.orderCode, remaining: data.remaining });
+        setForm((f) => ({ ...f, name: data.name, major: data.major ?? "", className: data.className ?? "" }));
+      } else {
+        setKnown(null);
+      }
+    } catch {
+      if (seq === lookupSeq.current) setKnown(null);
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -154,6 +180,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       }
       setFormSuccess(`Đã đăng ký ${form.totalSessions} suất ăn cho ${form.name}.`);
       setForm({ ...emptyForm, startDate: emptyForm.startDate });
+      setKnown(null);
       loadStudents(search);
     } finally {
       setSubmitting(false);
@@ -303,7 +330,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className={inputCls}
+                    readOnly={!!known}
+                    className={`${inputCls} ${known ? "bg-slate-50 text-slate-500" : ""}`}
                     placeholder="Nguyễn Văn A"
                   />
                 </div>
@@ -313,10 +341,16 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     required
                     inputMode="numeric"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) => onPhoneChange(e.target.value)}
                     className={inputCls}
                     placeholder="09xxxxxxxx"
                   />
+                  {known && (
+                    <p className="mt-1 text-xs text-green-700">
+                      Sinh viên đã có trong danh sách{known.orderCode != null ? ` (STT ${known.orderCode})` : ""}, còn {known.remaining} suất.
+                      Đăng ký này sẽ gia hạn thêm.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>Ngành</label>
@@ -330,7 +364,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                         className: classLevelsFor(major).includes(form.className) ? form.className : "",
                       });
                     }}
-                    className={inputCls}
+                    disabled={!!known}
+                    className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-500`}
                   >
                     <option value="">Chọn ngành (tùy chọn)</option>
                     {MAJORS.map((m) => (
@@ -345,7 +380,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <select
                     value={form.className}
                     onChange={(e) => setForm({ ...form, className: e.target.value })}
-                    disabled={!form.major}
+                    disabled={!form.major || !!known}
                     className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`}
                   >
                     <option value="">{form.major ? "Chọn lớp (tùy chọn)" : "Chọn ngành trước"}</option>
