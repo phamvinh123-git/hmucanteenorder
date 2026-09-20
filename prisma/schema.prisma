@@ -43,8 +43,10 @@ model User {
   /// Cleared in bulk by Sales/Manager at the start of each term and
   /// auto-assigned (max existing + 1) when a brand-new student is created.
   orderCode         Int?     @unique
-  /// Class group ("Tổ") for a STUDENT, e.g. "Tổ 1". Purely informational.
-  group             String?
+  /// Major ("Ngành") and year ("Lớp": Y1-Y4) of a STUDENT. Informational;
+  /// allowed values live in src/lib/student-info.ts.
+  major             String?
+  className         String?
   createdAt         DateTime @default(now())
 
   registrations     MealRegistration[] @relation("StudentRegistrations")

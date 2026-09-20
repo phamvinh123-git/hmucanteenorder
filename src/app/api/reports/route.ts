@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       studentId: true,
       status: true,
       pickedUp: true,
-      student: { select: { name: true, orderCode: true, group: true } },
+      student: { select: { name: true, orderCode: true, major: true, className: true } },
     },
   });
 
@@ -62,7 +62,8 @@ export async function GET(req: NextRequest) {
     studentId: string;
     name: string;
     orderCode: number | null;
-    group: string | null;
+    major: string | null;
+    className: string | null;
     booked: number;
     eaten: number;
   };
@@ -75,7 +76,8 @@ export async function GET(req: NextRequest) {
         studentId: s.studentId,
         name: s.student.name,
         orderCode: s.student.orderCode,
-        group: s.student.group,
+        major: s.student.major,
+        className: s.student.className,
         booked: 0,
         eaten: 0,
       };

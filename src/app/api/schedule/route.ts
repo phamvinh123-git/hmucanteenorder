@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { id: true, name: true, phone: true, orderCode: true, group: true } },
+      student: { select: { id: true, name: true, phone: true, orderCode: true, major: true, className: true } },
     },
     orderBy: [{ student: { orderCode: "asc" } }, { student: { name: "asc" } }],
   });
@@ -55,7 +55,8 @@ export async function GET(req: NextRequest) {
       studentName: s.student.name,
       studentPhone: s.student.phone,
       orderCode: s.student.orderCode,
-      group: s.student.group,
+      major: s.student.major,
+      className: s.student.className,
     })),
   });
 }

@@ -15,6 +15,7 @@ const ACTION_LABEL: Record<string, string> = {
   UPDATE_USER: "Cập nhật tài khoản",
   UPDATE_ORDER_CODE: "Sửa mã thứ tự",
   UPDATE_STUDENT_GROUP: "Sửa tổ",
+  UPDATE_STUDENT_CLASS: "Sửa ngành/lớp",
   RESET_ORDER_CODES: "Reset mã thứ tự",
   BACKFILL_ORDER_CODES: "Gán mã cho SV chưa có mã",
 };

@@ -19,7 +19,8 @@ type ScheduleSession = {
   studentName: string;
   studentPhone: string;
   orderCode: number | null;
-  group: string | null;
+  major: string | null;
+  className: string | null;
 };
 
 const MEAL_LABEL: Record<MealType, string> = { LUNCH: "Trưa", DINNER: "Tối" };
@@ -163,7 +164,10 @@ export default function ScheduleView() {
                   {s.orderCode ?? "—"}
                 </span>
                 <span className="font-medium text-slate-800 w-40 flex-shrink-0">{s.studentName}</span>
-                <span className="text-slate-400 w-20 flex-shrink-0">{s.group || "—"}</span>
+                <span className="text-slate-400 w-28 flex-shrink-0 truncate" title={s.major ?? undefined}>
+                  {s.className || "—"}
+                  {s.major ? ` · ${s.major.replace(/^Cử nhân /, "")}` : ""}
+                </span>
                 <span className="text-slate-400 w-32 flex-shrink-0">{s.studentPhone}</span>
                 <span className="text-slate-600 w-24 flex-shrink-0">{currency.format(s.price)}</span>
                 <span

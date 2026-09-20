@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
+import { isMajor, isValidClassFor } from "@/lib/student-info";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -36,7 +37,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     name: student.name,
     phone: student.phone,
     orderCode: student.orderCode,
-    group: student.group,
+    major: student.major,
+    className: student.className,
     registrations: student.registrations,
     sessions: student.sessions,
   });
@@ -44,7 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 const patchSchema = z.object({
   orderCode: z.union([z.coerce.number().int().min(1).max(999999), z.null()]).optional(),
-  group: z.union([z.string().max(100), z.null()]).optional(),
+  major: z.union([z.string(), z.null()]).optional(),
+  className: z.union([z.string(), z.null()]).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -64,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
   }
 
-  const data: { orderCode?: number | null; group?: string | null } = {};
+  const data: { orderCode?: number | null; major?: string | null; className?: string | null } = {};
 
   if ("orderCode" in parsed.data) {
     const orderCode = parsed.data.orderCode ?? null;
@@ -79,8 +82,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.orderCode = orderCode;
   }
 
-  if ("group" in parsed.data) {
-    data.group = parsed.data.group || null;
+  if ("major" in parsed.data || "className" in parsed.data) {
+    const major = "major" in parsed.data ? parsed.data.major || null : student.major;
+    if (major && !isMajor(major)) {
+      return NextResponse.json({ error: "Ngành không hợp lệ." }, { status: 400 });
+    }
+    let className = "className" in parsed.data ? parsed.data.className || null : student.className;
+    if (className && !isValidClassFor(major, className)) {
+      // Changing major can leave the old year invalid (e.g. Y5 outside Bác sĩ y khoa).
+      if ("className" in parsed.data) {
+        return NextResponse.json(
+          { error: major ? "Lớp không hợp lệ với ngành đã chọn." : "Hãy chọn ngành trước khi chọn lớp." },
+          { status: 400 },
+        );
+      }
+      className = null;
+    }
+    data.major = major;
+    data.className = className;
   }
 
   await prisma.user.update({ where: { id }, data });
@@ -88,8 +107,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ("orderCode" in data) {
     await logActivity(session.userId, "UPDATE_ORDER_CODE", `Đặt mã số ${data.orderCode ?? "(trống)"} cho ${student.name} (${student.phone})`);
   }
-  if ("group" in data) {
-    await logActivity(session.userId, "UPDATE_STUDENT_GROUP", `Đặt tổ "${data.group ?? "(trống)"}" cho ${student.name} (${student.phone})`);
+  if ("major" in data) {
+    await logActivity(
+      session.userId,
+      "UPDATE_STUDENT_CLASS",
+      `Đặt ngành "${data.major ?? "(trống)"}", lớp "${data.className ?? "(trống)"}" cho ${student.name} (${student.phone})`,
+    );
   }
 
   return NextResponse.json({ ok: true });

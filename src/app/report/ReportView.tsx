@@ -9,7 +9,8 @@ type ReportRow = {
   studentId: string;
   name: string;
   orderCode: number | null;
-  group: string | null;
+  major: string | null;
+  className: string | null;
   booked: number;
   eaten: number;
 };
@@ -66,7 +67,11 @@ export default function ReportView() {
   const rows = data?.rows.filter((r) => {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
-    return r.name.toLowerCase().includes(q) || (r.group ?? "").toLowerCase().includes(q);
+    return (
+      r.name.toLowerCase().includes(q) ||
+      (r.major ?? "").toLowerCase().includes(q) ||
+      (r.className ?? "").toLowerCase().includes(q)
+    );
   });
 
   return (
@@ -113,7 +118,7 @@ export default function ReportView() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo tên hoặc tổ..."
+          placeholder="Tìm theo tên, ngành hoặc lớp..."
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
         />
       </div>
@@ -148,7 +153,8 @@ export default function ReportView() {
                   <tr className="text-left text-slate-500 border-b border-slate-100">
                     <th className="py-2 pr-4">STT</th>
                     <th className="py-2 pr-4">Họ và tên</th>
-                    <th className="py-2 pr-4">Tổ</th>
+                    <th className="py-2 pr-4">Ngành</th>
+                    <th className="py-2 pr-4">Lớp</th>
                     <th className="py-2 pr-4 text-right">Suất đã đặt</th>
                     <th className="py-2 pr-4 text-right">Suất đã ăn</th>
                   </tr>
@@ -156,7 +162,7 @@ export default function ReportView() {
                 <tbody>
                   {rows && rows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-slate-400">
+                      <td colSpan={6} className="py-6 text-center text-slate-400">
                         Không có dữ liệu trong khoảng thời gian này.
                       </td>
                     </tr>
@@ -165,7 +171,8 @@ export default function ReportView() {
                     <tr key={r.studentId} className="border-b border-slate-50 hover:bg-red-50/40 transition-colors">
                       <td className="py-1.5 pr-4 font-mono">{r.orderCode ?? "—"}</td>
                       <td className="py-1.5 pr-4">{r.name}</td>
-                      <td className="py-1.5 pr-4 text-slate-500">{r.group || "—"}</td>
+                      <td className="py-1.5 pr-4 text-slate-500">{r.major || "—"}</td>
+                      <td className="py-1.5 pr-4 text-slate-500">{r.className || "—"}</td>
                       <td className="py-1.5 pr-4 text-right">{r.booked}</td>
                       <td className="py-1.5 pr-4 text-right text-green-600 font-medium">{r.eaten}</td>
                     </tr>

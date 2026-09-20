@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canAccessSalesTools, DEFAULT_STUDENT_PASSWORD, getSession, hashPassword } from "@/lib/auth";
 import { createRegistrationWithSessions, LOW_MEAL_THRESHOLD, nextOrderCode, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
+import { isMajor, isValidClassFor } from "@/lib/student-info";
 
 const schema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên sinh viên."),
@@ -17,7 +18,8 @@ const schema = z.object({
   mealPattern: z.enum(["LUNCH", "DINNER", "BOTH"]),
   pricePerMeal: z.coerce.number().int().min(0),
   note: z.string().optional(),
-  group: z.string().max(100).optional(),
+  major: z.string().optional(),
+  className: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -31,6 +33,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." }, { status: 400 });
   }
   const data = parsed.data;
+
+  const major = data.major || null;
+  const className = data.className || null;
+  if (major && !isMajor(major)) {
+    return NextResponse.json({ error: "Ngành không hợp lệ." }, { status: 400 });
+  }
+  if (className && !isValidClassFor(major, className)) {
+    return NextResponse.json(
+      { error: major ? "Lớp không hợp lệ với ngành đã chọn." : "Hãy chọn ngành trước khi chọn lớp." },
+      { status: 400 },
+    );
+  }
 
   const existing = await prisma.user.findUnique({ where: { phone: data.phone } });
   if (existing && existing.role !== "STUDENT") {
@@ -52,7 +66,8 @@ export async function POST(req: NextRequest) {
             role: "STUDENT",
             mustChangePassword: true,
             orderCode,
-            group: data.group || null,
+            major,
+            className,
           },
         });
       } catch (err) {
@@ -129,7 +144,8 @@ export async function GET(req: NextRequest) {
         name: s.name,
         phone: s.phone,
         orderCode: s.orderCode,
-        group: s.group,
+        major: s.major,
+        className: s.className,
         mustChangePassword: s.mustChangePassword,
         active: s.active,
         latestRegistration: s.registrations[0] ?? null,

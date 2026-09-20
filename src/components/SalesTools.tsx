@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
+import { classLevelsFor, MAJORS } from "@/lib/student-info";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 
@@ -10,7 +11,8 @@ type StudentRow = {
   name: string;
   phone: string;
   orderCode: number | null;
-  group: string | null;
+  major: string | null;
+  className: string | null;
   mustChangePassword: boolean;
   active: boolean;
   remaining: number;
@@ -56,7 +58,8 @@ function fmtDate(iso: string) {
 const emptyForm = {
   name: "",
   phone: "",
-  group: "",
+  major: "",
+  className: "",
   startDate: localDateKey(new Date()),
   totalSessions: 14,
   mealPattern: "BOTH" as MealPattern,
@@ -80,8 +83,9 @@ export default function SalesTools() {
   const [editingOrderCodeId, setEditingOrderCodeId] = useState<string | null>(null);
   const [orderCodeDraft, setOrderCodeDraft] = useState("");
   const [orderCodeError, setOrderCodeError] = useState<string | null>(null);
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
-  const [groupDraft, setGroupDraft] = useState("");
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [majorDraft, setMajorDraft] = useState("");
+  const [classDraft, setClassDraft] = useState("");
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
@@ -172,19 +176,20 @@ export default function SalesTools() {
     loadStudents(search);
   }
 
-  function startEditGroup(s: StudentRow) {
-    setEditingGroupId(s.id);
-    setGroupDraft(s.group ?? "");
+  function startEditClass(s: StudentRow) {
+    setEditingClassId(s.id);
+    setMajorDraft(s.major ?? "");
+    setClassDraft(s.className ?? "");
   }
 
-  async function saveGroup(id: string) {
+  async function saveClass(id: string) {
     const res = await fetch(`/api/students/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ group: groupDraft.trim() || null }),
+      body: JSON.stringify({ major: majorDraft || null, className: classDraft || null }),
     });
     if (res.ok) {
-      setEditingGroupId(null);
+      setEditingClassId(null);
       loadStudents(search);
     }
   }
@@ -248,13 +253,42 @@ export default function SalesTools() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Tổ (tùy chọn)</label>
-            <input
-              value={form.group}
-              onChange={(e) => setForm({ ...form, group: e.target.value })}
+            <label className="block text-xs font-medium text-slate-600 mb-1">Ngành (tùy chọn)</label>
+            <select
+              value={form.major}
+              onChange={(e) => {
+                const major = e.target.value;
+                setForm({
+                  ...form,
+                  major,
+                  className: classLevelsFor(major).includes(form.className) ? form.className : "",
+                });
+              }}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-              placeholder="VD: Tổ 1"
-            />
+            >
+              <option value="">— Chọn ngành —</option>
+              {MAJORS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Lớp (tùy chọn)</label>
+            <select
+              value={form.className}
+              onChange={(e) => setForm({ ...form, className: e.target.value })}
+              disabled={!form.major}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100 disabled:opacity-50"
+            >
+              <option value="">{form.major ? "— Chọn lớp —" : "Chọn ngành trước"}</option>
+              {classLevelsFor(form.major).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Ngày bắt đầu</label>
@@ -426,24 +460,42 @@ export default function SalesTools() {
                   </p>
                   <p className="text-xs text-slate-400">{s.phone}</p>
                 </div>
-                {editingGroupId === s.id ? (
-                  <div className="flex items-center gap-1 sm:w-24 flex-shrink-0">
-                    <input
+                {editingClassId === s.id ? (
+                  <div className="flex flex-wrap items-center gap-1 sm:w-64 flex-shrink-0">
+                    <select
                       autoFocus
-                      value={groupDraft}
-                      onChange={(e) => setGroupDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveGroup(s.id);
-                        if (e.key === "Escape") setEditingGroupId(null);
+                      value={majorDraft}
+                      onChange={(e) => {
+                        setMajorDraft(e.target.value);
+                        if (!classLevelsFor(e.target.value).includes(classDraft)) setClassDraft("");
                       }}
-                      placeholder="Tổ"
-                      className="w-16 rounded-lg border border-red-300 px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-red-100"
-                    />
-                    <button onClick={() => saveGroup(s.id)} className="text-green-600 hover:text-green-700 text-sm" title="Lưu">
+                      className="rounded-lg border border-red-300 px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-red-100"
+                    >
+                      <option value="">— Ngành —</option>
+                      {MAJORS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={classDraft}
+                      onChange={(e) => setClassDraft(e.target.value)}
+                      disabled={!majorDraft}
+                      className="rounded-lg border border-red-300 px-1.5 py-1 text-sm outline-none focus:ring-2 focus:ring-red-100 disabled:opacity-50"
+                    >
+                      <option value="">— Lớp —</option>
+                      {classLevelsFor(majorDraft).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => saveClass(s.id)} className="text-green-600 hover:text-green-700 text-sm" title="Lưu">
                       ✓
                     </button>
                     <button
-                      onClick={() => setEditingGroupId(null)}
+                      onClick={() => setEditingClassId(null)}
                       className="text-slate-400 hover:text-slate-600 text-sm"
                       title="Hủy"
                     >
@@ -452,13 +504,20 @@ export default function SalesTools() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => startEditGroup(s)}
-                    title="Bấm để sửa tổ"
-                    className={`sm:w-24 flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
-                      s.group ? "text-slate-700" : "text-slate-300"
+                    onClick={() => startEditClass(s)}
+                    title="Bấm để sửa ngành và lớp"
+                    className={`sm:w-64 flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
+                      s.major || s.className ? "text-slate-700" : "text-slate-300"
                     }`}
                   >
-                    {s.group || "— tổ —"}
+                    {s.major || s.className ? (
+                      <>
+                        <span className="font-medium">{s.className || "—"}</span>
+                        <span className="text-xs text-slate-500"> · {s.major || "chưa có ngành"}</span>
+                      </>
+                    ) : (
+                      "— ngành / lớp —"
+                    )}
                   </button>
                 )}
                 <div className="text-sm text-slate-600 flex-1">
