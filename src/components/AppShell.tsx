@@ -42,7 +42,7 @@ export default function AppShell({
   return (
     <div className="min-h-screen">
       <header className="print:hidden bg-white border-b-2 border-red-600 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <Image
               src="/logo.webp"
@@ -53,7 +53,7 @@ export default function AppShell({
             />
             <div>
               <p className="font-semibold text-slate-800 text-sm">Căng tin Phân hiệu ĐHYHN Thanh Hóa</p>
-              <nav className="flex gap-1 mt-1 -ml-2">
+              <nav className="flex flex-wrap gap-1 mt-1 -ml-2">
                 {items.map((item) => (
                   <Link
                     key={item.href}
@@ -66,9 +66,11 @@ export default function AppShell({
               </nav>
             </div>
           </div>
-          <div className="text-right">
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 md:block md:border-0 md:pt-0 md:text-right">
+            <div>
             <p className="text-sm font-medium text-slate-700">{name}</p>
-            <p className="text-xs text-slate-400 mb-1">{ROLE_LABEL[role]}</p>
+            <p className="text-xs text-slate-400 md:mb-1">{ROLE_LABEL[role]}</p>
+            </div>
             <div className="flex items-center gap-3 justify-end">
               <Link href="/profile" className="text-sm text-slate-500 hover:text-red-600 transition-colors">
                 Hồ sơ

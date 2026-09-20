@@ -107,7 +107,7 @@ export default function WeekMealGrid({
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-rise-in">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto animate-rise-in">
         <div className="grid min-w-[720px]" style={{ gridTemplateColumns: "110px repeat(7, 1fr)" }}>
           <div className="bg-red-50 border-b border-r border-red-100 p-2 text-xs font-semibold text-slate-600">
             Khung giờ
