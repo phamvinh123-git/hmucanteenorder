@@ -56,6 +56,23 @@ function fmtDate(iso: string) {
   return dateFmt.format(new Date(iso));
 }
 
+const inputCls =
+  "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-slate-300 hover:border-slate-400 focus:border-red-500 focus:ring-4 focus:ring-red-100";
+const labelCls = "mb-1.5 block text-xs font-semibold text-slate-600";
+const chipCls = (active: boolean) =>
+  `rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${
+    active
+      ? "border-red-600 bg-red-600 text-white"
+      : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+  }`;
+const SESSION_PRESETS = [7, 14, 28, 56];
+const PRICE_PRESETS = [30000, 40000];
+const MEAL_OPTIONS: [MealPattern, string][] = [
+  ["LUNCH", "Trưa"],
+  ["DINNER", "Tối"],
+  ["BOTH", "Trưa & Tối"],
+];
+
 const emptyForm = {
   name: "",
   phone: "",
@@ -257,136 +274,208 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="text-sm font-semibold text-slate-700 mb-2">Đăng ký suất ăn cho sinh viên</h2>
-        <form
-          onSubmit={onSubmit}
-          className="bg-white border border-slate-200 border-t-4 border-t-red-500 rounded-xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 animate-rise-in"
-        >
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Tên sinh viên</label>
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            />
+        <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm animate-rise-in">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-red-600 to-red-500 px-5 py-4 text-white">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v6M10 3v7a3 3 0 0 1-3 3M17 21V3c-2.5 1.5-4 4.5-4 8h4" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-semibold leading-tight">Đăng ký suất ăn cho sinh viên</h2>
+              <p className="text-xs text-red-100">Sinh viên mới sẽ tự có tài khoản: tên đăng nhập là số điện thoại, mật khẩu mặc định 123.</p>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Số điện thoại</label>
-            <input
-              required
-              inputMode="numeric"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-              placeholder="09xxxxxxxx"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ngành (tùy chọn)</label>
-            <select
-              value={form.major}
-              onChange={(e) => {
-                const major = e.target.value;
-                setForm({
-                  ...form,
-                  major,
-                  className: classLevelsFor(major).includes(form.className) ? form.className : "",
-                });
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            >
-              <option value="">— Chọn ngành —</option>
-              {MAJORS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Lớp (tùy chọn)</label>
-            <select
-              value={form.className}
-              onChange={(e) => setForm({ ...form, className: e.target.value })}
-              disabled={!form.major}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100 disabled:opacity-50"
-            >
-              <option value="">{form.major ? "— Chọn lớp —" : "Chọn ngành trước"}</option>
-              {classLevelsFor(form.major).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ngày bắt đầu</label>
-            <input
-              required
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Số buổi ăn</label>
-            <input
-              required
-              type="number"
-              min={1}
-              max={200}
-              value={form.totalSessions}
-              onChange={(e) => setForm({ ...form, totalSessions: Number(e.target.value) })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Bữa ăn</label>
-            <select
-              value={form.mealPattern}
-              onChange={(e) => setForm({ ...form, mealPattern: e.target.value as MealPattern })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            >
-              <option value="LUNCH">Trưa</option>
-              <option value="DINNER">Tối</option>
-              <option value="BOTH">Trưa &amp; Tối</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Giá mỗi suất (VNĐ)</label>
-            <input
-              required
-              type="number"
-              min={0}
-              step={1000}
-              value={form.pricePerMeal}
-              onChange={(e) => setForm({ ...form, pricePerMeal: Number(e.target.value) })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            />
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ghi chú (tùy chọn)</label>
-            <input
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-              placeholder="Ví dụ: ăn chay, dị ứng hải sản..."
-            />
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-red-700 hover:shadow-md hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
-            >
-              {submitting ? "Đang lưu..." : "Đăng ký"}
-            </button>
-            {formError && <p className="text-sm text-red-600 animate-pop-in">{formError}</p>}
-            {formSuccess && <p className="text-sm text-green-600 animate-pop-in">{formSuccess}</p>}
-          </div>
-        </form>
+
+          <form onSubmit={onSubmit} className="space-y-6 p-5">
+            <fieldset>
+              <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] text-white">1</span>
+                Thông tin sinh viên
+              </legend>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className={labelCls}>Họ và tên</label>
+                  <input
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className={inputCls}
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Số điện thoại</label>
+                  <input
+                    required
+                    inputMode="numeric"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    className={inputCls}
+                    placeholder="09xxxxxxxx"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Ngành</label>
+                  <select
+                    value={form.major}
+                    onChange={(e) => {
+                      const major = e.target.value;
+                      setForm({
+                        ...form,
+                        major,
+                        className: classLevelsFor(major).includes(form.className) ? form.className : "",
+                      });
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">Chọn ngành (tùy chọn)</option>
+                    {MAJORS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Lớp</label>
+                  <select
+                    value={form.className}
+                    onChange={(e) => setForm({ ...form, className: e.target.value })}
+                    disabled={!form.major}
+                    className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`}
+                  >
+                    <option value="">{form.major ? "Chọn lớp (tùy chọn)" : "Chọn ngành trước"}</option>
+                    {classLevelsFor(form.major).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </fieldset>
+
+            <div className="border-t border-dashed border-slate-200" />
+
+            <fieldset>
+              <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] text-white">2</span>
+                Gói suất ăn
+              </legend>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className={labelCls}>Ngày bắt đầu</label>
+                  <input
+                    required
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Số buổi ăn</label>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={form.totalSessions}
+                    onChange={(e) => setForm({ ...form, totalSessions: Number(e.target.value) })}
+                    className={inputCls}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {SESSION_PRESETS.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setForm({ ...form, totalSessions: n })}
+                        className={chipCls(form.totalSessions === n)}
+                      >
+                        {n} buổi
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Bữa ăn</label>
+                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                    {MEAL_OPTIONS.map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setForm({ ...form, mealPattern: value })}
+                        className={`rounded-lg px-2 py-2 text-sm font-medium transition ${
+                          form.mealPattern === value
+                            ? "bg-red-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white hover:text-red-700"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Giá mỗi suất (VNĐ)</label>
+                  <input
+                    required
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={form.pricePerMeal}
+                    onChange={(e) => setForm({ ...form, pricePerMeal: Number(e.target.value) })}
+                    className={inputCls}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {PRICE_PRESETS.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setForm({ ...form, pricePerMeal: p })}
+                        className={chipCls(form.pricePerMeal === p)}
+                      >
+                        {p.toLocaleString("vi-VN")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className={labelCls}>Ghi chú</label>
+                <input
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  className={inputCls}
+                  placeholder="Ví dụ: ăn chay, dị ứng hải sản... (tùy chọn)"
+                />
+              </div>
+            </fieldset>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50/70 px-4 py-3">
+              <div className="text-sm text-slate-600">
+                <span className="font-semibold text-slate-800">{form.totalSessions || 0} buổi</span> &middot;{" "}
+                {PATTERN_LABEL[form.mealPattern]} &middot; tổng{" "}
+                <span className="font-bold text-red-700">
+                  {currency.format((form.totalSessions || 0) * (form.pricePerMeal || 0))}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                {formError && <p className="text-sm text-red-600 animate-pop-in">{formError}</p>}
+                {formSuccess && <p className="text-sm text-green-600 animate-pop-in">{formSuccess}</p>}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 hover:shadow-md hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+                >
+                  {submitting ? "Đang lưu..." : "Đăng ký suất ăn"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section>
