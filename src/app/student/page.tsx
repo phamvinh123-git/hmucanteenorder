@@ -26,15 +26,6 @@ export default async function StudentPage() {
     <AppShell role={user.role} name={user.name}>
       <StudentDashboard
         studentName={user.name}
-        registrations={registrations.map((r) => ({
-          id: r.id,
-          startDate: r.startDate.toISOString(),
-          totalSessions: r.totalSessions,
-          mealPattern: r.mealPattern,
-          pricePerMeal: r.pricePerMeal,
-          note: r.note,
-          createdAt: r.createdAt.toISOString(),
-        }))}
         sessions={sessions.map((s) => ({
           id: s.id,
           date: s.date.toISOString(),

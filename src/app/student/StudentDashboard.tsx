@@ -14,16 +14,6 @@ type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 type MealType = "LUNCH" | "DINNER";
 type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
-type RegistrationDTO = {
-  id: string;
-  startDate: string;
-  totalSessions: number;
-  mealPattern: MealPattern;
-  pricePerMeal: number;
-  note: string | null;
-  createdAt: string;
-};
-
 type SessionDTO = {
   id: string;
   date: string;
@@ -38,7 +28,6 @@ type SessionDTO = {
 };
 
 const MEAL_LABEL: Record<MealType, string> = { LUNCH: "Trưa", DINNER: "Tối" };
-const PATTERN_LABEL: Record<MealPattern, string> = { LUNCH: "Trưa", DINNER: "Tối", BOTH: "Trưa & Tối" };
 const STATUS_LABEL: Record<SessionStatus, string> = {
   SCHEDULED: "Sắp tới",
   COMPLETED: "Đã dùng",
@@ -62,7 +51,6 @@ function statusStyle(s: StatusInput) {
   return STATUS_STYLE[s.status];
 }
 
-const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 
 function fmtDate(iso: string) {
@@ -71,11 +59,9 @@ function fmtDate(iso: string) {
 
 export default function StudentDashboard({
   studentName,
-  registrations,
   sessions: initialSessions,
 }: {
   studentName: string;
-  registrations: RegistrationDTO[];
   sessions: SessionDTO[];
 }) {
   const [sessions, setSessions] = useState(initialSessions);
@@ -404,32 +390,6 @@ export default function StudentDashboard({
               </div>
             );
           })}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-bold text-slate-800">Gói suất ăn của bạn</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {registrations.map((r, i) => (
-            <div
-              key={r.id}
-              className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md animate-rise-in"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <div className="flex h-14 w-14 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-red-50 text-red-700">
-                <span className="text-xl font-bold leading-none">{r.totalSessions}</span>
-                <span className="text-[10px] uppercase">buổi</span>
-              </div>
-              <div className="min-w-0 text-sm">
-                <p className="font-semibold text-slate-800">{PATTERN_LABEL[r.mealPattern]}</p>
-                <p className="text-slate-500">Từ {fmtDate(r.startDate)}</p>
-                <p className="font-medium text-red-700">{currency.format(r.pricePerMeal)} / suất</p>
-              </div>
-            </div>
-          ))}
-          {registrations.length === 0 && (
-            <p className="text-sm text-slate-400">Chưa có đăng ký nào. Vui lòng liên hệ bộ phận bán hàng.</p>
-          )}
         </div>
       </section>
 
