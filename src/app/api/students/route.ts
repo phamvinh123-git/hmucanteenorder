@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { canAccessSalesTools, DEFAULT_STUDENT_PASSWORD, getSession, hashPassword } from "@/lib/auth";
 import { createRegistrationWithSessions, LOW_MEAL_THRESHOLD, nextOrderCode, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
+import { generateSessionPlan } from "@/lib/session-rules";
+import { localDateKey } from "@/lib/client-session-rules";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
 
 const schema = z.object({
@@ -49,6 +51,25 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.user.findUnique({ where: { phone: data.phone } });
   if (existing && existing.role !== "STUDENT") {
     return NextResponse.json({ error: "Số điện thoại này đã được dùng cho một tài khoản không phải sinh viên." }, { status: 400 });
+  }
+
+  // A renewal must not double-book a meal the student already has.
+  if (existing) {
+    const plan = generateSessionPlan(new Date(data.startDate), data.mealPattern, data.totalSessions);
+    const firstDate = plan[0]?.date;
+    const active = await prisma.mealSession.findMany({
+      where: { studentId: existing.id, status: { not: "CANCELLED" }, ...(firstDate ? { date: { gte: firstDate } } : {}) },
+      select: { date: true, mealType: true },
+    });
+    const taken = new Set(active.map((a) => `${localDateKey(a.date)}|${a.mealType}`));
+    const clash = plan.find((p) => taken.has(`${localDateKey(p.date)}|${p.mealType}`));
+    if (clash) {
+      const [y, m, d] = localDateKey(clash.date).split("-");
+      return NextResponse.json(
+        { error: `Sinh viên đã có suất ${clash.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${d}/${m}/${y}. Hãy chọn ngày bắt đầu sau suất ăn cuối cùng.` },
+        { status: 400 },
+      );
+    }
   }
 
   let student = existing;
@@ -136,9 +157,14 @@ export async function GET(req: NextRequest) {
 
   const withCounts = await Promise.all(
     students.map(async (s) => {
-      const remaining = await prisma.mealSession.count({
-        where: { studentId: s.id, status: "SCHEDULED" },
-      });
+      const [remaining, last] = await Promise.all([
+        prisma.mealSession.count({ where: { studentId: s.id, status: "SCHEDULED" } }),
+        prisma.mealSession.findFirst({
+          where: { studentId: s.id, status: { not: "CANCELLED" } },
+          orderBy: { date: "desc" },
+          select: { date: true },
+        }),
+      ]);
       return {
         id: s.id,
         name: s.name,
@@ -150,6 +176,7 @@ export async function GET(req: NextRequest) {
         active: s.active,
         latestRegistration: s.registrations[0] ?? null,
         remaining,
+        lastSessionDate: last?.date ?? null,
         lowMeal: remaining < LOW_MEAL_THRESHOLD,
       };
     }),

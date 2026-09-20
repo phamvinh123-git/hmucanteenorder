@@ -18,6 +18,7 @@ type StudentRow = {
   mustChangePassword: boolean;
   active: boolean;
   remaining: number;
+  lastSessionDate: string | null;
   lowMeal: boolean;
   latestRegistration: {
     id: string;
@@ -73,6 +74,16 @@ const MEAL_OPTIONS: [MealPattern, string][] = [
   ["DINNER", "Tối"],
   ["BOTH", "Trưa & Tối"],
 ];
+
+/** Earliest sensible start for a renewal: today, or the day after the student's last booked meal. */
+function renewStartDate(lastSessionDate: string | null) {
+  const today = localDateKey(new Date());
+  if (!lastSessionDate) return today;
+  const next = new Date(lastSessionDate);
+  next.setDate(next.getDate() + 1);
+  const nextKey = localDateKey(next);
+  return nextKey > today ? nextKey : today;
+}
 
 const emptyForm = {
   name: "",
@@ -153,7 +164,13 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       if (seq !== lookupSeq.current) return;
       if (res.ok && data.found) {
         setKnown({ orderCode: data.orderCode, remaining: data.remaining });
-        setForm((f) => ({ ...f, name: data.name, major: data.major ?? "", className: data.className ?? "" }));
+        setForm((f) => ({
+          ...f,
+          name: data.name,
+          major: data.major ?? "",
+          className: data.className ?? "",
+          startDate: renewStartDate(data.lastSessionDate),
+        }));
       } else {
         setKnown(null);
       }
@@ -173,7 +190,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       className: s.className ?? "",
       mealPattern: last?.mealPattern ?? emptyForm.mealPattern,
       pricePerMeal: last?.pricePerMeal ?? emptyForm.pricePerMeal,
-      startDate: localDateKey(new Date()),
+      startDate: renewStartDate(s.lastSessionDate),
     });
     lookupSeq.current++;
     setKnown({ orderCode: s.orderCode, remaining: s.remaining });

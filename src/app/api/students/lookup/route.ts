@@ -16,7 +16,14 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ found: false });
   if (user.role !== "STUDENT") return NextResponse.json({ found: false, notStudent: true });
 
-  const remaining = await prisma.mealSession.count({ where: { studentId: user.id, status: "SCHEDULED" } });
+  const [remaining, last] = await Promise.all([
+    prisma.mealSession.count({ where: { studentId: user.id, status: "SCHEDULED" } }),
+    prisma.mealSession.findFirst({
+      where: { studentId: user.id, status: { not: "CANCELLED" } },
+      orderBy: { date: "desc" },
+      select: { date: true },
+    }),
+  ]);
   return NextResponse.json({
     found: true,
     name: user.name,
@@ -24,5 +31,6 @@ export async function GET(req: NextRequest) {
     className: user.className,
     orderCode: user.orderCode,
     remaining,
+    lastSessionDate: last?.date ?? null,
   });
 }
