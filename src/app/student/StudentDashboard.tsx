@@ -379,7 +379,7 @@ export default function StudentDashboard({
                     </div>
                   </div>
                   {s ? (
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyle(s)}`}>{statusLabel(s)}</span>
+                    <span className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyle(s)}`}>{statusLabel(s)}</span>
                   ) : (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-400">
                       Không có suất
@@ -613,7 +613,7 @@ export default function StudentDashboard({
               return (
                 <div key={s.id} className="p-3 flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
                   <span className="w-40">{fmtDate(s.date)}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${statusStyle(s)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${statusStyle(s)}`}>
                     Bữa {MEAL_LABEL[s.mealType]} &middot; {statusLabel(s)}
                   </span>
                   {restoreCheck &&
