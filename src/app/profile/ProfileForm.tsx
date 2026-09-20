@@ -21,7 +21,9 @@ const labelCls = "mb-1.5 block text-xs font-semibold text-slate-600";
 export default function ProfileForm({ role, initial }: { role: string; initial: Initial }) {
   const router = useRouter();
   const isStudent = role === "STUDENT";
+  const isAdmin = role === "ADMIN";
   const [name, setName] = useState(initial.name);
+  const [phone, setPhone] = useState(initial.phone);
   const [major, setMajor] = useState(initial.major ?? "");
   const [className, setClassName] = useState(initial.className ?? "");
   const [saving, setSaving] = useState(false);
@@ -37,7 +39,13 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isStudent ? { name, major: major || null, className: className || null } : { name }),
+        body: JSON.stringify(
+          isStudent
+            ? { name, major: major || null, className: className || null }
+            : isAdmin
+              ? { name, phone }
+              : { name },
+        ),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -64,8 +72,22 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls}>Số điện thoại (tên đăng nhập)</label>
-            <input value={initial.phone} readOnly className={`${inputCls} bg-slate-50 text-slate-500`} />
-            <p className="mt-1 text-xs text-slate-400">Cần đổi số điện thoại, vui lòng liên hệ bộ phận bán hàng.</p>
+            {isAdmin ? (
+              <>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/D/g, ""))}
+                  inputMode="numeric"
+                  className={inputCls}
+                />
+                <p className="mt-1 text-xs text-slate-400">Lần đăng nhập sau dùng số này.</p>
+              </>
+            ) : (
+              <>
+                <input value={initial.phone} readOnly className={`${inputCls} bg-slate-50 text-slate-500`} />
+                <p className="mt-1 text-xs text-slate-400">Cần đổi số điện thoại, vui lòng liên hệ bộ phận bán hàng.</p>
+              </>
+            )}
           </div>
           {isStudent && (
             <div>

@@ -16,9 +16,14 @@ export async function GET() {
   return NextResponse.json(user);
 }
 
-// Phone is the login name, so it is deliberately not editable here.
+// Phone is the login name: only admins may change their own (staff/students go through admin/sales).
 const patchSchema = z.object({
   name: z.string().trim().min(1, "Họ tên không được để trống.").max(100, "Họ tên quá dài.").optional(),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{9,15}$/, "Số điện thoại gồm 9–15 chữ số.")
+    .optional(),
   major: z.union([z.string(), z.null()]).optional(),
   className: z.union([z.string(), z.null()]).optional(),
 });
@@ -36,8 +41,17 @@ export async function PATCH(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (!user || !user.active) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
 
-  const data: { name?: string; major?: string | null; className?: string | null } = {};
+  const data: { name?: string; phone?: string; major?: string | null; className?: string | null } = {};
   if (body.name !== undefined) data.name = body.name;
+
+  if (body.phone !== undefined && body.phone !== user.phone) {
+    if (user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Bạn không thể tự đổi số điện thoại." }, { status: 403 });
+    }
+    const taken = await prisma.user.findUnique({ where: { phone: body.phone } });
+    if (taken) return NextResponse.json({ error: "Số điện thoại này đã được dùng." }, { status: 409 });
+    data.phone = body.phone;
+  }
 
   if ("major" in body || "className" in body) {
     if (user.role !== "STUDENT") {
@@ -62,7 +76,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updated = await prisma.user.update({ where: { id: user.id }, data, select });
-  await logActivity(user.id, "UPDATE_PROFILE", `${user.name} cập nhật hồ sơ cá nhân`);
+  await logActivity(
+    user.id,
+    "UPDATE_PROFILE",
+    data.phone ? `${user.name} cập nhật hồ sơ, đổi SĐT ${user.phone} → ${data.phone}` : `${user.name} cập nhật hồ sơ cá nhân`,
+  );
 
   // Keep the name stored in the session cookie in step with the profile.
   if (data.name) await createSessionCookie({ userId: user.id, role: user.role, name: data.name });
