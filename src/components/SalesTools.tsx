@@ -36,7 +36,14 @@ type StudentDetail = {
     pricePerMeal: number;
     note: string | null;
   }[];
-  sessions: { id: string; date: string; mealType: "LUNCH" | "DINNER"; status: string; note: string | null }[];
+  sessions: {
+    id: string;
+    date: string;
+    mealType: "LUNCH" | "DINNER";
+    status: string;
+    pickedUp: boolean;
+    note: string | null;
+  }[];
 };
 
 const PATTERN_LABEL: Record<MealPattern, string> = { LUNCH: "Trưa", DINNER: "Tối", BOTH: "Trưa & Tối" };
@@ -500,15 +507,23 @@ export default function SalesTools() {
                             <li
                               key={sx.id}
                               className={
-                                sx.status === "COMPLETED"
-                                  ? "text-green-600"
-                                  : sx.status === "CANCELLED"
-                                    ? "text-slate-400 line-through"
-                                    : "text-slate-600"
+                                sx.status === "CANCELLED"
+                                  ? "text-slate-400 line-through"
+                                  : sx.pickedUp
+                                    ? "text-green-600"
+                                    : sx.status === "COMPLETED"
+                                      ? "text-amber-600"
+                                      : "text-slate-600"
                               }
                             >
                               {fmtDate(sx.date)} &middot; {sx.mealType === "LUNCH" ? "Trưa" : "Tối"}
-                              {sx.status === "COMPLETED" ? " (đã ăn)" : sx.status === "CANCELLED" ? " (đã hủy)" : ""}
+                              {sx.status === "CANCELLED"
+                                ? " (đã hủy)"
+                                : sx.pickedUp
+                                  ? " (đã ăn)"
+                                  : sx.status === "COMPLETED"
+                                    ? " (chưa lấy)"
+                                    : ""}
                               {sx.note ? ` — ${sx.note}` : ""}
                             </li>
                           ))}

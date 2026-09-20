@@ -168,10 +168,14 @@ export default function ScheduleView() {
                 <span className="text-slate-600 w-24 flex-shrink-0">{currency.format(s.price)}</span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    s.status === "COMPLETED" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                    s.pickedUp
+                      ? "bg-green-50 text-green-700"
+                      : s.status === "COMPLETED"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-red-700"
                   }`}
                 >
-                  {STATUS_LABEL[s.status]}
+                  {s.pickedUp ? "Đã lấy" : s.status === "COMPLETED" ? "Chưa lấy" : STATUS_LABEL[s.status]}
                 </span>
                 {s.note && <span className="text-slate-400 italic truncate flex-1 min-w-0">{s.note}</span>}
                 <label className="flex items-center gap-1.5 ml-auto flex-shrink-0 cursor-pointer text-xs text-slate-600">

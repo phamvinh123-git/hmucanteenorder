@@ -38,6 +38,7 @@ export default async function StudentPage() {
           date: s.date.toISOString(),
           mealType: s.mealType,
           status: s.status,
+          pickedUp: s.pickedUp,
           note: s.note,
           price: s.price,
         }))}

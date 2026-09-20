@@ -23,6 +23,7 @@ type SessionDTO = {
   date: string;
   mealType: MealType;
   status: SessionStatus;
+  pickedUp: boolean;
   note: string | null;
   price: number;
 };
@@ -39,6 +40,18 @@ const STATUS_STYLE: Record<SessionStatus, string> = {
   COMPLETED: "bg-green-50 text-green-700",
   CANCELLED: "bg-slate-100 text-slate-400 line-through",
 };
+
+// "Past" is decided by the date, but whether the meal was actually received
+// is only known once staff tick "Đã lấy", so the two are shown separately.
+type StatusInput = { status: SessionStatus; pickedUp: boolean };
+function statusLabel(s: StatusInput) {
+  if (s.status === "COMPLETED") return s.pickedUp ? "Đã nhận" : "Chưa ghi nhận lấy";
+  return STATUS_LABEL[s.status];
+}
+function statusStyle(s: StatusInput) {
+  if (s.status === "COMPLETED" && !s.pickedUp) return "bg-amber-50 text-amber-700";
+  return STATUS_STYLE[s.status];
+}
 
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
@@ -100,6 +113,7 @@ export default function StudentDashboard({
           date: data.newSession.date,
           mealType: data.newSession.mealType,
           status: "SCHEDULED",
+          pickedUp: false,
           note: null,
           price: data.newSession.price,
         });
@@ -217,7 +231,10 @@ export default function StudentDashboard({
                 <span className="w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200 inline-block" /> Đã đặt
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-green-50 border border-green-200 inline-block" /> Đã dùng
+                <span className="w-2.5 h-2.5 rounded-sm bg-green-50 border border-green-200 inline-block" /> Đã nhận
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-amber-50 border border-amber-200 inline-block" /> Chưa ghi nhận lấy
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-200 inline-block" /> Đã hủy
@@ -234,7 +251,9 @@ export default function StudentDashboard({
               s.status === "CANCELLED"
                 ? "border-slate-200 bg-slate-50 text-slate-400"
                 : s.status === "COMPLETED"
-                  ? "border-green-200 bg-green-50 text-green-700"
+                  ? s.pickedUp
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
                   : "border-red-200 bg-red-50 text-red-700";
             return (
               <button
@@ -243,7 +262,7 @@ export default function StudentDashboard({
                   selectedId === s.id ? "ring-2 ring-red-400 ring-offset-1" : ""
                 }`}
               >
-                <p className="font-semibold">{STATUS_LABEL[s.status]}</p>
+                <p className="font-semibold">{statusLabel(s)}</p>
                 {s.note && <p className="truncate mt-0.5 opacity-70">{s.note}</p>}
               </button>
             );
@@ -257,8 +276,8 @@ export default function StudentDashboard({
                 <p className="text-sm font-medium text-slate-800">
                   {fmtDate(selectedSession.date)} &middot; Bữa {MEAL_LABEL[selectedSession.mealType]}
                 </p>
-                <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[selectedSession.status]}`}>
-                  {STATUS_LABEL[selectedSession.status]}
+                <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${statusStyle(selectedSession)}`}>
+                  {statusLabel(selectedSession)}
                 </span>
               </div>
               <button onClick={() => setSelectedId(null)} className="text-xs text-slate-400 hover:text-slate-600">
@@ -381,7 +400,7 @@ export default function StudentDashboard({
               >
                 <div className="sm:w-48 flex-shrink-0">
                   <p className="text-sm font-medium text-slate-800">{fmtDate(s.date)}</p>
-                  <span className={`inline-block mt-0.5 text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[s.status]}`}>
+                  <span className={`inline-block mt-0.5 text-xs px-2 py-0.5 rounded-full ${statusStyle(s)}`}>
                     Bữa {MEAL_LABEL[s.mealType]}
                   </span>
                 </div>
@@ -451,8 +470,8 @@ export default function StudentDashboard({
               return (
                 <div key={s.id} className="p-3 flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
                   <span className="w-40">{fmtDate(s.date)}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_STYLE[s.status]}`}>
-                    Bữa {MEAL_LABEL[s.mealType]} &middot; {STATUS_LABEL[s.status]}
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${statusStyle(s)}`}>
+                    Bữa {MEAL_LABEL[s.mealType]} &middot; {statusLabel(s)}
                   </span>
                   {s.note && <span className="text-slate-400 italic flex-1 min-w-0 truncate">{s.note}</span>}
                   {restoreCheck &&
