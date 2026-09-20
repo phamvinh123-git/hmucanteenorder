@@ -63,7 +63,7 @@ const emptyForm = {
   startDate: localDateKey(new Date()),
   totalSessions: 14,
   mealPattern: "BOTH" as MealPattern,
-  pricePerMeal: 25000,
+  pricePerMeal: 30000,
   note: "",
 };
 
