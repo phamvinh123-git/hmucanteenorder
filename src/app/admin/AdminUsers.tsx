@@ -177,8 +177,19 @@ export default function AdminUsers() {
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">{ROLE_LABEL[u.role]}</span>
               {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit">Đã khóa</span>}
-              {u.mustChangePassword && (
+              {u.mustChangePassword && u.role === "STUDENT" && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit"
+                  title="Sinh viên chưa đổi mật khẩu nên vẫn dùng mật khẩu mặc định"
+                >
+                  Chưa đổi MK · mật khẩu là <span className="font-mono font-semibold">123</span>
+                </span>
+              )}
+              {u.mustChangePassword && u.role !== "STUDENT" && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit">Chưa đổi MK</span>
+              )}
+              {!u.mustChangePassword && u.role === "STUDENT" && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 w-fit">Đã tự đặt mật khẩu</span>
               )}
               <div className="flex-1" />
               <div className="flex gap-2">
