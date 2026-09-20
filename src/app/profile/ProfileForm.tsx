@@ -76,7 +76,7 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
               <>
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/D/g, ""))}
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
                   inputMode="numeric"
                   className={inputCls}
                 />
