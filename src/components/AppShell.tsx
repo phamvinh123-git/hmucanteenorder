@@ -70,6 +70,9 @@ export default function AppShell({
             <p className="text-sm font-medium text-slate-700">{name}</p>
             <p className="text-xs text-slate-400 mb-1">{ROLE_LABEL[role]}</p>
             <div className="flex items-center gap-3 justify-end">
+              <Link href="/profile" className="text-sm text-slate-500 hover:text-red-600 transition-colors">
+                Hồ sơ
+              </Link>
               <Link href="/change-password" className="text-sm text-slate-500 hover:text-red-600 transition-colors">
                 Đổi mật khẩu
               </Link>
