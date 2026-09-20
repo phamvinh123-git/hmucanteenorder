@@ -70,7 +70,7 @@ export default function WeekMealGrid({
       <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
         <button
           onClick={() => setWeekStart((w) => addWeeks(w, -1))}
-          className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          className="px-3 py-1.5 rounded-lg border border-slate-300 whitespace-nowrap hover:border-red-300 hover:bg-red-50 hover:text-red-700"
         >
           ◀ Tuần trước
         </button>
@@ -81,17 +81,20 @@ export default function WeekMealGrid({
         >
           «
         </button>
-        <span className="px-2 font-medium text-slate-700">{rangeLabel}</span>
-        {isCurrentWeek ? (
-          <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">Tuần này</span>
-        ) : (
-          <button
-            onClick={() => setWeekStart(() => startOfWeekMonday(new Date()))}
-            className="text-xs text-red-600 hover:underline"
-          >
-            Về tuần này
-          </button>
-        )}
+        <div className="order-first flex w-full items-center gap-2 sm:order-none sm:w-auto">
+          <span className="px-2 font-medium text-slate-700 whitespace-nowrap">{rangeLabel}</span>
+          {isCurrentWeek ? (
+            <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium whitespace-nowrap">Tuần này</span>
+          ) : (
+            <button
+              onClick={() => setWeekStart(() => startOfWeekMonday(new Date()))}
+              className="text-xs text-red-600 hover:underline whitespace-nowrap"
+            >
+              Về tuần này
+            </button>
+          )}
+        </div>
+        <span className="ml-auto sm:hidden" />
         <button
           onClick={() => setWeekStart((w) => addWeeks(w, 4))}
           title="Tiến 4 tuần"
@@ -101,7 +104,7 @@ export default function WeekMealGrid({
         </button>
         <button
           onClick={() => setWeekStart((w) => addWeeks(w, 1))}
-          className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          className="px-3 py-1.5 rounded-lg border border-slate-300 whitespace-nowrap hover:border-red-300 hover:bg-red-50 hover:text-red-700"
         >
           Tuần sau ▶
         </button>
