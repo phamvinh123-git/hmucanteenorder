@@ -162,6 +162,26 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     }
   }
 
+  // Renewal shortcut for students running low: prefill the registration form from their last registration.
+  function startRenew(s: StudentRow) {
+    const last = s.latestRegistration;
+    setForm({
+      ...emptyForm,
+      name: s.name,
+      phone: s.phone,
+      major: s.major ?? "",
+      className: s.className ?? "",
+      mealPattern: last?.mealPattern ?? emptyForm.mealPattern,
+      pricePerMeal: last?.pricePerMeal ?? emptyForm.pricePerMeal,
+      startDate: localDateKey(new Date()),
+    });
+    lookupSeq.current++;
+    setKnown({ orderCode: s.orderCode, remaining: s.remaining });
+    setFormError(null);
+    setFormSuccess(null);
+    document.getElementById("register-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -317,7 +337,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
             </div>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-6 p-5">
+          <form id="register-form" onSubmit={onSubmit} className="scroll-mt-4 space-y-6 p-5">
             <fieldset>
               <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] text-white">1</span>
@@ -708,6 +728,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 </div>
                 {s.mustChangePassword && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Chưa đổi MK</span>
+                )}
+                {s.lowMeal && (
+                  <button
+                    onClick={() => startRenew(s)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-600 font-semibold text-white shadow-sm hover:bg-red-700"
+                  >
+                    Gia hạn
+                  </button>
                 )}
                 <button
                   onClick={() => toggleExpand(s.id)}
