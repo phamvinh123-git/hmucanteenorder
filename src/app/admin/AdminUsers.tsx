@@ -22,12 +22,24 @@ const ROLE_LABEL: Record<Role, string> = {
   STUDENT: "Sinh viên",
 };
 
+/** Lower-case and strip Vietnamese diacritics so "nguyen" also finds "Nguyễn". */
+function foldText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .trim();
+}
+
 const emptyForm = { name: "", phone: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
+  const [search, setSearch] = useState("");
 
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -81,7 +93,12 @@ export default function AdminUsers() {
     load();
   }
 
-  const visible = users.filter((u) => roleFilter === "ALL" || u.role === roleFilter);
+  const q = foldText(search);
+  const visible = users.filter(
+    (u) =>
+      (roleFilter === "ALL" || u.role === roleFilter) &&
+      (!q || foldText(u.name).includes(q) || u.phone.includes(search.trim())),
+  );
 
   return (
     <div className="space-y-8">
@@ -146,8 +163,19 @@ export default function AdminUsers() {
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-slate-700">Danh sách tài khoản</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <h2 className="text-sm font-semibold text-slate-700">
+            Danh sách tài khoản
+            {!loading && <span className="ml-2 font-normal text-slate-400">({visible.length})</span>}
+          </h2>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên hoặc số điện thoại..."
+            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100 sm:w-64"
+          />
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
@@ -159,10 +187,15 @@ export default function AdminUsers() {
             <option value="SALES">Bán hàng</option>
             <option value="STUDENT">Sinh viên</option>
           </select>
+          </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
           {loading && <p className="p-4 text-sm text-slate-400">Đang tải...</p>}
-          {!loading && visible.length === 0 && <p className="p-4 text-sm text-slate-400">Không có tài khoản.</p>}
+          {!loading && visible.length === 0 && (
+            <p className="p-4 text-sm text-slate-400">
+              {search.trim() ? `Không tìm thấy tài khoản nào khớp "${search.trim()}".` : "Không có tài khoản."}
+            </p>
+          )}
           {visible.map((u, i) => (
             <div
               key={u.id}
