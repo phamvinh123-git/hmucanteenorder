@@ -74,6 +74,11 @@ export default function StudentDashboard({
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Multi-select mode: cancel several upcoming meals, or restore several cancelled ones, in one go.
+  const [multi, setMulti] = useState<null | "cancel" | "restore">(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const remaining = sessions.filter((s) => s.status === "SCHEDULED").length;
   const lowMeal = remaining < LOW_MEAL_THRESHOLD;
@@ -143,6 +148,85 @@ export default function StudentDashboard({
       );
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function startMulti(mode: "cancel" | "restore") {
+    setMulti(mode);
+    setPicked([]);
+    setBulkConfirm(false);
+    setConfirmingId(null);
+    setError(null);
+    if (mode === "cancel") setShowAllUpcoming(true);
+  }
+
+  function stopMulti() {
+    setMulti(null);
+    setPicked([]);
+    setBulkConfirm(false);
+  }
+
+  function togglePick(id: string) {
+    setBulkConfirm(false);
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function runBulk() {
+    if (!multi || picked.length === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/sessions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: multi, ids: picked }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Không thể thực hiện.");
+        return;
+      }
+      const done: {
+        id: string;
+        newSession?: { id: string; date: string; mealType: MealType; price: number };
+        removedCompensationId?: string;
+      }[] = data.done;
+      setSessions((prev) => {
+        let next = [...prev];
+        for (const d of done) {
+          if (multi === "cancel" && d.newSession) {
+            const source = next.find((x) => x.id === d.id);
+            next = next.map((x) => (x.id === d.id ? { ...x, status: "CANCELLED" as SessionStatus } : x));
+            next.push({
+              id: d.newSession.id,
+              date: d.newSession.date,
+              mealType: d.newSession.mealType,
+              status: "SCHEDULED",
+              pickedUp: false,
+              note: null,
+              price: d.newSession.price,
+              isCompensation: true,
+              mealPattern: source?.mealPattern ?? "BOTH",
+            });
+          } else if (multi === "restore") {
+            next = next
+              .filter((x) => x.id !== d.removedCompensationId)
+              .map((x) => (x.id === d.id ? { ...x, status: "SCHEDULED" as SessionStatus } : x));
+          }
+        }
+        return next;
+      });
+      if (data.failed.length > 0) {
+        setError(
+          `Đã xử lý ${done.length} buổi, còn ${data.failed.length} buổi không thực hiện được: ${data.failed[0].error}`,
+        );
+        setPicked(data.failed.map((x: { id: string }) => x.id));
+        setBulkConfirm(false);
+      } else {
+        stopMulti();
+      }
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -459,8 +543,28 @@ export default function StudentDashboard({
       <section>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="text-lg font-bold text-slate-800">Sắp tới</h2>
-          <span className="text-sm text-slate-400">{upcoming.length} buổi</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-400">{upcoming.length} buổi</span>
+            {upcoming.length > 0 &&
+              (multi === "cancel" ? (
+                <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
+                  Thoát chọn nhiều
+                </button>
+              ) : (
+                <button
+                  onClick={() => startMulti("cancel")}
+                  className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                >
+                  Chọn nhiều để hủy
+                </button>
+              ))}
+          </div>
         </div>
+        {multi === "cancel" && (
+          <p className="mb-3 rounded-xl bg-red-50 px-4 py-2 text-xs text-red-700">
+            Bấm vào các bữa muốn hủy. Mỗi bữa hủy sẽ được bù 1 buổi ở cuối lịch. Bữa đã quá giờ chốt không chọn được.
+          </p>
+        )}
         {upcoming.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
             Không có buổi ăn sắp tới.
@@ -469,12 +573,34 @@ export default function StudentDashboard({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleUpcoming.map((s, i) => {
             const d = new Date(s.date);
+            const cancellable = canCancelSession({ date: d, mealType: s.mealType, status: s.status }).ok;
+            const isPicked = picked.includes(s.id);
+            const selecting = multi === "cancel";
             return (
               <div
                 key={s.id}
-                className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md animate-rise-in"
+                onClick={selecting && cancellable ? () => togglePick(s.id) : undefined}
+                className={`flex gap-4 rounded-2xl border bg-white p-4 shadow-sm transition-all animate-rise-in ${
+                  selecting
+                    ? cancellable
+                      ? isPicked
+                        ? "cursor-pointer border-red-500 bg-red-50 ring-2 ring-red-200"
+                        : "cursor-pointer border-slate-200 hover:border-red-300"
+                      : "border-slate-200 opacity-50"
+                    : "border-slate-200 hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md"
+                }`}
                 style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
               >
+                {selecting && (
+                  <input
+                    type="checkbox"
+                    checked={isPicked}
+                    disabled={!cancellable}
+                    readOnly
+                    className="mt-1 h-5 w-5 flex-shrink-0 accent-red-600"
+                    aria-label="Chọn bữa này để hủy"
+                  />
+                )}
                 <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-red-50 text-red-700">
                   <span className="text-2xl font-bold leading-none">{d.getDate()}</span>
                   <span className="text-[11px] uppercase">Th{d.getMonth() + 1}</span>
@@ -491,13 +617,14 @@ export default function StudentDashboard({
                   <p className="mb-2 text-xs capitalize text-slate-500">
                     {new Intl.DateTimeFormat("vi-VN", { weekday: "long" }).format(d)}
                   </p>
-                  {renderActions(s)}
+                  {!selecting && renderActions(s)}
+                  {selecting && !cancellable && <p className="text-xs text-slate-400">Đã quá giờ chốt</p>}
                 </div>
               </div>
             );
           })}
         </div>
-        {upcoming.length > 8 && (
+        {upcoming.length > 8 && multi !== "cancel" && (
           <button
             onClick={() => setShowAllUpcoming((v) => !v)}
             className="mt-3 text-sm font-medium text-red-600 hover:underline"
@@ -514,6 +641,22 @@ export default function StudentDashboard({
         >
           {showHistory ? "Ẩn lịch sử" : "Xem lịch sử buổi ăn"}
         </button>
+        {showHistory && history.some((h) => h.status === "CANCELLED") && (
+          <div className="mt-2">
+            {multi === "restore" ? (
+              <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
+                Thoát chọn nhiều
+              </button>
+            ) : (
+              <button
+                onClick={() => startMulti("restore")}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+              >
+                Chọn nhiều để khôi phục
+              </button>
+            )}
+          </div>
+        )}
         {showHistory && (
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mt-2 animate-rise-in">
             {history.length === 0 && <p className="p-4 text-sm text-slate-400">Chưa có lịch sử.</p>}
@@ -523,12 +666,29 @@ export default function StudentDashboard({
                   ? canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status })
                   : null;
               return (
-                <div key={s.id} className="p-3 flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
+                <div
+                  key={s.id}
+                  onClick={multi === "restore" && restoreCheck?.ok ? () => togglePick(s.id) : undefined}
+                  className={`p-3 flex flex-wrap items-center gap-3 sm:gap-4 text-sm ${
+                    multi === "restore" && restoreCheck?.ok ? "cursor-pointer hover:bg-red-50/60" : ""
+                  } ${picked.includes(s.id) ? "bg-red-50" : ""}`}
+                >
+                  {multi === "restore" && restoreCheck && (
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(s.id)}
+                      disabled={!restoreCheck.ok}
+                      readOnly
+                      className="h-5 w-5 flex-shrink-0 accent-red-600"
+                      aria-label="Chọn bữa này để khôi phục"
+                    />
+                  )}
                   <span className="w-40">{fmtDate(s.date)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${statusStyle(s)}`}>
                     Bữa {MEAL_LABEL[s.mealType]} &middot; {statusLabel(s)}
                   </span>
                   {restoreCheck &&
+                    multi !== "restore" &&
                     (confirmingId === s.id ? (
                       <span className="ml-auto flex gap-2">
                         <button
@@ -561,6 +721,51 @@ export default function StudentDashboard({
           </div>
         )}
       </section>
+
+      {multi && (
+        <div className="sticky bottom-3 z-40 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-4 py-3 shadow-xl animate-pop-in">
+          <p className="text-sm font-medium text-slate-700">
+            {picked.length === 0
+              ? multi === "cancel"
+                ? "Chọn các bữa muốn hủy"
+                : "Chọn các bữa muốn khôi phục"
+              : `Đã chọn ${picked.length} bữa`}
+          </p>
+          <div className="flex items-center gap-2">
+            {bulkConfirm ? (
+              <>
+                <button
+                  onClick={runBulk}
+                  disabled={bulkBusy}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {bulkBusy ? "Đang xử lý..." : `Xác nhận ${multi === "cancel" ? "hủy" : "khôi phục"} ${picked.length} bữa`}
+                </button>
+                <button
+                  onClick={() => setBulkConfirm(false)}
+                  disabled={bulkBusy}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-xs hover:bg-slate-50"
+                >
+                  Thôi
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setBulkConfirm(true)}
+                  disabled={picked.length === 0}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-40"
+                >
+                  {multi === "cancel" ? "Hủy" : "Khôi phục"} {picked.length > 0 ? `${picked.length} bữa` : ""}
+                </button>
+                <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-2 text-xs hover:bg-slate-50">
+                  Thoát
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
