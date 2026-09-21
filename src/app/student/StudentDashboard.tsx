@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  canBookSlot,
   canCancelSession,
   canRestoreSession,
   localDateKey,
@@ -22,7 +21,7 @@ type SessionDTO = {
   pickedUp: boolean;
   note: string | null;
   price: number;
-  /** Auto-added after a cancellation; the only kind a student can move to another day. */
+  /** Auto-added after a cancellation; a make-up slot. */
   isCompensation: boolean;
   mealPattern: MealPattern;
 };
@@ -71,9 +70,6 @@ export default function StudentDashboard({
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
-  const [moveDate, setMoveDate] = useState("");
-  const [moveMeal, setMoveMeal] = useState<MealType>("LUNCH");
 
   const remaining = sessions.filter((s) => s.status === "SCHEDULED").length;
   const lowMeal = remaining < LOW_MEAL_THRESHOLD;
@@ -123,99 +119,6 @@ export default function StudentDashboard({
     } finally {
       setBusyId(null);
     }
-  }
-
-  function startMove(s: SessionDTO) {
-    setMovingId(s.id);
-    setMoveDate("");
-    setMoveMeal(s.mealPattern === "DINNER" ? "DINNER" : "LUNCH");
-    setError(null);
-  }
-
-  async function submitMove(s: SessionDTO) {
-    if (!moveDate) {
-      setError("Hãy chọn ngày muốn ăn.");
-      return;
-    }
-    const [y, m, d] = moveDate.split("-").map(Number);
-    const check = canBookSlot({ date: new Date(y, m - 1, d), mealType: moveMeal });
-    if (!check.ok) {
-      setError(check.reason ?? "Không thể chọn buổi này.");
-      return;
-    }
-    setBusyId(s.id);
-    setError(null);
-    try {
-      const res = await fetch(`/api/sessions/${s.id}/move`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: moveDate, mealType: moveMeal }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Không thể đổi buổi ăn.");
-        return;
-      }
-      setSessions((prev) =>
-        prev.map((x) => (x.id === s.id ? { ...x, date: data.date, mealType: data.mealType } : x)),
-      );
-      setMovingId(null);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  function renderMover(s: SessionDTO) {
-    if (!s.isCompensation || s.status !== "SCHEDULED" || s.pickedUp) return null;
-    const canMove = canCancelSession({ date: new Date(s.date), mealType: s.mealType, status: s.status });
-    if (movingId !== s.id) {
-      return (
-        <button
-          onClick={() => startMove(s)}
-          disabled={busyId === s.id || !canMove.ok}
-          title={canMove.ok ? "Chọn ngày ăn bù khác" : canMove.reason}
-          className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Đổi ngày ăn bù
-        </button>
-      );
-    }
-    return (
-      <div className="flex flex-wrap items-center gap-2 animate-pop-in">
-        <input
-          type="date"
-          value={moveDate}
-          min={localDateKey(new Date())}
-          onChange={(e) => setMoveDate(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-        />
-        {s.mealPattern === "BOTH" ? (
-          <select
-            value={moveMeal}
-            onChange={(e) => setMoveMeal(e.target.value as MealType)}
-            className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-          >
-            <option value="LUNCH">Bữa trưa</option>
-            <option value="DINNER">Bữa tối</option>
-          </select>
-        ) : (
-          <span className="text-sm text-slate-600">Bữa {MEAL_LABEL[moveMeal]}</span>
-        )}
-        <button
-          onClick={() => submitMove(s)}
-          disabled={busyId === s.id}
-          className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
-        >
-          Xác nhận đổi
-        </button>
-        <button
-          onClick={() => setMovingId(null)}
-          className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50"
-        >
-          Thôi
-        </button>
-      </div>
-    );
   }
 
   async function restoreSession(id: string) {
@@ -296,7 +199,6 @@ export default function StudentDashboard({
             Hủy bữa
           </button>
         )}
-        {renderMover(s)}
       </div>
     );
   }
@@ -495,10 +397,9 @@ export default function StudentDashboard({
                       </button>
                     );
                   })()}
-                  {renderMover(selectedSession)}
                 </div>
                 {selectedSession.isCompensation && selectedSession.status === "SCHEDULED" && (
-                  <span className="text-xs text-slate-400">Đây là buổi bù sau khi bạn hủy, bạn có thể đổi sang ngày khác.</span>
+                  <span className="text-xs text-slate-400">Đây là buổi bù được thêm sau khi bạn hủy.</span>
                 )}
               </div>
             )}
