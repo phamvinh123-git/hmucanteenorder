@@ -1,4 +1,5 @@
 import { addDays, startOfDay } from "date-fns";
+import { localDateKey } from "@/lib/client-session-rules";
 import { MealPattern, MealType, SessionStatus } from "@prisma/client";
 
 export const LUNCH_CUTOFF_HOUR = 8; // cancel lunch only before 08:00 same day
@@ -54,9 +55,22 @@ export function generateSessionPlan(
   return slots;
 }
 
+/**
+ * One-off launch exception: on these days the dinner can still be cancelled until it is
+ * marked finished (20:00) instead of the usual 14:00. Remove the date once it has passed.
+ */
+const DINNER_LATE_CANCEL_DATES = ["2026-09-21"];
+const DINNER_LATE_CANCEL_HOUR = 20;
+
 export function cancelCutoff(sessionDate: Date, mealType: MealType) {
   const cutoff = startOfDay(sessionDate);
-  cutoff.setHours(mealType === "LUNCH" ? LUNCH_CUTOFF_HOUR : DINNER_CUTOFF_HOUR, 0, 0, 0);
+  const lateDinner = mealType === "DINNER" && DINNER_LATE_CANCEL_DATES.includes(localDateKey(sessionDate));
+  cutoff.setHours(
+    mealType === "LUNCH" ? LUNCH_CUTOFF_HOUR : lateDinner ? DINNER_LATE_CANCEL_HOUR : DINNER_CUTOFF_HOUR,
+    0,
+    0,
+    0,
+  );
   return cutoff;
 }
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  cancelCutoff,
   canCancelSession,
   canRestoreSession,
   localDateKey,
@@ -250,7 +251,7 @@ export default function StudentDashboard({
         <div className="grid gap-4 sm:grid-cols-2">
           {(["LUNCH", "DINNER"] as MealType[]).map((meal, i) => {
             const s = todaySessions.find((x) => x.mealType === meal);
-            const cutoff = meal === "LUNCH" ? "8:00" : "14:00";
+            const cutoff = `${cancelCutoff(new Date(), meal).getHours()}:00`;
             const tone =
               !s || s.status === "CANCELLED"
                 ? "border-slate-200 bg-slate-50"
