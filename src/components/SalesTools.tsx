@@ -698,9 +698,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           )}
           {students.map((s, i) => (
             <div key={s.id} className="animate-rise-in" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
-              <div className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 hover:bg-red-50/40 transition-colors">
+              <div className="p-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 lg:grid lg:grid-cols-[4.5rem_minmax(0,14rem)_minmax(0,15rem)_minmax(0,1fr)_5.5rem_6.5rem_minmax(0,16rem)] lg:gap-3 hover:bg-red-50/40 transition-colors">
                 {editingOrderCodeId === s.id ? (
-                  <div className="sm:w-32 flex-shrink-0">
+                  <div className="sm:w-32 lg:w-full flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <input
                         autoFocus
@@ -731,14 +731,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <button
                     onClick={() => startEditOrderCode(s)}
                     title="Bấm để sửa mã số"
-                    className={`sm:w-16 flex-shrink-0 text-left text-sm font-mono font-semibold rounded-lg px-2 py-1 hover:bg-red-50 ${
+                    className={`sm:w-16 lg:w-full flex-shrink-0 text-left text-sm font-mono font-semibold rounded-lg px-2 py-1 hover:bg-red-50 ${
                       s.orderCode != null ? "text-red-700" : "text-slate-300"
                     }`}
                   >
                     {s.orderCode ?? "—"}
                   </button>
                 )}
-                <div className="sm:w-56">
+                <div className="sm:w-56 lg:w-full min-w-0">
                   <p className={`text-sm font-medium ${s.lowMeal ? "text-red-600" : "text-slate-800"}`}>
                     {s.name}
                     {s.lowMeal && " ⚠"}
@@ -781,7 +781,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   )}
                 </div>
                 {editingClassId === s.id ? (
-                  <div className="flex flex-wrap items-center gap-1 sm:w-64 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-1 sm:w-64 lg:w-full flex-shrink-0">
                     <select
                       autoFocus
                       value={majorDraft}
@@ -826,7 +826,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <button
                     onClick={() => startEditClass(s)}
                     title="Bấm để sửa ngành và lớp"
-                    className={`sm:w-64 flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
+                    className={`sm:w-64 lg:w-full flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
                       s.major || s.className ? "text-slate-700" : "text-slate-300"
                     }`}
                   >
@@ -840,7 +840,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     )}
                   </button>
                 )}
-                <div className="text-sm text-slate-600 flex-1">
+                <div className="text-sm text-slate-600 flex-1 lg:min-w-0">
                   {s.latestRegistration ? (
                     <span>
                       {PATTERN_LABEL[s.latestRegistration.mealPattern]} &middot; {s.latestRegistration.totalSessions} buổi
@@ -850,12 +850,15 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     <span className="text-slate-400">Chưa có đăng ký</span>
                   )}
                 </div>
-                <div className={`text-sm font-medium ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
+                <div className={`text-sm font-medium whitespace-nowrap lg:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
                   Còn {s.remaining} buổi
                 </div>
-                {s.mustChangePassword && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Chưa đổi MK</span>
-                )}
+                <div className="lg:text-center">
+                  {s.mustChangePassword && (
+                    <span className="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Chưa đổi MK</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 lg:justify-end">
                 {s.lowMeal && (
                   <button
                     onClick={() => startRenew(s)}
@@ -882,6 +885,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     Xóa
                   </button>
                 )}
+                </div>
               </div>
               {expandedId === s.id && (
                 <div className="bg-red-50/50 px-4 py-3 text-sm animate-rise-in">
