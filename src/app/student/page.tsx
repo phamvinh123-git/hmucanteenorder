@@ -26,6 +26,7 @@ export default async function StudentPage() {
     <AppShell role={user.role} name={user.name}>
       <StudentDashboard
         studentName={user.name}
+        orderCode={user.orderCode}
         sessions={sessions.map((s) => ({
           id: s.id,
           date: s.date.toISOString(),

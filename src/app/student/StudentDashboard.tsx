@@ -58,9 +58,11 @@ function fmtDate(iso: string) {
 
 export default function StudentDashboard({
   studentName,
+  orderCode,
   sessions: initialSessions,
 }: {
   studentName: string;
+  orderCode: number | null;
   sessions: SessionDTO[];
 }) {
   const [sessions, setSessions] = useState(initialSessions);
@@ -212,6 +214,12 @@ export default function StudentDashboard({
           <div>
             <p className="text-sm capitalize text-red-100">{todayLabel}</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">Xin chào, {studentName}</h1>
+            {orderCode != null && (
+              <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm">
+                <span className="text-red-100">Số thứ tự của bạn</span>
+                <span className="text-lg font-bold leading-none">{orderCode}</span>
+              </p>
+            )}
             <p className="mt-1 text-sm text-red-100">Chúc bạn ngon miệng. Xem và quản lý suất ăn của mình tại đây.</p>
           </div>
           <div className="min-w-[220px] rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
