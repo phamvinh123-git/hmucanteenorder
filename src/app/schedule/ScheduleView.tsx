@@ -155,7 +155,12 @@ export default function ScheduleView() {
           <div className="divide-y divide-slate-100">
             {selectedList.length === 0 && <p className="text-sm text-slate-400 py-2">Chưa có sinh viên nào đăng ký bữa này.</p>}
             {selectedList.map((s) => (
-              <div key={s.id} className="py-2 flex items-center gap-3 sm:gap-4 text-sm flex-wrap">
+              <div
+                key={s.id}
+                className={`py-2 flex items-center gap-3 sm:gap-4 text-sm flex-wrap transition-colors ${
+                  s.pickedUp ? "bg-red-600 px-3 rounded-lg [&_*]:!text-white" : ""
+                }`}
+              >
                 <span className="font-mono text-xs text-red-700 w-10 flex-shrink-0">
                   {s.orderCode ?? "—"}
                 </span>
@@ -169,7 +174,7 @@ export default function ScheduleView() {
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
                     s.pickedUp
-                      ? "bg-green-50 text-green-700"
+                      ? "bg-white/25 text-white font-semibold"
                       : s.status === "COMPLETED"
                         ? "bg-amber-50 text-amber-700"
                         : "bg-red-50 text-red-700"
@@ -183,7 +188,7 @@ export default function ScheduleView() {
                     type="checkbox"
                     checked={s.pickedUp}
                     onChange={() => togglePickedUp(s)}
-                    className="w-4 h-4 accent-red-600"
+                    className={`w-4 h-4 ${s.pickedUp ? "accent-white" : "accent-red-600"}`}
                   />
                   Đã lấy
                 </label>
