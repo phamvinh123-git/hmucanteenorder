@@ -53,13 +53,26 @@ export async function createRegistrationWithSessions(params: {
   });
 }
 
-/** Marks past scheduled sessions as completed. Call before reading session data. */
+/** Local hours after which today's lunch / dinner counts as finished. */
+const LUNCH_DONE_HOUR = 14;
+const DINNER_DONE_HOUR = 20;
+
+/**
+ * Marks finished scheduled sessions as completed: anything before today, plus today's
+ * lunch after 14:00 and today's dinner after 20:00. Call before reading session data.
+ */
 export async function syncCompletedSessions(studentId?: string) {
-  const today = startOfDay(new Date());
+  const now = new Date();
+  const today = startOfDay(now);
+  const hour = now.getHours();
   await prisma.mealSession.updateMany({
     where: {
       status: "SCHEDULED",
-      date: { lt: today },
+      OR: [
+        { date: { lt: today } },
+        ...(hour >= LUNCH_DONE_HOUR ? [{ date: today, mealType: "LUNCH" as const }] : []),
+        ...(hour >= DINNER_DONE_HOUR ? [{ date: today, mealType: "DINNER" as const }] : []),
+      ],
       ...(studentId ? { studentId } : {}),
     },
     data: { status: "COMPLETED" },

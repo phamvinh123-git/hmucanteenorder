@@ -106,6 +106,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [form, setForm] = useState(emptyForm);
   const [known, setKnown] = useState<{ orderCode: number | null; remaining: number } | null>(null);
   const lookupSeq = useRef(0);
+  const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -234,6 +237,22 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setDetail(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
+  }
+
+  async function savePhone(id: string) {
+    setPhoneError(null);
+    const res = await fetch(`/api/students/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: phoneDraft.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setPhoneError(data.error ?? "Không thể đổi số điện thoại.");
+      return;
+    }
+    setEditingPhoneId(null);
+    loadStudents(search);
   }
 
   function startEditOrderCode(s: StudentRow) {
@@ -666,7 +685,42 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     {s.name}
                     {s.lowMeal && " ⚠"}
                   </p>
-                  <p className="text-xs text-slate-400">{s.phone}</p>
+                  {editingPhoneId === s.id ? (
+                    <div className="mt-0.5">
+                      <div className="flex items-center gap-1">
+                        <input
+                          autoFocus
+                          inputMode="numeric"
+                          value={phoneDraft}
+                          onChange={(e) => setPhoneDraft(e.target.value.replace(/[^0-9]/g, ""))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") savePhone(s.id);
+                            if (e.key === "Escape") setEditingPhoneId(null);
+                          }}
+                          className="w-32 rounded-lg border border-red-300 px-2 py-0.5 text-xs outline-none focus:ring-2 focus:ring-red-100"
+                        />
+                        <button onClick={() => savePhone(s.id)} className="text-green-600 hover:text-green-700 text-sm" title="Lưu">
+                          ✓
+                        </button>
+                        <button onClick={() => setEditingPhoneId(null)} className="text-slate-400 hover:text-slate-600 text-sm" title="Hủy">
+                          ✕
+                        </button>
+                      </div>
+                      {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingPhoneId(s.id);
+                        setPhoneDraft(s.phone);
+                        setPhoneError(null);
+                      }}
+                      title="Bấm để đổi số điện thoại (cũng là tên đăng nhập)"
+                      className="text-xs text-slate-400 hover:text-red-600 hover:underline"
+                    >
+                      {s.phone}
+                    </button>
+                  )}
                 </div>
                 {editingClassId === s.id ? (
                   <div className="flex flex-wrap items-center gap-1 sm:w-64 flex-shrink-0">

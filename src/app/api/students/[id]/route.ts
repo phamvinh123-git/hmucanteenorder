@@ -45,6 +45,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 const patchSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{9,15}$/, "Số điện thoại gồm 9–15 chữ số.")
+    .optional(),
   orderCode: z.union([z.coerce.number().int().min(1).max(999999), z.null()]).optional(),
   major: z.union([z.string(), z.null()]).optional(),
   className: z.union([z.string(), z.null()]).optional(),
@@ -59,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." }, { status: 400 });
   }
 
   const student = await prisma.user.findUnique({ where: { id } });
@@ -67,7 +72,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
   }
 
-  const data: { orderCode?: number | null; major?: string | null; className?: string | null } = {};
+  const data: { phone?: string; orderCode?: number | null; major?: string | null; className?: string | null } = {};
+
+  if (parsed.data.phone !== undefined && parsed.data.phone !== student.phone) {
+    const taken = await prisma.user.findUnique({ where: { phone: parsed.data.phone } });
+    if (taken) {
+      return NextResponse.json({ error: `Số điện thoại này đã được dùng cho ${taken.name}.` }, { status: 409 });
+    }
+    data.phone = parsed.data.phone;
+  }
 
   if ("orderCode" in parsed.data) {
     const orderCode = parsed.data.orderCode ?? null;
@@ -104,6 +117,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   await prisma.user.update({ where: { id }, data });
 
+  if (data.phone) {
+    await logActivity(session.userId, "UPDATE_STUDENT_PHONE", `Đổi SĐT của ${student.name}: ${student.phone} → ${data.phone}`);
+  }
   if ("orderCode" in data) {
     await logActivity(session.userId, "UPDATE_ORDER_CODE", `Đặt mã số ${data.orderCode ?? "(trống)"} cho ${student.name} (${student.phone})`);
   }
