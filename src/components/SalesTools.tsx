@@ -106,6 +106,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [form, setForm] = useState(emptyForm);
   const [known, setKnown] = useState<{ orderCode: number | null; remaining: number } | null>(null);
   const lookupSeq = useRef(0);
+  const [deleteTarget, setDeleteTarget] = useState<StudentRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
   const [phoneDraft, setPhoneDraft] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -237,6 +240,25 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setDetail(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
+  }
+
+  async function deleteStudent() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/students/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Không thể xóa sinh viên.");
+        return;
+      }
+      if (expandedId === deleteTarget.id) setExpandedId(null);
+      setDeleteTarget(null);
+      loadStudents(search);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function savePhone(id: string) {
@@ -812,6 +834,18 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 >
                   {expandedId === s.id ? "Đóng" : "Chi tiết"}
                 </button>
+                {canResetAll && (
+                  <button
+                    onClick={() => {
+                      setDeleteTarget(s);
+                      setDeleteError(null);
+                    }}
+                    title="Xóa sinh viên khỏi danh sách"
+                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  >
+                    Xóa
+                  </button>
+                )}
               </div>
               {expandedId === s.id && (
                 <div className="bg-red-50/50 px-4 py-3 text-sm animate-rise-in">
@@ -865,6 +899,24 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           ))}
         </div>
       </section>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title={`Xóa sinh viên ${deleteTarget.name}?`}
+          confirmWord="XOA"
+          confirmLabel="Xóa sinh viên"
+          busy={deleting}
+          error={deleteError}
+          onConfirm={deleteStudent}
+          onClose={() => setDeleteTarget(null)}
+        >
+          <p>
+            Tài khoản <b>{deleteTarget.phone}</b>, toàn bộ đăng ký và lịch ăn của bạn này sẽ bị <b>xóa vĩnh viễn</b> và
+            không khôi phục được. Số liệu báo cáo cũ của bạn này cũng mất.
+          </p>
+          <p>Nếu chỉ cần ngừng cho bạn này đăng nhập, hãy khóa tài khoản ở mục Tài khoản thay vì xóa.</p>
+        </ConfirmModal>
+      )}
 
       {showResetAll && (
         <ConfirmModal

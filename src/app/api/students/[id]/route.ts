@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { canAccessSalesTools, getSession } from "@/lib/auth";
+import { canAccessSalesTools, canAccessStats, getSession } from "@/lib/auth";
 import { syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
@@ -130,6 +130,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `Đặt ngành "${data.major ?? "(trống)"}", lớp "${data.className ?? "(trống)"}" cho ${student.name} (${student.phone})`,
     );
   }
+
+  return NextResponse.json({ ok: true });
+}
+
+// Permanently removes one student with their registrations and meal sessions (managers and admins only).
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session || !canAccessStats(session.role)) {
+    return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được xóa sinh viên." }, { status: 403 });
+  }
+  const { id } = await params;
+
+  const student = await prisma.user.findUnique({ where: { id } });
+  if (!student || student.role !== "STUDENT") {
+    return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
+  }
+
+  const sessionCount = await prisma.mealSession.count({ where: { studentId: id } });
+
+  await prisma.$transaction([
+    // Break the compensation self-links before the sessions themselves go.
+    prisma.mealSession.updateMany({ where: { studentId: id }, data: { compensationForId: null } }),
+    prisma.mealSession.deleteMany({ where: { studentId: id } }),
+    prisma.mealRegistration.deleteMany({ where: { studentId: id } }),
+    prisma.activityLog.updateMany({ where: { userId: id }, data: { userId: null } }),
+    prisma.user.delete({ where: { id } }),
+  ]);
+
+  await logActivity(
+    session.userId,
+    "DELETE_STUDENT",
+    `Xóa sinh viên ${student.name} (${student.phone}), STT ${student.orderCode ?? "—"}, ${sessionCount} buổi ăn`,
+  );
 
   return NextResponse.json({ ok: true });
 }
