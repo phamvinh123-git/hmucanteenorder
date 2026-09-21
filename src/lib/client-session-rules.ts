@@ -33,15 +33,27 @@ export function localDateKey(d: Date) {
 const DINNER_LATE_CANCEL_DATES = ["2026-09-21"];
 const DINNER_LATE_CANCEL_HOUR = 20;
 
+/** From this date the cancellation deadlines move to 9:00 (lunch) and 15:00 (dinner). */
+const NEW_CUTOFF_FROM = "2026-09-22";
+const LUNCH_CUTOFF_HOUR_NEW = 9;
+const DINNER_CUTOFF_HOUR_NEW = 15;
+
 export function cancelCutoff(sessionDate: Date, mealType: MealType) {
   const cutoff = startOfDayLocal(sessionDate);
-  const lateDinner = mealType === "DINNER" && DINNER_LATE_CANCEL_DATES.includes(localDateKey(sessionDate));
-  cutoff.setHours(
-    mealType === "LUNCH" ? LUNCH_CUTOFF_HOUR : lateDinner ? DINNER_LATE_CANCEL_HOUR : DINNER_CUTOFF_HOUR,
-    0,
-    0,
-    0,
-  );
+  const key = localDateKey(sessionDate);
+  const isNew = key >= NEW_CUTOFF_FROM;
+  const lateDinner = mealType === "DINNER" && DINNER_LATE_CANCEL_DATES.includes(key);
+  const hour =
+    mealType === "LUNCH"
+      ? isNew
+        ? LUNCH_CUTOFF_HOUR_NEW
+        : LUNCH_CUTOFF_HOUR
+      : lateDinner
+        ? DINNER_LATE_CANCEL_HOUR
+        : isNew
+          ? DINNER_CUTOFF_HOUR_NEW
+          : DINNER_CUTOFF_HOUR;
+  cutoff.setHours(hour, 0, 0, 0);
   return cutoff;
 }
 
@@ -65,7 +77,7 @@ function withinCutoffWindow(
   if (sessionDay.getTime() === today.getTime()) {
     const cutoff = cancelCutoff(date, mealType);
     if (now >= cutoff) {
-      const label = mealType === "LUNCH" ? "8:00 sáng" : "14:00";
+      const label = `${cutoff.getHours()}h00`;
       return { ok: false, reason: `Đã quá giờ (${label}) cho bữa ăn hôm nay.` };
     }
   }

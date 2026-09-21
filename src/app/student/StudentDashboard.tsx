@@ -9,6 +9,7 @@ import {
   LOW_MEAL_THRESHOLD,
 } from "@/lib/client-session-rules";
 import WeekMealGrid from "@/components/WeekMealGrid";
+import RulesNoticeModal from "@/components/RulesNoticeModal";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 type MealType = "LUNCH" | "DINNER";
@@ -244,6 +245,7 @@ export default function StudentDashboard({
         )}
       </div>
 
+      <RulesNoticeModal />
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 animate-pop-in">{error}</p>}
 
       <section>

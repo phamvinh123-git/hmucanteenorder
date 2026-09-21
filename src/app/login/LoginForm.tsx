@@ -25,6 +25,10 @@ export default function LoginForm() {
         setError(data.error ?? "Đăng nhập thất bại.");
         return;
       }
+      // The student page shows the meal-rules notice once per login until it is acknowledged.
+      try {
+        sessionStorage.setItem("canteenRulesPending", "1");
+      } catch {}
       if (data.mustChangePassword) {
         router.push("/change-password");
       } else {
