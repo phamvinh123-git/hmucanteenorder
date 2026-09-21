@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 /** Blocking confirmation pop-up: the action button stays disabled until the exact word is typed. */
 export default function ConfirmModal({
@@ -33,7 +34,8 @@ export default function ConfirmModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onClose]);
 
-  return (
+  // Portal to <body> so the page's transform-based entrance animation can't anchor `fixed` to itself.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       role="dialog"
@@ -86,6 +88,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

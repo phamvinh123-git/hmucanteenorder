@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const FLAG = "canteenRulesPending";
 
@@ -33,9 +34,10 @@ export default function RulesNoticeModal() {
 
   if (!open) return null;
 
-  return (
+  // Portal to <body>: an ancestor with a CSS transform (the page entrance animation) would otherwise anchor `fixed` to itself.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3"
       role="dialog"
       aria-modal="true"
       aria-label="Lưu ý khi đăng ký/hủy suất ăn"
@@ -76,6 +78,7 @@ export default function RulesNoticeModal() {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
