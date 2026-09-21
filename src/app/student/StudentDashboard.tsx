@@ -209,7 +209,7 @@ export default function StudentDashboard({
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-red-600 to-rose-500 p-6 text-white shadow-lg shadow-red-200 animate-rise-in sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-red-600 to-brand-blue-700 p-6 text-white shadow-lg shadow-red-200 animate-rise-in sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-white/10" />
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">

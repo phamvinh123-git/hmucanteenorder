@@ -20,7 +20,7 @@ import {
 // Shared across all three chart modes and the summary cards above them, so
 // Trưa/Tối always mean the same color no matter which range is selected.
 const LUNCH_COLOR = "#f59e0b";
-const DINNER_COLOR = "#6366f1";
+const DINNER_COLOR = "#0556a2";
 
 type Range = "day" | "week" | "month" | "custom";
 
