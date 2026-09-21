@@ -842,9 +842,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 )}
                 <div className="text-sm text-slate-600 lg:min-w-0">
                   {s.latestRegistration ? (
-                    <span>
-                      {PATTERN_LABEL[s.latestRegistration.mealPattern]} &middot; {s.latestRegistration.totalSessions} buổi
-                      &middot; {currency.format(s.latestRegistration.pricePerMeal)} &middot; từ {fmtDate(s.latestRegistration.startDate)}
+                    <span className="flex flex-col leading-snug lg:flex-row lg:flex-wrap lg:gap-x-1.5">
+                      <span>{PATTERN_LABEL[s.latestRegistration.mealPattern]}</span>
+                      <span className="hidden lg:inline">&middot;</span>
+                      <span>{s.latestRegistration.totalSessions} buổi</span>
+                      <span className="hidden lg:inline">&middot;</span>
+                      <span>{currency.format(s.latestRegistration.pricePerMeal)}</span>
+                      <span className="hidden lg:inline">&middot;</span>
+                      <span>từ {fmtDate(s.latestRegistration.startDate)}</span>
                     </span>
                   ) : (
                     <span className="text-slate-400">Chưa có đăng ký</span>
