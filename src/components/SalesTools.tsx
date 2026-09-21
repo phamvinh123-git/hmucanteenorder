@@ -698,9 +698,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           )}
           {students.map((s, i) => (
             <div key={s.id} className="animate-rise-in" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
-              <div className="p-3 flex flex-col items-start gap-1.5 lg:items-center lg:grid lg:grid-cols-[4.5rem_minmax(0,14rem)_minmax(0,15rem)_minmax(0,1fr)_5.5rem_6.5rem_minmax(0,16rem)] lg:gap-3 hover:bg-red-50/40 transition-colors">
+              <div className="p-3 flex flex-col items-start gap-1.5 xl:items-center xl:grid xl:grid-cols-[3.5rem_minmax(0,12rem)_minmax(0,11rem)_minmax(11rem,1fr)_5.5rem_6.5rem_13rem] xl:gap-3 hover:bg-red-50/40 transition-colors">
                 {editingOrderCodeId === s.id ? (
-                  <div className="lg:w-full flex-shrink-0">
+                  <div className="xl:w-full flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <input
                         autoFocus
@@ -731,14 +731,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <button
                     onClick={() => startEditOrderCode(s)}
                     title="Bấm để sửa mã số"
-                    className={`lg:w-full flex-shrink-0 text-left text-sm font-mono font-semibold rounded-lg px-2 py-1 hover:bg-red-50 ${
+                    className={`xl:w-full flex-shrink-0 text-left text-sm font-mono font-semibold rounded-lg px-2 py-1 hover:bg-red-50 ${
                       s.orderCode != null ? "text-red-700" : "text-slate-300"
                     }`}
                   >
                     {s.orderCode ?? "—"}
                   </button>
                 )}
-                <div className="lg:w-full min-w-0">
+                <div className="xl:w-full min-w-0">
                   <p className={`text-sm font-medium ${s.lowMeal ? "text-red-600" : "text-slate-800"}`}>
                     {s.name}
                     {s.lowMeal && " ⚠"}
@@ -781,7 +781,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   )}
                 </div>
                 {editingClassId === s.id ? (
-                  <div className="flex flex-wrap items-center gap-1 lg:w-full flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-1 xl:w-full flex-shrink-0">
                     <select
                       autoFocus
                       value={majorDraft}
@@ -826,7 +826,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   <button
                     onClick={() => startEditClass(s)}
                     title="Bấm để sửa ngành và lớp"
-                    className={`lg:w-full flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
+                    className={`xl:w-full flex-shrink-0 text-left text-sm rounded-lg px-2 py-1 hover:bg-red-50 ${
                       s.major || s.className ? "text-slate-700" : "text-slate-300"
                     }`}
                   >
@@ -840,7 +840,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     )}
                   </button>
                 )}
-                <div className="text-sm text-slate-600 lg:min-w-0">
+                <div className="text-sm text-slate-600 xl:min-w-0">
                   {s.latestRegistration ? (
                     <span className="flex flex-col leading-snug">
                       <span className="whitespace-nowrap">
@@ -854,15 +854,15 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     <span className="text-slate-400">Chưa có đăng ký</span>
                   )}
                 </div>
-                <div className={`text-sm font-medium whitespace-nowrap lg:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
+                <div className={`text-sm font-medium whitespace-nowrap xl:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
                   Còn {s.remaining} buổi
                 </div>
-                <div className="lg:text-center">
+                <div className="xl:text-center">
                   {s.mustChangePassword && (
                     <span className="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Chưa đổi MK</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 lg:justify-end">
+                <div className="flex items-center gap-2 xl:justify-end">
                 {s.lowMeal && (
                   <button
                     onClick={() => startRenew(s)}
