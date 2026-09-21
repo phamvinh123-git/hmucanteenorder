@@ -18,6 +18,7 @@ const schema = z.object({
   startDate: z.string().min(1),
   totalSessions: z.coerce.number().int().min(1).max(200),
   mealPattern: z.enum(["LUNCH", "DINNER", "BOTH"]),
+  startMeal: z.enum(["LUNCH", "DINNER"]).optional(),
   pricePerMeal: z.coerce.number().int().min(0),
   note: z.string().optional(),
   major: z.string().optional(),
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   // A renewal must not double-book a meal the student already has.
   if (existing) {
-    const plan = generateSessionPlan(new Date(data.startDate), data.mealPattern, data.totalSessions);
+    const plan = generateSessionPlan(new Date(data.startDate), data.mealPattern, data.totalSessions, data.startMeal);
     const firstDate = plan[0]?.date;
     const active = await prisma.mealSession.findMany({
       where: { studentId: existing.id, status: { not: "CANCELLED" }, ...(firstDate ? { date: { gte: firstDate } } : {}) },
@@ -121,6 +122,7 @@ export async function POST(req: NextRequest) {
     totalSessions: data.totalSessions,
     mealPattern: data.mealPattern,
     pricePerMeal: data.pricePerMeal,
+    firstMeal: data.startMeal,
     note: data.note,
     createdById: session.userId,
   });

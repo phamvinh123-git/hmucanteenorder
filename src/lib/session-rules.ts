@@ -30,18 +30,19 @@ export function nextSlot(from: Slot, mealPattern: MealPattern): Slot {
   return { date: addDays(from.date, 1), mealType };
 }
 
-/** Builds the initial list of meal slots for a brand-new registration. */
+/** Builds the initial list of meal slots for a registration. `firstMeal` only matters for "BOTH" (start with dinner). */
 export function generateSessionPlan(
   startDate: Date,
   mealPattern: MealPattern,
   totalSessions: number,
+  firstMeal: MealType = "LUNCH",
 ): Slot[] {
   const start = startOfDay(startDate);
   const slots: Slot[] = [];
 
   let cursor: Slot =
     mealPattern === "BOTH"
-      ? { date: start, mealType: "LUNCH" }
+      ? { date: start, mealType: firstMeal }
       : { date: start, mealType: mealPattern === "LUNCH" ? "LUNCH" : "DINNER" };
 
   for (let i = 0; i < totalSessions; i++) {

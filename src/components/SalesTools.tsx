@@ -85,7 +85,13 @@ function renewStartDate(lastSessionDate: string | null) {
   return nextKey > today ? nextKey : today;
 }
 
+/** Lunch is over after 14:00, so a "start today" registration then begins with dinner. */
+function defaultStartMeal(dateKey: string): "LUNCH" | "DINNER" {
+  return dateKey === localDateKey(new Date()) && new Date().getHours() >= 14 ? "DINNER" : "LUNCH";
+}
+
 const emptyForm = {
+  startMeal: defaultStartMeal(localDateKey(new Date())) as "LUNCH" | "DINNER",
   name: "",
   phone: "",
   major: "",
@@ -176,6 +182,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           major: data.major ?? "",
           className: data.className ?? "",
           startDate: renewStartDate(data.lastSessionDate),
+          startMeal: defaultStartMeal(renewStartDate(data.lastSessionDate)),
         }));
       } else {
         setKnown(null);
@@ -197,6 +204,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       mealPattern: last?.mealPattern ?? emptyForm.mealPattern,
       pricePerMeal: last?.pricePerMeal ?? emptyForm.pricePerMeal,
       startDate: renewStartDate(s.lastSessionDate),
+      startMeal: defaultStartMeal(renewStartDate(s.lastSessionDate)),
     });
     lookupSeq.current++;
     setKnown({ orderCode: s.orderCode, remaining: s.remaining });
@@ -484,7 +492,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                     required
                     type="date"
                     value={form.startDate}
-                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, startDate: e.target.value, startMeal: defaultStartMeal(e.target.value) })
+                    }
                     className={inputCls}
                   />
                 </div>
@@ -530,6 +540,32 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                       </button>
                     ))}
                   </div>
+                  {form.mealPattern === "BOTH" && (
+                    <div className="mt-2">
+                      <p className="mb-1 text-xs text-slate-500">Bữa đầu tiên trong ngày bắt đầu</p>
+                      <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                        {(
+                          [
+                            ["LUNCH", "Bắt đầu từ trưa"],
+                            ["DINNER", "Bắt đầu từ tối"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setForm({ ...form, startMeal: value })}
+                            className={`rounded-lg px-2 py-1.5 text-xs font-medium transition ${
+                              form.startMeal === value
+                                ? "bg-red-600 text-white shadow-sm"
+                                : "text-slate-600 hover:bg-white hover:text-red-700"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>Giá mỗi suất (VNĐ)</label>

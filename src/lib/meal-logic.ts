@@ -28,8 +28,9 @@ export async function createRegistrationWithSessions(params: {
   pricePerMeal: number;
   note?: string;
   createdById: string;
+  firstMeal?: MealType;
 }) {
-  const slots = generateSessionPlan(params.startDate, params.mealPattern, params.totalSessions);
+  const slots = generateSessionPlan(params.startDate, params.mealPattern, params.totalSessions, params.firstMeal);
 
   return prisma.mealRegistration.create({
     data: {
