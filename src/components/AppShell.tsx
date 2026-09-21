@@ -41,7 +41,7 @@ export default function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="print:hidden bg-white border-b-4 border-brand-blue-700 shadow-sm">
+      <header className="print:hidden bg-white border-b-2 border-red-600 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <Image
@@ -58,7 +58,7 @@ export default function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="text-sm text-slate-600 hover:text-brand-blue-700 hover:bg-brand-blue-50 rounded-md px-2 py-0.5 transition-colors"
+                    className="text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md px-2 py-0.5 transition-colors"
                   >
                     {item.label}
                   </Link>

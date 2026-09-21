@@ -5,7 +5,7 @@
   --foreground: #1e1a2b;
 }
 
-/* Hanoi Medical University brand: crimson #be1651 (red-600), blue #0556a2 (brand-blue-700), white.
+/* Hanoi Medical University brand: crimson #be1651 (red-600) and white.
    Overriding Tailwind's red scale re-colours every existing red-* class at once. */
 @theme {
   --color-red-50: #fdf2f6;
@@ -19,17 +19,6 @@
   --color-red-800: #830f3a;
   --color-red-900: #6b0f32;
   --color-red-950: #3f0620;
-
-  --color-brand-blue-50: #eff6fc;
-  --color-brand-blue-100: #dcebf8;
-  --color-brand-blue-200: #b9d7f1;
-  --color-brand-blue-300: #86bae6;
-  --color-brand-blue-400: #4d97d6;
-  --color-brand-blue-500: #1a6fbd;
-  --color-brand-blue-600: #0a61ad;
-  --color-brand-blue-700: #0556a2;
-  --color-brand-blue-800: #044785;
-  --color-brand-blue-900: #033767;
 }
 
 @theme inline {
