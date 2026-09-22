@@ -116,6 +116,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [restoreConfirmId, setRestoreConfirmId] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [missedOpenId, setMissedOpenId] = useState<string | null>(null);
@@ -264,6 +265,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setMissedOpenId(null);
     setRemoveConfirmId(null);
     setRemoveError(null);
+    setRestoreConfirmId(null);
     setRestoreError(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
@@ -300,6 +302,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         setRestoreError(data.error ?? "Không thể khôi phục buổi ăn.");
         return;
       }
+      setRestoreConfirmId(null);
       loadStudents(search);
       const res2 = await fetch(`/api/students/${studentId}`);
       if (res2.ok) setDetail(await res2.json());
@@ -1103,14 +1106,31 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                 )
                               )}
                               {sx.status === "CANCELLED" && sx.hasCompensation && (
-                                <button
-                                  onClick={() => staffRestoreSession(s.id, sx.id)}
-                                  disabled={restoringId === sx.id}
-                                  className="text-xs font-medium text-red-600 no-underline hover:underline disabled:opacity-50"
-                                  title="Khôi phục buổi này hộ sinh viên, bỏ qua giờ chốt"
-                                >
-                                  {restoringId === sx.id ? "Đang khôi phục..." : "Khôi phục"}
-                                </button>
+                                restoreConfirmId === sx.id ? (
+                                  <span className="flex items-center gap-1 no-underline">
+                                    <button
+                                      onClick={() => staffRestoreSession(s.id, sx.id)}
+                                      disabled={restoringId === sx.id}
+                                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                                    >
+                                      {restoringId === sx.id ? "Đang khôi phục..." : "Xác nhận khôi phục"}
+                                    </button>
+                                    <button
+                                      onClick={() => setRestoreConfirmId(null)}
+                                      className="text-xs text-slate-400 hover:underline"
+                                    >
+                                      Thôi
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setRestoreConfirmId(sx.id)}
+                                    className="text-xs text-red-600 no-underline hover:underline"
+                                    title="Khôi phục buổi này hộ sinh viên, bỏ qua giờ chốt"
+                                  >
+                                    Khôi phục
+                                  </button>
+                                )
                               )}
                             </li>
                           ))}
