@@ -4,7 +4,7 @@ import { MealPattern, MealType, SessionStatus } from "@prisma/client";
 
 export const LUNCH_CUTOFF_HOUR = 8; // cancel lunch only before 08:00 same day
 export const DINNER_CUTOFF_HOUR = 14; // cancel dinner only before 14:00 same day
-export const LOW_MEAL_THRESHOLD = 2; // flag student red when remaining < 2
+export const LOW_MEAL_THRESHOLD = 4; // flag student red when remaining < 4
 
 export type Slot = { date: Date; mealType: MealType };
 

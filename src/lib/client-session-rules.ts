@@ -3,7 +3,7 @@
 
 export const LUNCH_CUTOFF_HOUR = 8;
 export const DINNER_CUTOFF_HOUR = 14;
-export const LOW_MEAL_THRESHOLD = 2;
+export const LOW_MEAL_THRESHOLD = 4;
 
 export type MealType = "LUNCH" | "DINNER";
 export type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
