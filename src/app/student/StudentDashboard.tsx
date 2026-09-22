@@ -104,6 +104,27 @@ export default function StudentDashboard({
     [sessions],
   );
 
+  // Full candidate sets for the "Chọn tất cả" shortcuts in each multi-select mode.
+  const cancellableUpcomingIds = useMemo(
+    () =>
+      upcoming
+        .filter((s) => canCancelSession({ date: new Date(s.date), mealType: s.mealType, status: s.status }).ok)
+        .map((s) => s.id),
+    [upcoming],
+  );
+  const restorableHistoryIds = useMemo(
+    () =>
+      history
+        .filter(
+          (s) =>
+            s.status === "CANCELLED" &&
+            s.hasCompensation &&
+            canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status }).ok,
+        )
+        .map((s) => s.id),
+    [history],
+  );
+
   async function cancelSession(id: string) {
     setConfirmingId(null);
     setBusyId(id);
@@ -178,6 +199,11 @@ export default function StudentDashboard({
   function togglePick(id: string) {
     setBulkConfirm(false);
     setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleSelectAll(ids: string[]) {
+    setBulkConfirm(false);
+    setPicked((prev) => (ids.length > 0 && prev.length === ids.length && ids.every((id) => prev.includes(id)) ? [] : ids));
   }
 
   async function runBulk() {
@@ -560,9 +586,21 @@ export default function StudentDashboard({
             <span className="text-sm text-slate-400">{upcoming.length} buổi</span>
             {upcoming.length > 0 &&
               (multi === "cancel" ? (
-                <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
-                  Thoát chọn nhiều
-                </button>
+                <>
+                  {cancellableUpcomingIds.length > 0 && (
+                    <button
+                      onClick={() => toggleSelectAll(cancellableUpcomingIds)}
+                      className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                    >
+                      {picked.length === cancellableUpcomingIds.length
+                        ? "Bỏ chọn tất cả"
+                        : `Chọn tất cả (${cancellableUpcomingIds.length})`}
+                    </button>
+                  )}
+                  <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
+                    Thoát chọn nhiều
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => startMulti("cancel")}
@@ -657,9 +695,21 @@ export default function StudentDashboard({
         {showHistory && history.some((h) => h.status === "CANCELLED" && h.hasCompensation) && (
           <div className="mt-2">
             {multi === "restore" ? (
-              <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
-                Thoát chọn nhiều
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {restorableHistoryIds.length > 0 && (
+                  <button
+                    onClick={() => toggleSelectAll(restorableHistoryIds)}
+                    className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                  >
+                    {picked.length === restorableHistoryIds.length
+                      ? "Bỏ chọn tất cả"
+                      : `Chọn tất cả (${restorableHistoryIds.length})`}
+                  </button>
+                )}
+                <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
+                  Thoát chọn nhiều
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => startMulti("restore")}
