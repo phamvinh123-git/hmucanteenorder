@@ -81,7 +81,7 @@ export default function StudentDashboard({
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const remaining = sessions.filter((s) => s.status === "SCHEDULED").length;
-  const lowMeal = remaining < LOW_MEAL_THRESHOLD;
+  const lowMeal = remaining <= LOW_MEAL_THRESHOLD;
 
   const upcoming = useMemo(
     () =>

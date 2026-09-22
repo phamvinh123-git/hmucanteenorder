@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
         latestRegistration: s.registrations[0] ?? null,
         remaining,
         lastSessionDate: last?.date ?? null,
-        lowMeal: remaining < LOW_MEAL_THRESHOLD,
+        lowMeal: remaining <= LOW_MEAL_THRESHOLD,
       };
     }),
   );
