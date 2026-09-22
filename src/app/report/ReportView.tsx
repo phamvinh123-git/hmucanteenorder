@@ -16,11 +16,33 @@ type ReportRow = {
   eaten: number;
 };
 
+type RegistrationRow = {
+  studentId: string;
+  name: string;
+  phone: string;
+  orderCode: number | null;
+  major: string | null;
+  className: string | null;
+  totalSessions: number;
+  mealPattern: "LUNCH" | "DINNER" | "BOTH";
+  pricePerMeal: number;
+  startDate: string;
+  createdAt: string;
+};
+
 type ReportResponse = {
   start: string;
   end: string;
   rows: ReportRow[];
+  newRegistrations: RegistrationRow[];
+  renewals: RegistrationRow[];
   summary: { totalStudents: number; totalBooked: number; totalEaten: number };
+};
+
+const PATTERN_LABEL: Record<RegistrationRow["mealPattern"], string> = {
+  LUNCH: "Trưa",
+  DINNER: "Tối",
+  BOTH: "Trưa & Tối",
 };
 
 const RANGE_LABEL: Record<Range, string> = {
@@ -37,6 +59,7 @@ function addDaysLocal(key: string, n: number) {
 }
 
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 
 export default function ReportView() {
   const [range, setRange] = useState<Range>("week");
@@ -65,7 +88,7 @@ export default function ReportView() {
       .finally(() => setLoading(false));
   }, [range, customStart, customEnd]);
 
-  const rows = data?.rows.filter((r) => {
+  function matchesSearch(r: { name: string; major: string | null; className: string | null }) {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
     return (
@@ -73,7 +96,11 @@ export default function ReportView() {
       (r.major ?? "").toLowerCase().includes(q) ||
       (r.className ?? "").toLowerCase().includes(q)
     );
-  });
+  }
+
+  const rows = data?.rows.filter(matchesSearch);
+  const newRegistrations = data?.newRegistrations.filter(matchesSearch);
+  const renewals = data?.renewals.filter(matchesSearch);
 
   return (
     <div className="space-y-6">
@@ -144,7 +171,7 @@ export default function ReportView() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-3 gap-3 print:gap-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 print:gap-2">
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in">
               <p className="text-xs text-slate-500">Số sinh viên</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalStudents}</p>
@@ -156,6 +183,14 @@ export default function ReportView() {
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "80ms" }}>
               <p className="text-xs text-slate-500">Tổng suất đã ăn</p>
               <p className="text-xl font-bold text-green-600">{data.summary.totalEaten}</p>
+            </div>
+            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "120ms" }}>
+              <p className="text-xs text-slate-500">Đăng ký mới</p>
+              <p className="text-xl font-bold text-slate-800">{data.newRegistrations.length}</p>
+            </div>
+            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "160ms" }}>
+              <p className="text-xs text-slate-500">Gia hạn</p>
+              <p className="text-xl font-bold text-slate-800">{data.renewals.length}</p>
             </div>
           </div>
 
@@ -197,8 +232,72 @@ export default function ReportView() {
               </table>
             </div>
           </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0 print:break-before-page" style={{ animationDelay: "160ms" }}>
+            <p className="mb-3 text-sm font-semibold text-slate-700">
+              Sinh viên mới đăng ký ({newRegistrations?.length ?? 0})
+              <span className="ml-2 font-normal text-slate-400 print:hidden">
+                Lần đầu đăng ký ăn trong khoảng {dateFmt.format(new Date(data.start))} – {dateFmt.format(new Date(data.end))}
+              </span>
+            </p>
+            <RegistrationTable rows={newRegistrations} emptyLabel="Không có sinh viên mới đăng ký trong khoảng thời gian này." />
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0 print:break-before-page" style={{ animationDelay: "200ms" }}>
+            <p className="mb-3 text-sm font-semibold text-slate-700">
+              Sinh viên mới gia hạn ({renewals?.length ?? 0})
+              <span className="ml-2 font-normal text-slate-400 print:hidden">
+                Đã đăng ký từ trước, mua thêm đợt mới trong khoảng thời gian này
+              </span>
+            </p>
+            <RegistrationTable rows={renewals} emptyLabel="Không có sinh viên nào gia hạn trong khoảng thời gian này." />
+          </div>
         </>
       )}
+    </div>
+  );
+}
+
+function RegistrationTable({ rows, emptyLabel }: { rows: RegistrationRow[] | undefined; emptyLabel: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm print:text-xs print:[&_td]:border print:[&_th]:border print:[&_td]:border-slate-400 print:[&_th]:border-slate-400 print:[&_td]:px-2 print:[&_th]:px-2">
+        <thead>
+          <tr className="text-left text-slate-500 border-b border-slate-100 print:text-black">
+            <th className="py-2 pr-4">STT</th>
+            <th className="py-2 pr-4">Họ và tên</th>
+            <th className="py-2 pr-4">SĐT</th>
+            <th className="py-2 pr-4">Ngành / Lớp</th>
+            <th className="py-2 pr-4">Bữa ăn</th>
+            <th className="py-2 pr-4 text-right">Số buổi</th>
+            <th className="py-2 pr-4 text-right">Giá</th>
+            <th className="py-2 pr-4">Từ ngày</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows && rows.length === 0 && (
+            <tr>
+              <td colSpan={8} className="py-6 text-center text-slate-400">
+                {emptyLabel}
+              </td>
+            </tr>
+          )}
+          {rows?.map((r) => (
+            <tr key={`${r.studentId}-${r.createdAt}`} className="border-b border-slate-50 hover:bg-red-50/40 transition-colors">
+              <td className="py-1.5 pr-4 font-mono">{r.orderCode ?? "—"}</td>
+              <td className="py-1.5 pr-4">{r.name}</td>
+              <td className="py-1.5 pr-4 text-slate-500">{r.phone}</td>
+              <td className="py-1.5 pr-4 text-slate-500">
+                {r.className || r.major ? `${r.className || "—"}${r.major ? ` · ${r.major}` : ""}` : "—"}
+              </td>
+              <td className="py-1.5 pr-4 text-slate-500">{PATTERN_LABEL[r.mealPattern]}</td>
+              <td className="py-1.5 pr-4 text-right">{r.totalSessions}</td>
+              <td className="py-1.5 pr-4 text-right">{currency.format(r.pricePerMeal)}</td>
+              <td className="py-1.5 pr-4 text-slate-500">{dateFmt.format(new Date(r.startDate))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

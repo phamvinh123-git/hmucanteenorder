@@ -48,6 +48,51 @@ export async function GET(req: NextRequest) {
 
   await syncCompletedSessions();
 
+  // Registrations created in this range, split into brand-new students vs. returning students
+  // renewing — "new" means this is the very first registration that student ever had.
+  const regsInRange = await prisma.mealRegistration.findMany({
+    where: { createdAt: { gte: start, lte: end } },
+    select: {
+      id: true,
+      studentId: true,
+      startDate: true,
+      totalSessions: true,
+      mealPattern: true,
+      pricePerMeal: true,
+      createdAt: true,
+      student: { select: { name: true, phone: true, orderCode: true, major: true, className: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const studentIds = Array.from(new Set(regsInRange.map((r) => r.studentId)));
+  const earliestEver =
+    studentIds.length > 0
+      ? await prisma.mealRegistration.groupBy({
+          by: ["studentId"],
+          where: { studentId: { in: studentIds } },
+          _min: { createdAt: true },
+        })
+      : [];
+  const firstEverByStudent = new Map(earliestEver.map((e) => [e.studentId, e._min.createdAt?.getTime()]));
+
+  const registrationRows = regsInRange.map((r) => ({
+    studentId: r.studentId,
+    name: r.student.name,
+    phone: r.student.phone,
+    orderCode: r.student.orderCode,
+    major: r.student.major,
+    className: r.student.className,
+    totalSessions: r.totalSessions,
+    mealPattern: r.mealPattern,
+    pricePerMeal: r.pricePerMeal,
+    startDate: r.startDate,
+    createdAt: r.createdAt,
+    isFirstEver: firstEverByStudent.get(r.studentId) === r.createdAt.getTime(),
+  }));
+  const newRegistrations = registrationRows.filter((r) => r.isFirstEver);
+  const renewals = registrationRows.filter((r) => !r.isFirstEver);
+
   const sessions = await prisma.mealSession.findMany({
     where: { date: { gte: start, lte: end } },
     select: {
@@ -101,6 +146,8 @@ export async function GET(req: NextRequest) {
     start: start.toISOString(),
     end: end.toISOString(),
     rows,
+    newRegistrations,
+    renewals,
     summary: {
       totalStudents: rows.length,
       totalBooked: rows.reduce((sum, r) => sum + r.booked, 0),
