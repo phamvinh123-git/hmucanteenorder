@@ -112,6 +112,13 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [form, setForm] = useState(emptyForm);
   const [known, setKnown] = useState<{ orderCode: number | null; remaining: number } | null>(null);
   const lookupSeq = useRef(0);
+  const [missedOpenId, setMissedOpenId] = useState<string | null>(null);
+  const [missedRegId, setMissedRegId] = useState("");
+  const [missedDate, setMissedDate] = useState(localDateKey(new Date()));
+  const [missedMeal, setMissedMeal] = useState<"LUNCH" | "DINNER">("LUNCH");
+  const [missedBusy, setMissedBusy] = useState(false);
+  const [missedError, setMissedError] = useState<string | null>(null);
+  const [missedSuccess, setMissedSuccess] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StudentRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -248,8 +255,34 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     }
     setExpandedId(id);
     setDetail(null);
+    setMissedOpenId(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
+  }
+
+  async function submitMissedSession(studentId: string) {
+    if (!missedRegId) return;
+    setMissedBusy(true);
+    setMissedError(null);
+    setMissedSuccess(null);
+    try {
+      const res = await fetch(`/api/registrations/${missedRegId}/missed-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: missedDate, mealType: missedMeal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMissedError(data.error ?? "Không thể ghi nhận buổi ăn.");
+        return;
+      }
+      setMissedSuccess("Đã ghi nhận. Tổng số buổi được giữ nguyên như gói đã mua.");
+      loadStudents(search);
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setMissedBusy(false);
+    }
   }
 
   async function deleteStudent() {
@@ -995,6 +1028,78 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             </li>
                           ))}
                       </ul>
+
+                      <div className="mt-3 border-t border-red-100 pt-3">
+                        {missedOpenId === s.id ? (
+                          <div className="space-y-2 rounded-lg bg-white p-3 animate-pop-in">
+                            <p className="text-xs text-slate-500">
+                              Dùng khi nhân viên quên đăng ký 1 buổi mà sinh viên đã ăn rồi (ví dụ chọn nhầm &quot;Bắt
+                              đầu từ tối&quot; dù bạn ấy đã ăn trưa). Hệ thống ghi nhận buổi này là đã ăn, và tự bớt 1
+                              buổi ở cuối lịch để tổng số buổi không đổi so với gói đã mua.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {detail.registrations.length > 1 && (
+                                <select
+                                  value={missedRegId}
+                                  onChange={(e) => setMissedRegId(e.target.value)}
+                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                >
+                                  {detail.registrations.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      Đợt từ {fmtDate(r.startDate)} ({r.totalSessions} buổi)
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <input
+                                type="date"
+                                value={missedDate}
+                                max={localDateKey(new Date())}
+                                onChange={(e) => setMissedDate(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                              />
+                              <select
+                                value={missedMeal}
+                                onChange={(e) => setMissedMeal(e.target.value as "LUNCH" | "DINNER")}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                              >
+                                <option value="LUNCH">Bữa trưa</option>
+                                <option value="DINNER">Bữa tối</option>
+                              </select>
+                              <button
+                                onClick={() => submitMissedSession(s.id)}
+                                disabled={missedBusy}
+                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {missedBusy ? "Đang lưu..." : "Ghi nhận đã ăn"}
+                              </button>
+                              <button
+                                onClick={() => setMissedOpenId(null)}
+                                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+                              >
+                                Thôi
+                              </button>
+                            </div>
+                            {missedError && <p className="text-xs text-red-600">{missedError}</p>}
+                            {missedSuccess && <p className="text-xs text-green-600">{missedSuccess}</p>}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setMissedOpenId(s.id);
+                              setMissedRegId(detail.registrations[0]?.id ?? "");
+                              setMissedDate(localDateKey(new Date()));
+                              setMissedMeal("LUNCH");
+                              setMissedError(null);
+                              setMissedSuccess(null);
+                            }}
+                            disabled={detail.registrations.length === 0}
+                            className="text-xs text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+                          >
+                            + Ghi nhận buổi ăn bị bỏ sót
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

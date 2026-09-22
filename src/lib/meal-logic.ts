@@ -275,3 +275,65 @@ export async function backfillMissingOrderCodes() {
 
   return missing.length;
 }
+
+/**
+ * Data-entry fix: staff forgot to register a meal the student already ate (e.g. picked "start
+ * from dinner" although lunch that day was already served). Records that meal as eaten today
+ * (or an earlier date), and — since the student only paid for `totalSessions` meals — gives up
+ * the registration's last still-scheduled slot so the total actually served doesn't grow.
+ */
+export async function recordMissedSession(params: { registrationId: string; date: Date; mealType: MealType }) {
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
+
+  if (registration.mealPattern !== "BOTH" && registration.mealPattern !== params.mealType) {
+    throw new Error(registration.mealPattern === "LUNCH" ? "Gói này chỉ có bữa trưa." : "Gói này chỉ có bữa tối.");
+  }
+
+  const day = startOfDay(params.date);
+  if (day.getTime() > startOfDay(new Date()).getTime()) {
+    throw new Error("Chỉ ghi nhận được buổi đã diễn ra (hôm nay hoặc trước đó).");
+  }
+
+  const clash = await prisma.mealSession.findFirst({
+    where: { studentId: registration.studentId, date: day, mealType: params.mealType, status: { not: "CANCELLED" } },
+  });
+  if (clash) {
+    throw new Error("Sinh viên đã có buổi ăn vào đúng ngày và bữa này rồi.");
+  }
+
+  const scheduled = await prisma.mealSession.findMany({
+    where: { registrationId: registration.id, status: "SCHEDULED" },
+    select: { id: true, date: true, mealType: true },
+  });
+  const last = scheduled.length > 0 ? [...scheduled].sort(compareSlots).at(-1)! : null;
+
+  const [created] = await prisma.$transaction([
+    prisma.mealSession.create({
+      data: {
+        registrationId: registration.id,
+        studentId: registration.studentId,
+        date: day,
+        mealType: params.mealType,
+        status: "COMPLETED",
+        pickedUp: true,
+        pickedUpAt: new Date(),
+        price: registration.pricePerMeal,
+        note: "Bổ sung buổi bị bỏ sót khi đăng ký (sinh viên đã ăn nhưng chưa được ghi nhận)",
+      },
+    }),
+    ...(last
+      ? [
+          prisma.mealSession.update({
+            where: { id: last.id },
+            data: {
+              status: "CANCELLED",
+              cancelledAt: new Date(),
+              note: "Tự động bớt buổi cuối để bù cho buổi bị bỏ sót ở trên",
+            },
+          }),
+        ]
+      : []),
+  ]);
+
+  return { created, removedFutureSessionId: last?.id ?? null };
+}
