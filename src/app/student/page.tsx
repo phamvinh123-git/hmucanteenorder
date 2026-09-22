@@ -27,6 +27,8 @@ export default async function StudentPage() {
       <StudentDashboard
         studentName={user.name}
         orderCode={user.orderCode}
+        major={user.major}
+        className={user.className}
         sessions={sessions.map((s) => ({
           id: s.id,
           date: s.date.toISOString(),

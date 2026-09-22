@@ -61,10 +61,14 @@ function fmtDate(iso: string) {
 export default function StudentDashboard({
   studentName,
   orderCode,
+  major,
+  className,
   sessions: initialSessions,
 }: {
   studentName: string;
   orderCode: number | null;
+  major: string | null;
+  className: string | null;
   sessions: SessionDTO[];
 }) {
   const [sessions, setSessions] = useState(initialSessions);
@@ -329,7 +333,7 @@ export default function StudentDashboard({
         )}
       </div>
 
-      <RulesNoticeModal />
+      <RulesNoticeModal major={major} className={className} />
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 animate-pop-in">{error}</p>}
 
       <section>
