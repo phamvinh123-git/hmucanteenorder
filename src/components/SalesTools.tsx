@@ -48,6 +48,7 @@ type StudentDetail = {
     status: string;
     pickedUp: boolean;
     note: string | null;
+    hasCompensation: boolean;
   }[];
 };
 
@@ -115,6 +116,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const [missedOpenId, setMissedOpenId] = useState<string | null>(null);
   const [missedRegId, setMissedRegId] = useState("");
   const [missedDate, setMissedDate] = useState(localDateKey(new Date()));
@@ -261,6 +264,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setMissedOpenId(null);
     setRemoveConfirmId(null);
     setRemoveError(null);
+    setRestoreError(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
   }
@@ -281,6 +285,26 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       if (res2.ok) setDetail(await res2.json());
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  // Restore a cancelled meal on the student's behalf, bypassing the usual cutoff — for when a
+  // student cancelled by mistake or missed the self-service window and asks staff to fix it.
+  async function staffRestoreSession(studentId: string, sessionId: string) {
+    setRestoringId(sessionId);
+    setRestoreError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/restore`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setRestoreError(data.error ?? "Không thể khôi phục buổi ăn.");
+        return;
+      }
+      loadStudents(search);
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -1078,9 +1102,20 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                   </button>
                                 )
                               )}
+                              {sx.status === "CANCELLED" && sx.hasCompensation && (
+                                <button
+                                  onClick={() => staffRestoreSession(s.id, sx.id)}
+                                  disabled={restoringId === sx.id}
+                                  className="text-xs font-medium text-red-600 no-underline hover:underline disabled:opacity-50"
+                                  title="Khôi phục buổi này hộ sinh viên, bỏ qua giờ chốt"
+                                >
+                                  {restoringId === sx.id ? "Đang khôi phục..." : "Khôi phục"}
+                                </button>
+                              )}
                             </li>
                           ))}
                       </ul>
+                      {restoreError && <p className="text-xs text-red-600">{restoreError}</p>}
                       {removeError && <p className="text-xs text-red-600">{removeError}</p>}
 
                       <div className="mt-3 border-t border-red-100 pt-3">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { restoreSession } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
@@ -18,17 +18,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const isOwner = target.studentId === session.userId && session.role === "STUDENT";
-  const isAdmin = session.role === "ADMIN";
-  if (!isOwner && !isAdmin) {
+  const isStaff = canAccessSalesTools(session.role);
+  if (!isOwner && !isStaff) {
     return NextResponse.json({ error: "Không có quyền khôi phục buổi ăn này." }, { status: 403 });
   }
 
   try {
-    const result = await restoreSession(id, { bypassDeadline: isAdmin });
+    // Staff acting on a student's behalf (e.g. the student missed the self-service cutoff) skip the deadline check.
+    const result = await restoreSession(id, { bypassDeadline: isStaff });
     await logActivity(
       session.userId,
       "RESTORE_SESSION",
-      `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), xóa suất bù đã thêm trước đó`,
+      `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), xóa suất bù đã thêm trước đó${
+        isStaff ? " (nhân viên khôi phục hộ)" : ""
+      }`,
     );
     return NextResponse.json({ ok: true, restored: result.restored, removedCompensationId: result.removedCompensationId });
   } catch (err) {
