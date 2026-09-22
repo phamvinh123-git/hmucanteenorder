@@ -337,3 +337,25 @@ export async function recordMissedSession(params: { registrationId: string; date
 
   return { created, removedFutureSessionId: last?.id ?? null };
 }
+
+/**
+ * Manager/admin correction: permanently drops one still-unused scheduled meal, with no
+ * compensation added (unlike the student-facing cancel flow). For fixing an accidental
+ * over-count — e.g. staff registered a make-up meal separately instead of using
+ * `recordMissedSession`, leaving the student with one extra session in the schedule.
+ */
+export async function removeScheduledSession(sessionId: string) {
+  const session = await prisma.mealSession.findUniqueOrThrow({ where: { id: sessionId } });
+
+  if (session.status !== "SCHEDULED") {
+    throw new Error("Chỉ xóa được buổi đang ở trạng thái Sắp tới.");
+  }
+  if (session.pickedUp) {
+    throw new Error("Buổi này đã lấy đồ ăn, không thể xóa.");
+  }
+
+  return prisma.mealSession.update({
+    where: { id: sessionId },
+    data: { status: "CANCELLED", cancelledAt: new Date(), note: "Xóa thủ công để chỉnh lại số buổi bị dư" },
+  });
+}

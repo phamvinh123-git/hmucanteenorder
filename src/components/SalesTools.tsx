@@ -112,6 +112,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [form, setForm] = useState(emptyForm);
   const [known, setKnown] = useState<{ orderCode: number | null; remaining: number } | null>(null);
   const lookupSeq = useRef(0);
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [missedOpenId, setMissedOpenId] = useState<string | null>(null);
   const [missedRegId, setMissedRegId] = useState("");
   const [missedDate, setMissedDate] = useState(localDateKey(new Date()));
@@ -256,8 +259,29 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setExpandedId(id);
     setDetail(null);
     setMissedOpenId(null);
+    setRemoveConfirmId(null);
+    setRemoveError(null);
     const res = await fetch(`/api/students/${id}`);
     if (res.ok) setDetail(await res.json());
+  }
+
+  async function removeSession(studentId: string, sessionId: string) {
+    setRemovingId(sessionId);
+    setRemoveError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/remove`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setRemoveError(data.error ?? "Không thể xóa buổi ăn.");
+        return;
+      }
+      setRemoveConfirmId(null);
+      loadStudents(search);
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   async function submitMissedSession(studentId: string) {
@@ -1006,7 +1030,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                           .map((sx) => (
                             <li
                               key={sx.id}
-                              className={
+                              className={`flex flex-wrap items-center gap-2 ${
                                 sx.status === "CANCELLED"
                                   ? "text-slate-400 line-through"
                                   : sx.pickedUp
@@ -1014,20 +1038,50 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     : sx.status === "COMPLETED"
                                       ? "text-amber-600"
                                       : "text-slate-600"
-                              }
+                              }`}
                             >
-                              {fmtDate(sx.date)} &middot; {sx.mealType === "LUNCH" ? "Trưa" : "Tối"}
-                              {sx.status === "CANCELLED"
-                                ? " (đã hủy)"
-                                : sx.pickedUp
-                                  ? " (đã ăn)"
-                                  : sx.status === "COMPLETED"
-                                    ? " (chưa lấy)"
-                                    : ""}
-                              {sx.note ? ` — ${sx.note}` : ""}
+                              <span>
+                                {fmtDate(sx.date)} &middot; {sx.mealType === "LUNCH" ? "Trưa" : "Tối"}
+                                {sx.status === "CANCELLED"
+                                  ? " (đã hủy)"
+                                  : sx.pickedUp
+                                    ? " (đã ăn)"
+                                    : sx.status === "COMPLETED"
+                                      ? " (chưa lấy)"
+                                      : ""}
+                                {sx.note ? ` — ${sx.note}` : ""}
+                              </span>
+                              {canResetAll && sx.status === "SCHEDULED" && !sx.pickedUp && (
+                                removeConfirmId === sx.id ? (
+                                  <span className="flex items-center gap-1 no-underline">
+                                    <button
+                                      onClick={() => removeSession(s.id, sx.id)}
+                                      disabled={removingId === sx.id}
+                                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                                    >
+                                      Xác nhận xóa
+                                    </button>
+                                    <button
+                                      onClick={() => setRemoveConfirmId(null)}
+                                      className="text-xs text-slate-400 hover:underline"
+                                    >
+                                      Thôi
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setRemoveConfirmId(sx.id)}
+                                    className="text-xs text-slate-300 no-underline hover:text-red-600 hover:underline"
+                                    title="Xóa buổi này (không bù, dùng khi buổi bị đăng ký dư)"
+                                  >
+                                    Xóa
+                                  </button>
+                                )
+                              )}
                             </li>
                           ))}
                       </ul>
+                      {removeError && <p className="text-xs text-red-600">{removeError}</p>}
 
                       <div className="mt-3 border-t border-red-100 pt-3">
                         {missedOpenId === s.id ? (
