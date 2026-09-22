@@ -68,6 +68,8 @@ export default function ScheduleView() {
     return [...list].sort(sortByOrderCode);
   }, [byCell, selectedCell]);
 
+  const [bulkPickupBusy, setBulkPickupBusy] = useState(false);
+
   async function togglePickedUp(s: ScheduleSession) {
     const next = !s.pickedUp;
     setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, pickedUp: next } : x)));
@@ -78,6 +80,27 @@ export default function ScheduleView() {
     });
     if (!res.ok) {
       setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, pickedUp: !next } : x)));
+    }
+  }
+
+  // "Chọn tất cả": tick (or untick) every row in the currently open cell at once.
+  async function toggleAllPickedUp(list: ScheduleSession[], pickedUp: boolean) {
+    const ids = list.filter((s) => s.pickedUp !== pickedUp).map((s) => s.id);
+    if (ids.length === 0) return;
+    setBulkPickupBusy(true);
+    const idSet = new Set(ids);
+    setSessions((prev) => prev.map((x) => (idSet.has(x.id) ? { ...x, pickedUp } : x)));
+    try {
+      const res = await fetch("/api/sessions/bulk-pickup", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, pickedUp }),
+      });
+      if (!res.ok) {
+        setSessions((prev) => prev.map((x) => (idSet.has(x.id) ? { ...x, pickedUp: !pickedUp } : x)));
+      }
+    } finally {
+      setBulkPickupBusy(false);
     }
   }
 
@@ -139,6 +162,24 @@ export default function ScheduleView() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {selectedList.length > 0 &&
+                (selectedList.every((s) => s.pickedUp) ? (
+                  <button
+                    onClick={() => toggleAllPickedUp(selectedList, false)}
+                    disabled={bulkPickupBusy}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                  >
+                    Bỏ chọn tất cả
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => toggleAllPickedUp(selectedList, true)}
+                    disabled={bulkPickupBusy}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-600 font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Chọn tất cả đã lấy
+                  </button>
+                ))}
               <a
                 href={`/schedule/print?date=${selectedCell.date}&mealType=${selectedCell.mealType}`}
                 target="_blank"
