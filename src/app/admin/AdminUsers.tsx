@@ -2,6 +2,7 @@
 
 import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
+import { foldText } from "@/lib/text";
 
 type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT";
 
@@ -21,17 +22,6 @@ const ROLE_LABEL: Record<Role, string> = {
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
 };
-
-/** Lower-case and strip Vietnamese diacritics so "nguyen" also finds "Nguyễn". */
-function foldText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "d")
-    .toLowerCase()
-    .trim();
-}
 
 const emptyForm = { name: "", phone: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" };
 

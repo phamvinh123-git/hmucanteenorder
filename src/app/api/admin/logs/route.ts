@@ -10,7 +10,7 @@ export async function GET() {
 
   const logs = await prisma.activityLog.findMany({
     orderBy: { createdAt: "desc" },
-    take: 300,
+    take: 1000,
     include: { user: { select: { name: true, role: true } } },
   });
 
