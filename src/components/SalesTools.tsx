@@ -2,7 +2,7 @@
 
 import PageHeader from "@/components/PageHeader";
 import { useEffect, useRef, useState } from "react";
-import { localDateKey } from "@/lib/client-session-rules";
+import { localDateKey, LOW_MEAL_THRESHOLD } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -124,6 +124,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
 
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState("");
+  const [lowMealOnly, setLowMealOnly] = useState(false);
+  const [priceFilter, setPriceFilter] = useState<"ALL" | number>("ALL");
   const [loadingList, setLoadingList] = useState(true);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -384,6 +386,17 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       setBackfilling(false);
     }
   }
+
+  // Distinct meal prices currently in use, for the price filter chips (e.g. 30.000đ / 40.000đ).
+  const priceOptions = Array.from(
+    new Set(students.map((s) => s.latestRegistration?.pricePerMeal).filter((p): p is number => p != null)),
+  ).sort((a, b) => a - b);
+
+  const visibleStudents = students.filter(
+    (s) =>
+      (!lowMealOnly || s.lowMeal) &&
+      (priceFilter === "ALL" || s.latestRegistration?.pricePerMeal === priceFilter),
+  );
 
   return (
     <div className="space-y-8">
@@ -687,6 +700,50 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
             />
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <button
+            onClick={() => setLowMealOnly((v) => !v)}
+            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+              lowMealOnly
+                ? "border-red-600 bg-red-600 text-white shadow-sm"
+                : "border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+            }`}
+            title={`Chỉ hiện sinh viên còn từ ${LOW_MEAL_THRESHOLD} buổi trở xuống`}
+          >
+            ⚠ Cần gia hạn
+          </button>
+          {priceOptions.length > 1 && (
+            <>
+              <span className="text-xs text-slate-300">|</span>
+              <button
+                onClick={() => setPriceFilter("ALL")}
+                className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                  priceFilter === "ALL"
+                    ? "border-red-600 bg-red-600 text-white shadow-sm"
+                    : "border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                }`}
+              >
+                Mọi giá
+              </button>
+              {priceOptions.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPriceFilter(p)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                    priceFilter === p
+                      ? "border-red-600 bg-red-600 text-white shadow-sm"
+                      : "border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  }`}
+                >
+                  {currency.format(p)}
+                </button>
+              ))}
+            </>
+          )}
+          {(lowMealOnly || priceFilter !== "ALL") && (
+            <span className="text-xs text-slate-400">{visibleStudents.length} kết quả</span>
+          )}
+        </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
         {resetAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
@@ -696,7 +753,10 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           {!loadingList && students.length === 0 && (
             <p className="p-4 text-sm text-slate-400">Chưa có sinh viên nào.</p>
           )}
-          {students.map((s, i) => (
+          {!loadingList && students.length > 0 && visibleStudents.length === 0 && (
+            <p className="p-4 text-sm text-slate-400">Không có sinh viên nào khớp bộ lọc.</p>
+          )}
+          {visibleStudents.map((s, i) => (
             <div key={s.id} className="animate-rise-in" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
               <div className="p-3 flex flex-col items-start gap-1.5 xl:items-center xl:grid xl:grid-cols-[3.5rem_minmax(0,12rem)_minmax(0,11rem)_minmax(11rem,1fr)_5.5rem_6.5rem_13rem] xl:gap-3 hover:bg-red-50/40 transition-colors">
                 {editingOrderCodeId === s.id ? (
