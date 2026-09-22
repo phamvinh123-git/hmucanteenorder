@@ -25,6 +25,8 @@ type SessionDTO = {
   price: number;
   /** Auto-added after a cancellation; a make-up slot. */
   isCompensation: boolean;
+  /** Only a cancelled session with a linked make-up slot can be restored (staff corrections have none). */
+  hasCompensation: boolean;
   mealPattern: MealPattern;
 };
 
@@ -115,7 +117,9 @@ export default function StudentDashboard({
       }
       setSessions((prev) => {
         const source = prev.find((s) => s.id === id);
-        const next = prev.map((s) => (s.id === id ? { ...s, status: "CANCELLED" as SessionStatus } : s));
+        const next = prev.map((s) =>
+          s.id === id ? { ...s, status: "CANCELLED" as SessionStatus, hasCompensation: true } : s,
+        );
         next.push({
           id: data.newSession.id,
           date: data.newSession.date,
@@ -125,6 +129,7 @@ export default function StudentDashboard({
           note: null,
           price: data.newSession.price,
           isCompensation: true,
+          hasCompensation: false,
           mealPattern: source?.mealPattern ?? "BOTH",
         });
         return next;
@@ -200,7 +205,9 @@ export default function StudentDashboard({
         for (const d of done) {
           if (multi === "cancel" && d.newSession) {
             const source = next.find((x) => x.id === d.id);
-            next = next.map((x) => (x.id === d.id ? { ...x, status: "CANCELLED" as SessionStatus } : x));
+            next = next.map((x) =>
+              x.id === d.id ? { ...x, status: "CANCELLED" as SessionStatus, hasCompensation: true } : x,
+            );
             next.push({
               id: d.newSession.id,
               date: d.newSession.date,
@@ -210,6 +217,7 @@ export default function StudentDashboard({
               note: null,
               price: d.newSession.price,
               isCompensation: true,
+              hasCompensation: false,
               mealPattern: source?.mealPattern ?? "BOTH",
             });
           } else if (multi === "restore") {
@@ -503,6 +511,7 @@ export default function StudentDashboard({
               </div>
             )}
             {selectedSession.status === "CANCELLED" &&
+              selectedSession.hasCompensation &&
               (() => {
                 const check = canRestoreSession({
                   date: new Date(selectedSession.date),
@@ -645,7 +654,7 @@ export default function StudentDashboard({
         >
           {showHistory ? "Ẩn lịch sử" : "Xem lịch sử buổi ăn"}
         </button>
-        {showHistory && history.some((h) => h.status === "CANCELLED") && (
+        {showHistory && history.some((h) => h.status === "CANCELLED" && h.hasCompensation) && (
           <div className="mt-2">
             {multi === "restore" ? (
               <button onClick={stopMulti} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50">
@@ -666,7 +675,7 @@ export default function StudentDashboard({
             {history.length === 0 && <p className="p-4 text-sm text-slate-400">Chưa có lịch sử.</p>}
             {history.map((s) => {
               const restoreCheck =
-                s.status === "CANCELLED"
+                s.status === "CANCELLED" && s.hasCompensation
                   ? canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status })
                   : null;
               return (

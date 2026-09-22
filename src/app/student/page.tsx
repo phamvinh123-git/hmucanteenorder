@@ -17,6 +17,7 @@ export default async function StudentPage() {
     prisma.mealSession.findMany({
       where: { studentId: user.id },
       orderBy: { date: "asc" },
+      include: { compensatedBy: { select: { id: true } } },
     }),
   ]);
 
@@ -38,6 +39,9 @@ export default async function StudentPage() {
           note: s.note,
           price: s.price,
           isCompensation: s.compensationForId != null,
+          // A cancelled session can only be restored if something still points back to it as its
+          // make-up slot — staff corrections (record-missed-session, remove-session) leave none.
+          hasCompensation: s.compensatedBy != null,
           mealPattern: patternById.get(s.registrationId) ?? "BOTH",
         }))}
       />
