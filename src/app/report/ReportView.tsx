@@ -233,24 +233,22 @@ export default function ReportView() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0 print:break-before-page" style={{ animationDelay: "160ms" }}>
-            <p className="mb-3 text-sm font-semibold text-slate-700">
+          <div className="animate-rise-in print:break-before-page" style={{ animationDelay: "160ms" }}>
+            <p className="mb-2 text-sm font-semibold text-slate-700">
               Sinh viên mới đăng ký ({newRegistrations?.length ?? 0})
-              <span className="ml-2 font-normal text-slate-400 print:hidden">
-                Lần đầu đăng ký ăn trong khoảng {dateFmt.format(new Date(data.start))} – {dateFmt.format(new Date(data.end))}
-              </span>
+              <span className="ml-2 font-normal text-slate-400 print:hidden">Lần đầu đăng ký ăn trong khoảng thời gian này</span>
             </p>
-            <RegistrationTable rows={newRegistrations} emptyLabel="Không có sinh viên mới đăng ký trong khoảng thời gian này." />
+            <RegistrationList rows={newRegistrations} emptyLabel="Không có sinh viên mới đăng ký trong khoảng thời gian này." />
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0 print:break-before-page" style={{ animationDelay: "200ms" }}>
-            <p className="mb-3 text-sm font-semibold text-slate-700">
+          <div className="animate-rise-in print:break-before-page" style={{ animationDelay: "200ms" }}>
+            <p className="mb-2 text-sm font-semibold text-slate-700">
               Sinh viên mới gia hạn ({renewals?.length ?? 0})
               <span className="ml-2 font-normal text-slate-400 print:hidden">
                 Đã đăng ký từ trước, mua thêm đợt mới trong khoảng thời gian này
               </span>
             </p>
-            <RegistrationTable rows={renewals} emptyLabel="Không có sinh viên nào gia hạn trong khoảng thời gian này." />
+            <RegistrationList rows={renewals} emptyLabel="Không có sinh viên nào gia hạn trong khoảng thời gian này." />
           </div>
         </>
       )}
@@ -258,46 +256,30 @@ export default function ReportView() {
   );
 }
 
-function RegistrationTable({ rows, emptyLabel }: { rows: RegistrationRow[] | undefined; emptyLabel: string }) {
+function RegistrationList({ rows, emptyLabel }: { rows: RegistrationRow[] | undefined; emptyLabel: string }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm print:text-xs print:[&_td]:border print:[&_th]:border print:[&_td]:border-slate-400 print:[&_th]:border-slate-400 print:[&_td]:px-2 print:[&_th]:px-2">
-        <thead>
-          <tr className="text-left text-slate-500 border-b border-slate-100 print:text-black">
-            <th className="py-2 pr-4">STT</th>
-            <th className="py-2 pr-4">Họ và tên</th>
-            <th className="py-2 pr-4">SĐT</th>
-            <th className="py-2 pr-4">Ngành / Lớp</th>
-            <th className="py-2 pr-4">Bữa ăn</th>
-            <th className="py-2 pr-4 text-right">Số buổi</th>
-            <th className="py-2 pr-4 text-right">Giá</th>
-            <th className="py-2 pr-4">Từ ngày</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows && rows.length === 0 && (
-            <tr>
-              <td colSpan={8} className="py-6 text-center text-slate-400">
-                {emptyLabel}
-              </td>
-            </tr>
-          )}
-          {rows?.map((r) => (
-            <tr key={`${r.studentId}-${r.createdAt}`} className="border-b border-slate-50 hover:bg-red-50/40 transition-colors">
-              <td className="py-1.5 pr-4 font-mono">{r.orderCode ?? "—"}</td>
-              <td className="py-1.5 pr-4">{r.name}</td>
-              <td className="py-1.5 pr-4 text-slate-500">{r.phone}</td>
-              <td className="py-1.5 pr-4 text-slate-500">
-                {r.className || r.major ? `${r.className || "—"}${r.major ? ` · ${r.major}` : ""}` : "—"}
-              </td>
-              <td className="py-1.5 pr-4 text-slate-500">{PATTERN_LABEL[r.mealPattern]}</td>
-              <td className="py-1.5 pr-4 text-right">{r.totalSessions}</td>
-              <td className="py-1.5 pr-4 text-right">{currency.format(r.pricePerMeal)}</td>
-              <td className="py-1.5 pr-4 text-slate-500">{dateFmt.format(new Date(r.startDate))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100 print:border-0 print:shadow-none print:divide-slate-200">
+      {rows && rows.length === 0 && <p className="p-3 text-sm text-slate-400">{emptyLabel}</p>}
+      {rows?.map((r) => (
+        <div
+          key={`${r.studentId}-${r.createdAt}`}
+          className="p-3 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 hover:bg-red-50/40 transition-colors print:text-xs"
+        >
+          <span className="text-slate-400 sm:w-28 flex-shrink-0">{dateFmt.format(new Date(r.createdAt))}</span>
+          <span className="font-medium text-slate-700 sm:w-52 flex-shrink-0">
+            {r.orderCode != null && <span className="font-mono text-red-700">{r.orderCode} · </span>}
+            {r.name}
+          </span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit flex-shrink-0">
+            {PATTERN_LABEL[r.mealPattern]}
+          </span>
+          <span className="text-slate-500">
+            {r.totalSessions} buổi &middot; {currency.format(r.pricePerMeal)} &middot; từ {dateFmt.format(new Date(r.startDate))}
+            &middot; {r.phone}
+            {r.className || r.major ? ` · ${r.className || "—"}${r.major ? ` (${r.major})` : ""}` : ""}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
