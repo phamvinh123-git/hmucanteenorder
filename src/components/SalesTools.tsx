@@ -177,6 +177,17 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     return () => clearTimeout(t);
   }, [search]);
 
+  // Meals auto-complete at fixed clock times (14:00 lunch, 20:00 dinner) with nobody clicking
+  // anything, so re-poll periodically — otherwise "Còn X buổi" only updates on the next explicit action.
+  const searchRef = useRef(search);
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+  useEffect(() => {
+    const t = setInterval(() => loadStudents(searchRef.current), 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // An existing phone number pulls the stored name/major/class so a returning student is re-registered, not re-typed.
   async function onPhoneChange(raw: string) {
     const phone = raw.replace(/[^0-9]/g, "");
@@ -268,7 +279,16 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setRestoreConfirmId(null);
     setRestoreError(null);
     const res = await fetch(`/api/students/${id}`);
-    if (res.ok) setDetail(await res.json());
+    if (!res.ok) return;
+    const data: StudentDetail = await res.json();
+    setDetail(data);
+    // The list row's "Còn X buổi" was fetched at page-load time and doesn't update on its own as
+    // time passes (e.g. a meal auto-completing at its 14:00/20:00 cutoff) — sync it from this
+    // fresher detail fetch so it doesn't show a stale count next to the accurate one below.
+    const remaining = data.sessions.filter((s) => s.status === "SCHEDULED").length;
+    setStudents((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : s)),
+    );
   }
 
   async function removeSession(studentId: string, sessionId: string) {
