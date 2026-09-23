@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canAccessStats, getSession } from "@/lib/auth";
-import { removeScheduledSession } from "@/lib/meal-logic";
+import { removeSession } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
 
-// Manager/admin-only: permanently drop one scheduled (unused) meal, no compensation added.
-// Used to fix an accidental over-count, e.g. a make-up meal registered twice by mistake.
+// Manager/admin-only: permanently drop one meal (scheduled or already eaten), no compensation
+// added. Used to fix an accidental over-count or a wrongly recorded/duplicated meal.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || !canAccessStats(session.role)) {
@@ -20,11 +20,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    await removeScheduledSession(id);
+    const wasEaten = target.status === "COMPLETED" || target.pickedUp;
+    await removeSession(id);
     await logActivity(
       session.userId,
       "REMOVE_SESSION",
-      `Xóa buổi ${target.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${localDateKey(target.date)} của ${target.student.name} (${target.student.phone}) để chỉnh số buổi bị dư`,
+      `Xóa buổi ${target.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${localDateKey(target.date)} của ${target.student.name} (${target.student.phone})${
+        wasEaten ? " (buổi đã ăn)" : " để chỉnh số buổi bị dư"
+      }`,
     );
     return NextResponse.json({ ok: true });
   } catch (err) {

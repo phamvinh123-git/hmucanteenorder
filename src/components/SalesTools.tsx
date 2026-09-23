@@ -1098,9 +1098,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                       : ""}
                                 {sx.note ? ` — ${sx.note}` : ""}
                               </span>
-                              {canResetAll && sx.status === "SCHEDULED" && !sx.pickedUp && (
+                              {canResetAll && sx.status !== "CANCELLED" && (
                                 removeConfirmId === sx.id ? (
                                   <span className="flex items-center gap-1 no-underline">
+                                    {(sx.status === "COMPLETED" || sx.pickedUp) && (
+                                      <span className="text-xs text-amber-700">Buổi đã ăn —</span>
+                                    )}
                                     <button
                                       onClick={() => removeSession(s.id, sx.id)}
                                       disabled={removingId === sx.id}
@@ -1119,7 +1122,11 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                   <button
                                     onClick={() => setRemoveConfirmId(sx.id)}
                                     className="text-xs text-slate-300 no-underline hover:text-red-600 hover:underline"
-                                    title="Xóa buổi này (không bù, dùng khi buổi bị đăng ký dư)"
+                                    title={
+                                      sx.status === "COMPLETED" || sx.pickedUp
+                                        ? "Xóa buổi đã ăn này (không bù, dùng khi ghi nhận nhầm hoặc trùng lặp)"
+                                        : "Xóa buổi này (không bù, dùng khi buổi bị đăng ký dư)"
+                                    }
                                   >
                                     Xóa
                                   </button>
