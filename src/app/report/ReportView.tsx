@@ -60,6 +60,14 @@ function addDaysLocal(key: string, n: number) {
 
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
+// When the registration/renewal was actually entered — date plus time, so staff can trace who did it and when.
+const dateTimeFmt = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export default function ReportView() {
   const [range, setRange] = useState<Range>("week");
@@ -281,7 +289,7 @@ function RegistrationList({ rows, emptyLabel }: { rows: RegistrationRow[] | unde
           key={`${r.studentId}-${r.createdAt}`}
           className="p-3 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 hover:bg-red-50/40 transition-colors print:text-xs"
         >
-          <span className="text-slate-400 sm:w-28 flex-shrink-0">{dateFmt.format(new Date(r.createdAt))}</span>
+          <span className="text-slate-400 sm:w-40 flex-shrink-0 tabular-nums">{dateTimeFmt.format(new Date(r.createdAt))}</span>
           <span className="font-medium text-slate-700 sm:w-52 flex-shrink-0">
             {r.orderCode != null && <span className="font-mono text-red-700">{r.orderCode} · </span>}
             {r.name}
