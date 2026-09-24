@@ -202,7 +202,7 @@ export default function ScheduleView() {
                   s.pickedUp ? "bg-red-600 px-3 rounded-lg [&_*]:!text-white" : ""
                 }`}
               >
-                <span className="font-mono text-xs text-red-700 w-10 flex-shrink-0">
+                <span className="font-mono text-base font-extrabold text-red-700 w-10 flex-shrink-0">
                   {s.orderCode ?? "—"}
                 </span>
                 <span className="font-medium text-slate-800 w-40 flex-shrink-0">{s.studentName}</span>
