@@ -98,6 +98,10 @@ export default function ReportView() {
     );
   }
 
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const rows = data?.rows.filter(matchesSearch);
   const newRegistrations = data?.newRegistrations.filter(matchesSearch);
   const renewals = data?.renewals.filter(matchesSearch);
@@ -184,14 +188,26 @@ export default function ReportView() {
               <p className="text-xs text-slate-500">Tổng suất đã ăn</p>
               <p className="text-xl font-bold text-green-600">{data.summary.totalEaten}</p>
             </div>
-            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "120ms" }}>
-              <p className="text-xs text-slate-500">Đăng ký mới</p>
+            <button
+              type="button"
+              onClick={() => scrollToSection("report-new-registrations")}
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 text-left animate-rise-in transition hover:-translate-y-0.5 hover:border-red-300 hover:shadow-md print:hover:translate-y-0"
+              style={{ animationDelay: "120ms" }}
+              title="Xem danh sách sinh viên mới đăng ký"
+            >
+              <p className="text-xs text-slate-500">Đăng ký mới ↓</p>
               <p className="text-xl font-bold text-slate-800">{data.newRegistrations.length}</p>
-            </div>
-            <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "160ms" }}>
-              <p className="text-xs text-slate-500">Gia hạn</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("report-renewals")}
+              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 text-left animate-rise-in transition hover:-translate-y-0.5 hover:border-red-300 hover:shadow-md print:hover:translate-y-0"
+              style={{ animationDelay: "160ms" }}
+              title="Xem danh sách sinh viên mới gia hạn"
+            >
+              <p className="text-xs text-slate-500">Gia hạn ↓</p>
               <p className="text-xl font-bold text-slate-800">{data.renewals.length}</p>
-            </div>
+            </button>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0" style={{ animationDelay: "120ms" }}>
@@ -233,7 +249,7 @@ export default function ReportView() {
             </div>
           </div>
 
-          <div className="animate-rise-in print:break-before-page" style={{ animationDelay: "160ms" }}>
+          <div id="report-new-registrations" className="scroll-mt-4 animate-rise-in print:break-before-page" style={{ animationDelay: "160ms" }}>
             <p className="mb-2 text-sm font-semibold text-slate-700">
               Sinh viên mới đăng ký ({newRegistrations?.length ?? 0})
               <span className="ml-2 font-normal text-slate-400 print:hidden">Lần đầu đăng ký ăn trong khoảng thời gian này</span>
@@ -241,7 +257,7 @@ export default function ReportView() {
             <RegistrationList rows={newRegistrations} emptyLabel="Không có sinh viên mới đăng ký trong khoảng thời gian này." />
           </div>
 
-          <div className="animate-rise-in print:break-before-page" style={{ animationDelay: "200ms" }}>
+          <div id="report-renewals" className="scroll-mt-4 animate-rise-in print:break-before-page" style={{ animationDelay: "200ms" }}>
             <p className="mb-2 text-sm font-semibold text-slate-700">
               Sinh viên mới gia hạn ({renewals?.length ?? 0})
               <span className="ml-2 font-normal text-slate-400 print:hidden">
