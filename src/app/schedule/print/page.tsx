@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import PrintButton from "./PrintButton";
+import { isPremiumPrice } from "@/lib/pricing";
 
 const MEAL_LABEL: Record<string, string> = { LUNCH: "Trưa", DINNER: "Tối" };
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
@@ -56,6 +57,9 @@ export default async function SchedulePrintPage({
     .sort(sortByOrderCode);
 
   const totalAmount = rows.reduce((sum, r) => sum + r.price, 0);
+  const premiumPrices = Array.from(new Set(rows.filter((r) => isPremiumPrice(r.price)).map((r) => r.price))).sort(
+    (a, b) => a - b,
+  );
   const now = new Date();
 
   return (
@@ -94,8 +98,9 @@ export default async function SchedulePrintPage({
 
         {rows.map((r, i) => (
           <div key={r.id} className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
-            <div className="w-5 flex-shrink-0 text-[12px] font-bold pt-0.5">
-              {r.orderCode != null ? r.orderCode : i + 1}
+            <div className="w-9 flex-shrink-0 flex text-[12px] font-bold pt-0.5">
+              <span className="w-3 flex-shrink-0 text-center">{isPremiumPrice(r.price) ? "★" : ""}</span>
+              <span>{r.orderCode != null ? r.orderCode : i + 1}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold leading-tight">{r.name}</p>
@@ -113,6 +118,11 @@ export default async function SchedulePrintPage({
         {rows.length > 0 && (
           <>
             <div className="border-t border-black" />
+            {premiumPrices.length > 0 && (
+              <p className="px-2 pt-1 text-[10px] leading-tight">
+                ★ = suất {premiumPrices.map((p) => currency.format(p)).join(", ")}
+              </p>
+            )}
             <div className="px-2 py-1.5 text-[11px] font-semibold">
               Tổng: {rows.length} suất &middot; {currency.format(totalAmount)}
             </div>

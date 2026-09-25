@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import WeekMealGrid, { startOfWeekMonday } from "@/components/WeekMealGrid";
 import { localDateKey } from "@/lib/client-session-rules";
+import { isPremiumPrice } from "@/lib/pricing";
 
 type MealType = "LUNCH" | "DINNER";
 type SessionStatus = "SCHEDULED" | "COMPLETED";
@@ -202,7 +203,13 @@ export default function ScheduleView() {
                   s.pickedUp ? "bg-red-600 px-3 rounded-lg [&_*]:!text-white" : ""
                 }`}
               >
-                <span className="font-mono text-base font-extrabold text-red-700 w-10 flex-shrink-0">
+                <span className="font-mono text-base font-extrabold text-red-700 w-14 flex-shrink-0">
+                  <span
+                    className="inline-block w-4 text-center text-amber-500"
+                    title={isPremiumPrice(s.price) ? `Suất ${currency.format(s.price)}` : undefined}
+                  >
+                    {isPremiumPrice(s.price) ? "★" : ""}
+                  </span>
                   {s.orderCode ?? "—"}
                 </span>
                 <span className="font-medium text-slate-800 w-40 flex-shrink-0">{s.studentName}</span>
