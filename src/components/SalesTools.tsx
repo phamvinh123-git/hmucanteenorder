@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useEffect, useRef, useState } from "react";
 import { localDateKey, LOW_MEAL_THRESHOLD } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
+import { foldText } from "@/lib/text";
 import ConfirmModal from "@/components/ConfirmModal";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
@@ -156,10 +157,13 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [backfilling, setBackfilling] = useState(false);
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
 
-  async function loadStudents(q = "") {
+  // Search is filtered entirely client-side (see `visibleStudents`) so it can ignore case and
+  // diacritics ("khue" still finds "Khuê") — a server `contains` query couldn't do that without
+  // extra DB setup, so the full list is simply kept in memory and re-fetched on changes.
+  async function loadStudents() {
     setLoadingList(true);
     try {
-      const res = await fetch(`/api/students?q=${encodeURIComponent(q)}`);
+      const res = await fetch("/api/students");
       const data = await res.json();
       if (res.ok) setStudents(data.students);
     } finally {
@@ -172,19 +176,10 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     loadStudents();
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => loadStudents(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
   // Meals auto-complete at fixed clock times (14:00 lunch, 20:00 dinner) with nobody clicking
   // anything, so re-poll periodically — otherwise "Còn X buổi" only updates on the next explicit action.
-  const searchRef = useRef(search);
   useEffect(() => {
-    searchRef.current = search;
-  }, [search]);
-  useEffect(() => {
-    const t = setInterval(() => loadStudents(searchRef.current), 5 * 60 * 1000);
+    const t = setInterval(() => loadStudents(), 5 * 60 * 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -259,7 +254,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       setFormSuccess(`Đã đăng ký ${form.totalSessions} suất ăn cho ${form.name}.`);
       setForm({ ...emptyForm, startDate: emptyForm.startDate });
       setKnown(null);
-      loadStudents(search);
+      loadStudents();
     } finally {
       setSubmitting(false);
     }
@@ -302,7 +297,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         return;
       }
       setRemoveConfirmId(null);
-      loadStudents(search);
+      loadStudents();
       const res2 = await fetch(`/api/students/${studentId}`);
       if (res2.ok) setDetail(await res2.json());
     } finally {
@@ -323,7 +318,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         return;
       }
       setRestoreConfirmId(null);
-      loadStudents(search);
+      loadStudents();
       const res2 = await fetch(`/api/students/${studentId}`);
       if (res2.ok) setDetail(await res2.json());
     } finally {
@@ -348,7 +343,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         return;
       }
       setMissedSuccess("Đã ghi nhận. Tổng số buổi được giữ nguyên như gói đã mua.");
-      loadStudents(search);
+      loadStudents();
       const res2 = await fetch(`/api/students/${studentId}`);
       if (res2.ok) setDetail(await res2.json());
     } finally {
@@ -369,7 +364,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       }
       if (expandedId === deleteTarget.id) setExpandedId(null);
       setDeleteTarget(null);
-      loadStudents(search);
+      loadStudents();
     } finally {
       setDeleting(false);
     }
@@ -388,7 +383,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       return;
     }
     setEditingPhoneId(null);
-    loadStudents(search);
+    loadStudents();
   }
 
   function startEditOrderCode(s: StudentRow) {
@@ -416,7 +411,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       return;
     }
     setEditingOrderCodeId(null);
-    loadStudents(search);
+    loadStudents();
   }
 
   function startEditClass(s: StudentRow) {
@@ -433,7 +428,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     });
     if (res.ok) {
       setEditingClassId(null);
-      loadStudents(search);
+      loadStudents();
     }
   }
 
@@ -455,7 +450,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       setResetAllMessage(
         `Đã reset: ${data.studentCount} sinh viên và ${data.sessionCount} buổi ăn được chuyển vào bản lưu trữ (Admin có thể khôi phục).`,
       );
-      loadStudents(search);
+      loadStudents();
     } finally {
       setResettingAll(false);
     }
@@ -466,7 +461,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     try {
       await fetch("/api/students/reset-order-codes", { method: "POST" });
       setConfirmingReset(false);
-      loadStudents(search);
+      loadStudents();
     } finally {
       setResetting(false);
     }
@@ -485,7 +480,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
             : "Mọi sinh viên đều đã có mã."
           : (data.error ?? "Không thể gán mã."),
       );
-      loadStudents(search);
+      loadStudents();
     } finally {
       setBackfilling(false);
     }
@@ -496,10 +491,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     new Set(students.map((s) => s.latestRegistration?.pricePerMeal).filter((p): p is number => p != null)),
   ).sort((a, b) => a - b);
 
+  const q = foldText(search);
   const visibleStudents = students.filter(
     (s) =>
       (!lowMealOnly || s.lowMeal) &&
-      (priceFilter === "ALL" || s.latestRegistration?.pricePerMeal === priceFilter),
+      (priceFilter === "ALL" || s.latestRegistration?.pricePerMeal === priceFilter) &&
+      (!q || foldText(s.name).includes(q) || s.phone.includes(search.trim())),
   );
 
   return (
