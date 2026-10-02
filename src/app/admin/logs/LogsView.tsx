@@ -15,6 +15,7 @@ const ACTION_LABEL: Record<string, string> = {
   UPDATE_STUDENT_PHONE: "Đổi SĐT sinh viên",
   RECORD_MISSED_SESSION: "Ghi nhận buổi ăn bị bỏ sót",
   REMOVE_SESSION: "Xóa buổi ăn",
+  FIX_STUDENT_SCHEDULE: "Sửa lịch ăn của sinh viên",
   CANCEL_SESSION: "Hủy buổi ăn",
   RESTORE_SESSION: "Khôi phục buổi ăn",
   CANCEL_SESSIONS_BULK: "Hủy nhiều buổi ăn",
