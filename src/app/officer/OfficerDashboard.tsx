@@ -9,7 +9,7 @@ import {
   canRestoreSession,
   localDateKey,
 } from "@/lib/client-session-rules";
-import { officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
+import { addDaysLocal, mondayOf, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
 
 type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
@@ -40,10 +40,20 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
       })),
     [],
   );
-  const openKeys = useMemo(() => new Set(weeks.flatMap((w) => w.days.map(localDateKey))), [weeks]);
+  // Days with a live registration, in any week. Only days of an open week can be edited.
   const [picked, setPicked] = useState<string[]>(() =>
-    initialSessions.filter((s) => s.status !== "CANCELLED" && openKeys.has(keyOf(s.date))).map((s) => keyOf(s.date)),
+    initialSessions.filter((s) => s.status !== "CANCELLED").map((s) => keyOf(s.date)),
   );
+
+  // The week on screen, navigable like the student schedule. Only a week that is open can be edited.
+  const registerWeek = weeks[0];
+  const [viewMonday, setViewMonday] = useState(registerWeek.monday);
+  const viewKey = localDateKey(viewMonday);
+  const viewDays = officerWeekDays(viewMonday);
+  const openWeek = weeks.find((w) => w.key === viewKey) ?? null;
+  const thisMonday = mondayOf(new Date());
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const [savingWeek, setSavingWeek] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, { ok: boolean; text: string } | null>>({});
@@ -72,6 +82,12 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
   // Days of a week that can still be added or dropped (a week already under way has locked days).
   const bookableKeys = (days: Date[]) =>
     days.filter((d) => canBookSlot({ date: d, mealType: "LUNCH" }).ok).map(localDateKey);
+
+  const free = openWeek ? bookableKeys(viewDays) : [];
+
+  function shiftWeek(n: number) {
+    setViewMonday((m) => addDaysLocal(m, 7 * n));
+  }
 
   function toggleDay(weekKey: string, key: string) {
     setMessages((m) => ({ ...m, [weekKey]: null }));
@@ -146,7 +162,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
         return;
       }
       setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, status: "SCHEDULED" } : x)));
-      if (openKeys.has(keyOf(s.date))) setPicked((prev) => (prev.includes(keyOf(s.date)) ? prev : [...prev, keyOf(s.date)]));
+      setPicked((prev) => (prev.includes(keyOf(s.date)) ? prev : [...prev, keyOf(s.date)]));
     } finally {
       setBusyId(null);
     }
@@ -159,94 +175,137 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
         subtitle={`Đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
       />
 
-      {weeks.map((week) => {
-        const free = bookableKeys(week.days);
-        return (
-          <section key={week.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold text-slate-800">
-                  Đăng ký cơm tuần {shortDate.format(week.days[0])} – {shortDate.format(week.days[week.days.length - 1])}
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Hạn đăng ký: hết{" "}
-                  <b>
-                    {weekdayLong.format(week.deadline)} {fullDate.format(week.deadline)}
-                  </b>
-                  . Quá hạn sẽ không thêm được ngày mới.
-                </p>
-              </div>
-              <div className="flex gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setPicked((prev) => Array.from(new Set([...prev, ...free])))}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                >
-                  Chọn cả tuần
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPicked((prev) => prev.filter((k) => !free.includes(k)))}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                >
-                  Bỏ chọn hết
-                </button>
-              </div>
-            </div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
+        <h2 className="mb-3 text-base font-bold text-slate-800">Lịch đăng ký cơm theo tuần</h2>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {week.days.map((d) => {
-                const key = localDateKey(d);
-                const on = picked.includes(key);
-                const locked = !free.includes(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleDay(week.key, key)}
-                    disabled={locked}
-                    aria-pressed={on}
-                    className={`relative rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed ${
-                      on
-                        ? "border-red-600 bg-red-600 text-white shadow-md disabled:opacity-90"
-                        : "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/40 disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-white"
-                    }`}
-                  >
-                    {on && (
-                      <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-red-600">
-                        ✓
-                      </span>
-                    )}
-                    <p className={`text-xs capitalize ${on ? "text-red-100" : "text-slate-500"}`}>{weekdayLong.format(d)}</p>
-                    <p className={`text-lg font-bold ${on ? "text-white" : "text-slate-800"}`}>{shortDate.format(d)}</p>
-                    <p className={`mt-1 text-xs font-semibold ${on ? "text-white" : "text-slate-400"}`}>
-                      {on ? "Đã đăng ký" : locked ? "Đã quá hạn" : "Chưa đăng ký"}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => shiftWeek(-1)}
+            className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          >
+            ◀ Tuần trước
+          </button>
+          <span className="px-2 font-medium whitespace-nowrap text-slate-700">
+            {fullDate.format(viewDays[0])} – {fullDate.format(viewDays[viewDays.length - 1])}
+          </span>
+          {viewMonday.getTime() === thisMonday.getTime() && (
+            <span className="whitespace-nowrap rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+              Tuần này
+            </span>
+          )}
+          {openWeek && (
+            <span className="whitespace-nowrap rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+              Đang mở đăng ký
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => shiftWeek(1)}
+            className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          >
+            Tuần sau ▶
+          </button>
+          {!openWeek && (
+            <button
+              type="button"
+              onClick={() => setViewMonday(registerWeek.monday)}
+              className="text-xs text-red-600 hover:underline"
+            >
+              Về tuần đang mở đăng ký
+            </button>
+          )}
+        </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-dashed border-slate-200 pt-4">
+        <p className="mb-3 text-xs text-slate-500">
+          {openWeek ? (
+            <>
+              Hạn đăng ký: hết{" "}
+              <b>
+                {weekdayLong.format(openWeek.deadline)} {fullDate.format(openWeek.deadline)}
+              </b>
+              . Quá hạn sẽ không thêm được ngày mới.
+            </>
+          ) : viewMonday.getTime() < thisMonday.getTime() ? (
+            "Tuần đã qua, chỉ để xem."
+          ) : viewMonday.getTime() === thisMonday.getTime() ? (
+            "Tuần đang diễn ra đã hết hạn đăng ký. Muốn bỏ một ngày, dùng nút Hủy cơm ở mục Cơm sắp tới."
+          ) : (
+            <>
+              Chưa đến thời gian đăng ký tuần này (mở từ thứ 7 ngày {fullDate.format(addDaysLocal(viewMonday, -9))}).
+              Chỉ đăng ký trước 1 tuần.
+            </>
+          )}
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {viewDays.map((d) => {
+            const key = localDateKey(d);
+            const on = picked.includes(key);
+            const locked = !free.includes(key);
+            const past = d.getTime() < today.getTime();
+            return (
               <button
+                key={key}
                 type="button"
-                onClick={() => saveWeek(week)}
-                disabled={savingWeek === week.key}
-                className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                onClick={() => toggleDay(viewKey, key)}
+                disabled={locked}
+                aria-pressed={on}
+                className={`relative rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed ${
+                  on
+                    ? "border-red-600 bg-red-600 text-white shadow-md disabled:opacity-90"
+                    : "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/40 disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-white"
+                }`}
               >
-                {savingWeek === week.key
-                  ? "Đang lưu..."
-                  : `Lưu đăng ký (${picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length} ngày)`}
+                {on && (
+                  <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-red-600">
+                    ✓
+                  </span>
+                )}
+                <p className={`text-xs capitalize ${on ? "text-red-100" : "text-slate-500"}`}>{weekdayLong.format(d)}</p>
+                <p className={`text-lg font-bold ${on ? "text-white" : "text-slate-800"}`}>{shortDate.format(d)}</p>
+                <p className={`mt-1 text-xs font-semibold ${on ? "text-white" : "text-slate-400"}`}>
+                  {on ? "Đã đăng ký" : past ? "Không ăn" : openWeek ? (locked ? "Đã quá hạn" : "Chưa đăng ký") : "Chưa mở đăng ký"}
+                </p>
               </button>
-              {messages[week.key] && (
-                <span className={`text-sm animate-pop-in ${messages[week.key]!.ok ? "text-green-600" : "text-red-600"}`}>
-                  {messages[week.key]!.text}
-                </span>
-              )}
-            </div>
-          </section>
-        );
-      })}
+            );
+          })}
+        </div>
+
+        {openWeek && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-dashed border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setPicked((prev) => Array.from(new Set([...prev, ...free])))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+            >
+              Chọn cả tuần
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicked((prev) => prev.filter((k) => !free.includes(k)))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+            >
+              Bỏ chọn hết
+            </button>
+            <button
+              type="button"
+              onClick={() => saveWeek(openWeek)}
+              disabled={savingWeek === openWeek.key}
+              className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+            >
+              {savingWeek === openWeek.key
+                ? "Đang lưu..."
+                : `Lưu đăng ký (${picked.filter((k) => viewDays.some((d) => localDateKey(d) === k)).length} ngày)`}
+            </button>
+            {messages[openWeek.key] && (
+              <span className={`text-sm animate-pop-in ${messages[openWeek.key]!.ok ? "text-green-600" : "text-red-600"}`}>
+                {messages[openWeek.key]!.text}
+              </span>
+            )}
+          </div>
+        )}
+      </section>
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 animate-pop-in">{error}</p>}
 

@@ -10,7 +10,7 @@ import {
   nextSlot,
 } from "@/lib/session-rules";
 import { localDateKey } from "@/lib/client-session-rules";
-import { OFFICER_MEAL_PRICE, officerWeekDays, registrationDeadline } from "@/lib/officer-rules";
+import { OFFICER_MEAL_PRICE, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
 
 export {
   LUNCH_CUTOFF_HOUR,
@@ -378,6 +378,10 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
   if (monday.getDay() !== 1) throw new Error("Tuần đăng ký không hợp lệ.");
   if (now.getTime() > registrationDeadline(monday).getTime()) {
     throw new Error("Đã hết hạn đăng ký cho tuần này. Cán bộ phải đăng ký trước hết thứ 6 của tuần trước đó.");
+  }
+  // Only the week(s) currently open can be ordered — not any week further ahead.
+  if (!openWeekMondays(now).some((m) => m.getTime() === monday.getTime())) {
+    throw new Error("Chưa đến thời gian đăng ký tuần này. Cán bộ chỉ đăng ký trước 1 tuần.");
   }
 
   const allowed = new Map(officerWeekDays(monday).map((d) => [localDateKey(d), d]));
