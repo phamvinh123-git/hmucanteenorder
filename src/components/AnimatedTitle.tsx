@@ -54,10 +54,13 @@ export default function AnimatedTitle({
   title,
   subtitle,
   fontClassName,
+  large = false,
 }: {
   title: string;
   subtitle: string;
   fontClassName: string;
+  /** Bigger type, for the full-screen idle screen. */
+  large?: boolean;
 }) {
   const [assembled, setAssembled] = useState(false);
 
@@ -71,11 +74,16 @@ export default function AnimatedTitle({
     <>
       <h1
         aria-label={title}
-        className={`${fontClassName} whitespace-nowrap pb-1 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl`}
+        className={`${fontClassName} whitespace-nowrap pb-1 font-extrabold leading-tight tracking-tight ${
+          large ? "text-4xl sm:text-6xl" : "text-3xl sm:text-5xl"
+        }`}
       >
         {assembled ? <span className="title-gradient">{title}</span> : <Letters text={title} step={0.05} />}
       </h1>
-      <p aria-label={subtitle} className={`${fontClassName} mt-1 pb-1 text-base font-bold uppercase tracking-wide sm:text-lg`}>
+      <p
+        aria-label={subtitle}
+        className={`${fontClassName} mt-1 pb-1 font-bold uppercase tracking-wide ${large ? "text-lg sm:text-2xl" : "text-base sm:text-lg"}`}
+      >
         {assembled ? <span className="title-gradient">{subtitle}</span> : <Letters text={subtitle} step={0.025} />}
       </p>
     </>

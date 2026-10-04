@@ -2,12 +2,9 @@ import { getSession, homePathForRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { Be_Vietnam_Pro } from "next/font/google";
 import LoginForm from "./LoginForm";
-import AnimatedTitle from "./AnimatedTitle";
-
-// A font drawn for Vietnamese, so every tone mark renders correctly (the default font lacks glyphs for them).
-const titleFont = Be_Vietnam_Pro({ subsets: ["vietnamese", "latin"], weight: ["600", "800"], display: "swap" });
+import AnimatedTitle from "@/components/AnimatedTitle";
+import { titleFont } from "../title-font";
 
 export default async function LoginPage() {
   const session = await getSession();

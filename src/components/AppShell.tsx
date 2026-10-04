@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import LogoutButton from "./LogoutButton";
+import IdleScreen from "./IdleScreen";
 import { Role } from "@prisma/client";
 
 const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
@@ -43,6 +44,7 @@ export default function AppShell({
 
   return (
     <div className="min-h-screen">
+      <IdleScreen />
       <header className="print:hidden bg-white border-b-2 border-red-600 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
