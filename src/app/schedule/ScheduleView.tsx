@@ -52,7 +52,8 @@ export default function ScheduleView() {
   const [selectedCell, setSelectedCell] = useState<{ date: string; mealType: MealType } | null>(null);
   // Show everyone together, or only cán bộ (staff), or only sinh viên.
   const [group, setGroup] = useState<"ALL" | "OFFICER" | "STUDENT">("ALL");
-  const noun = group === "ALL" ? "người" : group === "OFFICER" ? "cán bộ" : "sinh viên";
+  // The unit of a meal count is always "suất" (a serving), whichever group is shown.
+  const noun = "suất";
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reload indicator when the visible week changes
