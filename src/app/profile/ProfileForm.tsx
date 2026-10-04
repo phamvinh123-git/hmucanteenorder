@@ -71,7 +71,7 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelCls}>Số điện thoại (tên đăng nhập)</label>
+            <label className={labelCls}>{role === "OFFICER" ? "Mã cán bộ (tên đăng nhập)" : "Số điện thoại (tên đăng nhập)"}</label>
             {isAdmin ? (
               <>
                 <input

@@ -12,19 +12,23 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const body = schema.safeParse(await req.json());
   if (!body.success) {
-    return NextResponse.json({ error: "Thiếu số điện thoại hoặc mật khẩu." }, { status: 400 });
+    return NextResponse.json({ error: "Thiếu số điện thoại / mã cán bộ hoặc mật khẩu." }, { status: 400 });
   }
 
-  const { phone, password } = body.data;
-  const user = await prisma.user.findUnique({ where: { phone } });
+  const login = body.data.phone.trim();
+  const { password } = body.data;
+  // Staff ("cán bộ") sign in with their staff code, stored in upper case; accept it in any case.
+  const user =
+    (await prisma.user.findUnique({ where: { phone: login } })) ??
+    (await prisma.user.findUnique({ where: { phone: login.toUpperCase() } }));
 
   if (!user || !user.active) {
-    return NextResponse.json({ error: "Số điện thoại hoặc mật khẩu không đúng." }, { status: 401 });
+    return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    return NextResponse.json({ error: "Số điện thoại hoặc mật khẩu không đúng." }, { status: 401 });
+    return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
   }
 
   await createSessionCookie({ userId: user.id, role: user.role, name: user.name });

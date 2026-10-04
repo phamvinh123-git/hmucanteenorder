@@ -54,15 +54,18 @@ export default function LoginForm() {
       style={{ animationDelay: "80ms" }}
     >
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại / Mã cán bộ</label>
         <input
           type="text"
-          inputMode="numeric"
+          autoComplete="username"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
           required
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-          placeholder="09xxxxxxxx"
+          placeholder="09xxxxxxxx hoặc mã cán bộ"
         />
       </div>
       <div>

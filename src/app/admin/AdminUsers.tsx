@@ -111,7 +111,9 @@ export default function AdminUsers() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Số điện thoại</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              {form.role === "OFFICER" ? "Mã cán bộ (tên đăng nhập)" : "Số điện thoại"}
+            </label>
             <input
               required
               value={form.phone}
