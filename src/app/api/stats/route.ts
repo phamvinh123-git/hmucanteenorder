@@ -54,16 +54,17 @@ export async function GET(req: NextRequest) {
     end = endOfWeek(refDate, { weekStartsOn: 1 });
   }
 
-  // Students and officers (cán bộ) are reported separately; students are the default.
-  const group = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
+  // Students and officers (cán bộ) can be counted together (ALL), or each on its own.
+  const groupParam = req.nextUrl.searchParams.get("group");
+  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "STUDENT" ? "STUDENT" : "ALL";
 
   const sessions = await prisma.mealSession.findMany({
     where: {
       date: { gte: start, lte: end },
       status: { in: ["SCHEDULED", "COMPLETED"] },
-      student: { role: group },
+      student: { role: group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : group },
     },
-    select: { date: true, mealType: true, price: true, status: true },
+    select: { date: true, mealType: true, price: true, status: true, student: { select: { role: true } } },
   });
 
   const days = eachDayOfInterval({ start, end });
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest) {
     buckets.set(key, { date: key, lunch: 0, dinner: 0, revenue: 0 });
   }
 
+  let officerMeals = 0;
   for (const s of sessions) {
     const key = format(s.date, "yyyy-MM-dd");
     const bucket = buckets.get(key);
@@ -80,7 +82,8 @@ export async function GET(req: NextRequest) {
     if (s.mealType === "LUNCH") bucket.lunch += 1;
     else bucket.dinner += 1;
     // Officers' meal prices are not shown anywhere, so they add nothing to the revenue figure.
-    if (group === "STUDENT") bucket.revenue += s.price;
+    if (s.student.role === "OFFICER") officerMeals += 1;
+    else bucket.revenue += s.price;
   }
 
   const series = Array.from(buckets.values());
@@ -92,8 +95,10 @@ export async function GET(req: NextRequest) {
       acc.totalRevenue += b.revenue;
       return acc;
     },
-    { totalMeals: 0, lunchMeals: 0, dinnerMeals: 0, totalRevenue: 0 },
+    { totalMeals: 0, lunchMeals: 0, dinnerMeals: 0, totalRevenue: 0, studentMeals: 0, officerMeals: 0 },
   );
+  summary.officerMeals = officerMeals;
+  summary.studentMeals = summary.totalMeals - officerMeals;
 
   return NextResponse.json({
     range,

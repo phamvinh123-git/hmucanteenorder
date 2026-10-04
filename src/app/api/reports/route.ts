@@ -3,6 +3,7 @@ import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth 
 import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { syncCompletedSessions } from "@/lib/meal-logic";
+import { compareVietnameseNames } from "@/lib/text";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -11,8 +12,9 @@ export async function GET(req: NextRequest) {
   }
 
   const range = req.nextUrl.searchParams.get("range") ?? "week";
-  // Students and officers (cán bộ) are reported separately; students are the default.
-  const group = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
+  // Students and officers (cán bộ) can be reported together (ALL), or each on its own.
+  const groupParam = req.nextUrl.searchParams.get("group");
+  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "STUDENT" ? "STUDENT" : "ALL";
   const dateParam = req.nextUrl.searchParams.get("date");
   const refDate = dateParam ? new Date(dateParam) : new Date();
 
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
-  const studentIds = group === "STUDENT" ? Array.from(new Set(regsInRange.map((r) => r.studentId))) : [];
+  const studentIds = group !== "OFFICER" ? Array.from(new Set(regsInRange.map((r) => r.studentId))) : [];
   const earliestEver =
     studentIds.length > 0
       ? await prisma.mealRegistration.groupBy({
@@ -93,22 +95,26 @@ export async function GET(req: NextRequest) {
     createdAt: r.createdAt,
     isFirstEver: firstEverByStudent.get(r.studentId) === r.createdAt.getTime(),
   }));
-  const newRegistrations = group === "STUDENT" ? registrationRows.filter((r) => r.isFirstEver) : [];
-  const renewals = group === "STUDENT" ? registrationRows.filter((r) => !r.isFirstEver) : [];
+  const newRegistrations = group !== "OFFICER" ? registrationRows.filter((r) => r.isFirstEver) : [];
+  const renewals = group !== "OFFICER" ? registrationRows.filter((r) => !r.isFirstEver) : [];
 
   const sessions = await prisma.mealSession.findMany({
-    where: { date: { gte: start, lte: end }, student: { role: group } },
+    where: {
+      date: { gte: start, lte: end },
+      student: { role: group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : group },
+    },
     select: {
       studentId: true,
       status: true,
       pickedUp: true,
-      student: { select: { name: true, staffCode: true, orderCode: true, major: true, className: true } },
+      student: { select: { name: true, role: true, staffCode: true, orderCode: true, major: true, className: true } },
     },
   });
 
   type Row = {
     studentId: string;
     name: string;
+    role: "STUDENT" | "OFFICER";
     orderCode: number | null;
     staffCode: string | null;
     major: string | null;
@@ -124,6 +130,7 @@ export async function GET(req: NextRequest) {
       row = {
         studentId: s.studentId,
         name: s.student.name,
+        role: s.student.role === "OFFICER" ? "OFFICER" : "STUDENT",
         orderCode: s.student.orderCode,
         staffCode: s.student.staffCode,
         major: s.student.major,
@@ -136,12 +143,15 @@ export async function GET(req: NextRequest) {
     if (s.status !== "CANCELLED") row.booked += 1;
     // Students are ticked off as "picked up"; officers sign a paper list instead, so for them a meal
     // counts as eaten once it has gone by (status COMPLETED) without being cancelled.
-    if (group === "OFFICER" ? s.status === "COMPLETED" : s.pickedUp) row.eaten += 1;
+    if (s.student.role === "OFFICER" ? s.status === "COMPLETED" : s.pickedUp) row.eaten += 1;
   }
 
   const rows = Array.from(byStudent.values())
     .filter((r) => r.booked > 0 || r.eaten > 0)
     .sort((a, b) => {
+      // Officers first (alphabetical by given name), then students by order number.
+      if (a.role !== b.role) return a.role === "OFFICER" ? -1 : 1;
+      if (a.role === "OFFICER") return compareVietnameseNames(a.name, b.name);
       if (a.orderCode != null && b.orderCode != null) return a.orderCode - b.orderCode;
       if (a.orderCode != null) return -1;
       if (b.orderCode != null) return 1;
@@ -158,6 +168,8 @@ export async function GET(req: NextRequest) {
     renewals,
     summary: {
       totalStudents: rows.length,
+      studentCount: rows.filter((r) => r.role === "STUDENT").length,
+      officerCount: rows.filter((r) => r.role === "OFFICER").length,
       totalBooked: rows.reduce((sum, r) => sum + r.booked, 0),
       totalEaten: rows.reduce((sum, r) => sum + r.eaten, 0),
     },

@@ -29,7 +29,14 @@ type StatsResponse = {
   start: string;
   end: string;
   series: { date: string; lunch: number; dinner: number; revenue: number }[];
-  summary: { totalMeals: number; lunchMeals: number; dinnerMeals: number; totalRevenue: number };
+  summary: {
+    totalMeals: number;
+    lunchMeals: number;
+    dinnerMeals: number;
+    totalRevenue: number;
+    studentMeals: number;
+    officerMeals: number;
+  };
 };
 
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 });
@@ -59,8 +66,9 @@ export default function StatsView() {
   const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   // Sinh viên and cán bộ (staff) are reported separately. Officers' prices are never shown.
-  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
-  const showRevenue = group === "STUDENT";
+  const [group, setGroup] = useState<"ALL" | "OFFICER" | "STUDENT">("ALL");
+  // Revenue only ever counts students: officers' prices are not shown.
+  const showRevenue = group !== "OFFICER";
 
   useEffect(() => {
     if (range === "custom" && customStart > customEnd) {
@@ -99,8 +107,9 @@ export default function StatsView() {
       <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm">
         {(
           [
-            ["STUDENT", "Sinh viên"],
+            ["ALL", "Tất cả"],
             ["OFFICER", "Cán bộ"],
+            ["STUDENT", "Sinh viên"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -163,6 +172,11 @@ export default function StatsView() {
             >
               <p className="text-xs text-slate-500">Tổng suất ăn</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalMeals}</p>
+              {group === "ALL" && (
+                <p className="text-[11px] text-slate-500">
+                  {data.summary.studentMeals} sinh viên · {data.summary.officerMeals} cán bộ
+                </p>
+              )}
             </div>
             <div
               className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
@@ -183,7 +197,7 @@ export default function StatsView() {
                 className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
                 style={{ animationDelay: "120ms" }}
               >
-                <p className="text-xs text-slate-500">Doanh thu</p>
+                <p className="text-xs text-slate-500">{group === "ALL" ? "Doanh thu (sinh viên)" : "Doanh thu"}</p>
                 <p className="text-xl font-bold text-green-600">{currency.format(data.summary.totalRevenue)}</p>
               </div>
             )}

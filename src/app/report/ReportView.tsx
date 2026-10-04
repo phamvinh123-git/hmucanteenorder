@@ -9,6 +9,7 @@ type Range = "day" | "week" | "month" | "custom";
 type ReportRow = {
   studentId: string;
   name: string;
+  role: "STUDENT" | "OFFICER";
   orderCode: number | null;
   staffCode: string | null;
   major: string | null;
@@ -37,7 +38,13 @@ type ReportResponse = {
   rows: ReportRow[];
   newRegistrations: RegistrationRow[];
   renewals: RegistrationRow[];
-  summary: { totalStudents: number; totalBooked: number; totalEaten: number };
+  summary: {
+    totalStudents: number;
+    studentCount: number;
+    officerCount: number;
+    totalBooked: number;
+    totalEaten: number;
+  };
 };
 
 const PATTERN_LABEL: Record<RegistrationRow["mealPattern"], string> = {
@@ -79,7 +86,7 @@ export default function ReportView() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   // Sinh viên and cán bộ (staff) are reported separately.
-  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
+  const [group, setGroup] = useState<"ALL" | "OFFICER" | "STUDENT">("ALL");
   const isOfficer = group === "OFFICER";
 
   useEffect(() => {
@@ -124,12 +131,12 @@ export default function ReportView() {
       <div className="print:hidden">
         <PageHeader
           title="Báo cáo"
-          subtitle={`Số suất đã đặt và đã ăn của từng ${isOfficer ? "cán bộ" : "sinh viên"} theo thời gian.`}
+          subtitle={`Số suất đã đặt và đã ăn của từng ${isOfficer ? "cán bộ" : group === "ALL" ? "người" : "sinh viên"} theo thời gian.`}
         />
       </div>
       <div className="hidden print:block text-center">
         <p className="text-sm">Đại học Y Hà Nội – Phân hiệu Thanh Hóa</p>
-        <h1 className="text-xl font-bold uppercase">Báo cáo suất ăn căng tin — {isOfficer ? "cán bộ" : "sinh viên"}</h1>
+        <h1 className="text-xl font-bold uppercase">Báo cáo suất ăn căng tin — {isOfficer ? "cán bộ" : group === "ALL" ? "sinh viên và cán bộ" : "sinh viên"}</h1>
         {data && (
           <p className="text-sm">
             Từ {dateFmt.format(new Date(data.start))} đến {dateFmt.format(new Date(data.end))}
@@ -140,8 +147,9 @@ export default function ReportView() {
       <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm print:hidden">
         {(
           [
-            ["STUDENT", "Sinh viên"],
+            ["ALL", "Tất cả"],
             ["OFFICER", "Cán bộ"],
+            ["STUDENT", "Sinh viên"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -193,7 +201,7 @@ export default function ReportView() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={isOfficer ? "Tìm theo tên hoặc mã cán bộ..." : "Tìm theo tên, ngành hoặc lớp..."}
+          placeholder={isOfficer ? "Tìm theo tên hoặc mã cán bộ..." : group === "ALL" ? "Tìm theo tên, mã, ngành hoặc lớp..." : "Tìm theo tên, ngành hoặc lớp..."}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-full sm:w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
         />
         <button
@@ -212,8 +220,13 @@ export default function ReportView() {
         <>
           <div className={`grid grid-cols-2 gap-3 print:gap-2 ${isOfficer ? "sm:grid-cols-3" : "sm:grid-cols-5"}`}>
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in">
-              <p className="text-xs text-slate-500">{isOfficer ? "Số cán bộ" : "Số sinh viên"}</p>
+              <p className="text-xs text-slate-500">{isOfficer ? "Số cán bộ" : group === "ALL" ? "Số người" : "Số sinh viên"}</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalStudents}</p>
+              {group === "ALL" && (
+                <p className="text-[11px] text-slate-500">
+                  {data.summary.studentCount} sinh viên · {data.summary.officerCount} cán bộ
+                </p>
+              )}
             </div>
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "40ms" }}>
               <p className="text-xs text-slate-500">Tổng suất đã đặt</p>
@@ -257,7 +270,7 @@ export default function ReportView() {
               <table className="w-full text-sm print:text-xs print:[&_td]:border print:[&_th]:border print:[&_td]:border-slate-400 print:[&_th]:border-slate-400 print:[&_td]:px-2 print:[&_th]:px-2">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100 print:text-black">
-                    <th className="py-2 pr-4">{isOfficer ? "Mã CB" : "STT"}</th>
+                    <th className="py-2 pr-4">{isOfficer ? "Mã CB" : group === "ALL" ? "STT / Mã CB" : "STT"}</th>
                     <th className="py-2 pr-4">Họ và tên</th>
                     {!isOfficer && <th className="py-2 pr-4">Ngành</th>}
                     {!isOfficer && <th className="py-2 pr-4">Lớp</th>}
@@ -275,7 +288,7 @@ export default function ReportView() {
                   )}
                   {rows?.map((r) => (
                     <tr key={r.studentId} className="border-b border-slate-50 hover:bg-red-50/40 transition-colors">
-                      <td className="py-1.5 pr-4 font-mono">{isOfficer ? (r.staffCode ?? "—") : (r.orderCode ?? "—")}</td>
+                      <td className="py-1.5 pr-4 font-mono">{r.role === "OFFICER" ? (r.staffCode ?? "—") : (r.orderCode ?? "—")}</td>
                       <td className="py-1.5 pr-4">{r.name}</td>
                       {!isOfficer && <td className="py-1.5 pr-4 text-slate-500">{r.major || "—"}</td>}
                       {!isOfficer && <td className="py-1.5 pr-4 text-slate-500">{r.className || "—"}</td>}
