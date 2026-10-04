@@ -207,17 +207,22 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
                     onClick={() => toggleDay(week.key, key)}
                     disabled={locked}
                     aria-pressed={on}
-                    className={`rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed ${
+                    className={`relative rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed ${
                       on
-                        ? "border-red-600 bg-red-50 shadow-sm"
+                        ? "border-red-600 bg-red-600 text-white shadow-md disabled:opacity-90"
                         : "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/40 disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-white"
                     }`}
                   >
-                    <p className="text-xs capitalize text-slate-500">{weekdayLong.format(d)}</p>
-                    <p className="text-lg font-bold text-slate-800">{shortDate.format(d)}</p>
-                    <p className="text-xs text-slate-500">{currency.format(OFFICER_MEAL_PRICE)}</p>
-                    <p className={`mt-1 text-xs font-semibold ${on ? "text-red-600" : "text-slate-400"}`}>
-                      {on ? "✓ Có ăn trưa" : locked ? "Đã quá hạn" : "Không ăn"}
+                    {on && (
+                      <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-red-600">
+                        ✓
+                      </span>
+                    )}
+                    <p className={`text-xs capitalize ${on ? "text-red-100" : "text-slate-500"}`}>{weekdayLong.format(d)}</p>
+                    <p className={`text-lg font-bold ${on ? "text-white" : "text-slate-800"}`}>{shortDate.format(d)}</p>
+                    <p className={`text-xs ${on ? "text-red-100" : "text-slate-500"}`}>{currency.format(OFFICER_MEAL_PRICE)}</p>
+                    <p className={`mt-1 text-xs font-semibold ${on ? "text-white" : "text-slate-400"}`}>
+                      {on ? "Đã đăng ký" : locked ? "Đã quá hạn" : "Chưa đăng ký"}
                     </p>
                   </button>
                 );
