@@ -2,8 +2,14 @@
 
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import { cancelCutoff, canCancelSession, canRestoreSession, localDateKey } from "@/lib/client-session-rules";
-import { officerWeekDays, openWeekMonday, registrationDeadline } from "@/lib/officer-rules";
+import {
+  canBookSlot,
+  cancelCutoff,
+  canCancelSession,
+  canRestoreSession,
+  localDateKey,
+} from "@/lib/client-session-rules";
+import { OFFICER_MEAL_PRICE, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
 
 type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
@@ -17,23 +23,31 @@ type OfficerSession = {
 const shortDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" });
 const fullDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const weekdayLong = new Intl.DateTimeFormat("vi-VN", { weekday: "long" });
+const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 
 const keyOf = (iso: string) => localDateKey(new Date(iso));
 
 export default function OfficerDashboard({ sessions: initialSessions }: { sessions: OfficerSession[] }) {
   const [sessions, setSessions] = useState(initialSessions);
 
-  // The one week that can currently be ordered, and which of its days are ticked.
-  const openMonday = useMemo(() => openWeekMonday(new Date()), []);
-  const openDays = useMemo(() => officerWeekDays(openMonday), [openMonday]);
-  const deadline = useMemo(() => registrationDeadline(openMonday), [openMonday]);
-  const [picked, setPicked] = useState<string[]>(() => {
-    const keys = new Set(openDays.map(localDateKey));
-    return initialSessions.filter((s) => s.status !== "CANCELLED" && keys.has(keyOf(s.date))).map((s) => keyOf(s.date));
-  });
+  // Every week that can be ordered right now (normally one; two during the launch week), and which days are ticked.
+  const weeks = useMemo(
+    () =>
+      openWeekMondays(new Date()).map((monday) => ({
+        monday,
+        key: localDateKey(monday),
+        days: officerWeekDays(monday),
+        deadline: registrationDeadline(monday),
+      })),
+    [],
+  );
+  const openKeys = useMemo(() => new Set(weeks.flatMap((w) => w.days.map(localDateKey))), [weeks]);
+  const [picked, setPicked] = useState<string[]>(() =>
+    initialSessions.filter((s) => s.status !== "CANCELLED" && openKeys.has(keyOf(s.date))).map((s) => keyOf(s.date)),
+  );
 
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [savingWeek, setSavingWeek] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Record<string, { ok: boolean; text: string } | null>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,39 +68,52 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
     [sessions],
   );
 
-  const openKeys = useMemo(() => new Set(openDays.map(localDateKey)), [openDays]);
   const cutoffHour = cancelCutoff(new Date(), "LUNCH").getHours();
 
-  function toggleDay(key: string) {
-    setMessage(null);
+  // Days of a week that can still be added or dropped (a week already under way has locked days).
+  const bookableKeys = (days: Date[]) =>
+    days.filter((d) => canBookSlot({ date: d, mealType: "LUNCH" }).ok).map(localDateKey);
+
+  function toggleDay(weekKey: string, key: string) {
+    setMessages((m) => ({ ...m, [weekKey]: null }));
     setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
-  async function saveWeek() {
-    setSaving(true);
-    setMessage(null);
+  async function saveWeek(week: (typeof weeks)[number]) {
+    setSavingWeek(week.key);
+    setMessages((m) => ({ ...m, [week.key]: null }));
+    const weekKeys = new Set(week.days.map(localDateKey));
     try {
       const res = await fetch("/api/officer/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weekStart: localDateKey(openMonday), dates: picked }),
+        body: JSON.stringify({ weekStart: week.key, dates: picked.filter((k) => weekKeys.has(k)) }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessage({ ok: false, text: data.error ?? "Không thể lưu đăng ký." });
+        setMessages((m) => ({ ...m, [week.key]: { ok: false, text: data.error ?? "Không thể lưu đăng ký." } }));
         return;
       }
-      const week: OfficerSession[] = (data.sessions as { id: string; date: string; status: SessionStatus; pickedUp: boolean }[]).map(
-        (s) => ({ id: s.id, date: s.date, status: s.status, pickedUp: s.pickedUp }),
-      );
-      setSessions((prev) => [...prev.filter((s) => !openKeys.has(keyOf(s.date))), ...week]);
-      setPicked(week.filter((s) => s.status !== "CANCELLED").map((s) => keyOf(s.date)));
-      setMessage({
-        ok: true,
-        text: data.total > 0 ? `Đã lưu: ${data.total} ngày ăn trưa trong tuần.` : "Đã lưu: tuần này bạn không đăng ký ăn.",
-      });
+      const saved: OfficerSession[] = (data.sessions as OfficerSession[]).map((x) => ({
+        id: x.id,
+        date: x.date,
+        status: x.status,
+        pickedUp: x.pickedUp,
+      }));
+      setSessions((prev) => [...prev.filter((x) => !weekKeys.has(keyOf(x.date))), ...saved]);
+      setPicked((prev) => [
+        ...prev.filter((k) => !weekKeys.has(k)),
+        ...saved.filter((x) => x.status !== "CANCELLED").map((x) => keyOf(x.date)),
+      ]);
+      setMessages((m) => ({
+        ...m,
+        [week.key]: {
+          ok: true,
+          text: data.total > 0 ? `Đã lưu: ${data.total} ngày ăn trưa trong tuần.` : "Đã lưu: tuần này bạn không đăng ký ăn.",
+        },
+      }));
     } finally {
-      setSaving(false);
+      setSavingWeek(null);
     }
   }
 
@@ -130,77 +157,103 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
     <div className="space-y-6">
       <PageHeader
         title="Đặt cơm trưa cho cán bộ"
-        subtitle={`Đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
+        subtitle={`Mỗi suất ${currency.format(OFFICER_MEAL_PRICE)} · đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
       />
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="text-base font-bold text-slate-800">
-              Đăng ký cơm tuần {shortDate.format(openDays[0])} – {shortDate.format(openDays[openDays.length - 1])}
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Hạn đăng ký: hết <b>{weekdayLong.format(deadline)} {fullDate.format(deadline)}</b>. Quá hạn sẽ không thêm được ngày mới.
-            </p>
-          </div>
-          <div className="flex gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => setPicked(openDays.map(localDateKey))}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-            >
-              Chọn cả tuần
-            </button>
-            <button
-              type="button"
-              onClick={() => setPicked([])}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-            >
-              Bỏ chọn hết
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {openDays.map((d) => {
-            const key = localDateKey(d);
-            const on = picked.includes(key);
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleDay(key)}
-                aria-pressed={on}
-                className={`rounded-2xl border-2 p-3 text-left transition ${
-                  on
-                    ? "border-red-600 bg-red-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/40"
-                }`}
-              >
-                <p className="text-xs capitalize text-slate-500">{weekdayLong.format(d)}</p>
-                <p className="text-lg font-bold text-slate-800">{shortDate.format(d)}</p>
-                <p className={`mt-1 text-xs font-semibold ${on ? "text-red-600" : "text-slate-400"}`}>
-                  {on ? "✓ Có ăn trưa" : "Không ăn"}
+      {weeks.map((week) => {
+        const free = bookableKeys(week.days);
+        return (
+          <section key={week.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">
+                  Đăng ký cơm tuần {shortDate.format(week.days[0])} – {shortDate.format(week.days[week.days.length - 1])}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Hạn đăng ký: hết{" "}
+                  <b>
+                    {weekdayLong.format(week.deadline)} {fullDate.format(week.deadline)}
+                  </b>
+                  . Quá hạn sẽ không thêm được ngày mới.
                 </p>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPicked((prev) => Array.from(new Set([...prev, ...free])))}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                >
+                  Chọn cả tuần
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPicked((prev) => prev.filter((k) => !free.includes(k)))}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                >
+                  Bỏ chọn hết
+                </button>
+              </div>
+            </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-dashed border-slate-200 pt-4">
-          <button
-            type="button"
-            onClick={saveWeek}
-            disabled={saving}
-            className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
-          >
-            {saving ? "Đang lưu..." : `Lưu đăng ký (${picked.length} ngày)`}
-          </button>
-          {message && (
-            <span className={`text-sm animate-pop-in ${message.ok ? "text-green-600" : "text-red-600"}`}>{message.text}</span>
-          )}
-        </div>
-      </section>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {week.days.map((d) => {
+                const key = localDateKey(d);
+                const on = picked.includes(key);
+                const locked = !free.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleDay(week.key, key)}
+                    disabled={locked}
+                    aria-pressed={on}
+                    className={`rounded-2xl border-2 p-3 text-left transition disabled:cursor-not-allowed ${
+                      on
+                        ? "border-red-600 bg-red-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-red-300 hover:bg-red-50/40 disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-white"
+                    }`}
+                  >
+                    <p className="text-xs capitalize text-slate-500">{weekdayLong.format(d)}</p>
+                    <p className="text-lg font-bold text-slate-800">{shortDate.format(d)}</p>
+                    <p className="text-xs text-slate-500">{currency.format(OFFICER_MEAL_PRICE)}</p>
+                    <p className={`mt-1 text-xs font-semibold ${on ? "text-red-600" : "text-slate-400"}`}>
+                      {on ? "✓ Có ăn trưa" : locked ? "Đã quá hạn" : "Không ăn"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-dashed border-slate-200 pt-4">
+              <button
+                type="button"
+                onClick={() => saveWeek(week)}
+                disabled={savingWeek === week.key}
+                className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+              >
+                {savingWeek === week.key
+                  ? "Đang lưu..."
+                  : `Lưu đăng ký (${picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length} ngày)`}
+              </button>
+              {picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length > 0 && (
+                <span className="text-sm text-slate-600">
+                  Tạm tính:{" "}
+                  <b className="text-red-700">
+                    {currency.format(
+                      picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length * OFFICER_MEAL_PRICE,
+                    )}
+                  </b>
+                </span>
+              )}
+              {messages[week.key] && (
+                <span className={`text-sm animate-pop-in ${messages[week.key]!.ok ? "text-green-600" : "text-red-600"}`}>
+                  {messages[week.key]!.text}
+                </span>
+              )}
+            </div>
+          </section>
+        );
+      })}
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 animate-pop-in">{error}</p>}
 
@@ -225,7 +278,9 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
                   <span className="text-[11px] uppercase">Th{d.getMonth() + 1}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800">Bữa trưa</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Bữa trưa <span className="font-normal text-slate-500">· {currency.format(OFFICER_MEAL_PRICE)}</span>
+                  </p>
                   <p className="mb-2 text-xs capitalize text-slate-500">{weekdayLong.format(d)}</p>
                   {confirmingId === s.id ? (
                     <div className="flex flex-wrap gap-2">

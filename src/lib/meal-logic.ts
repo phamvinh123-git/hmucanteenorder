@@ -397,13 +397,22 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
     const existing = await tx.mealSession.findMany({ where: inWeek });
     const byKey = new Map(existing.map((s) => [localDateKey(s.date), s]));
 
-    const removeIds = existing
-      .filter((s) => s.status === "SCHEDULED" && !wanted.has(localDateKey(s.date)))
-      .map((s) => s.id);
-    const reviveIds = existing
-      .filter((s) => s.status === "CANCELLED" && wanted.has(localDateKey(s.date)))
-      .map((s) => s.id);
+    const dropped = existing.filter((s) => s.status === "SCHEDULED" && !wanted.has(localDateKey(s.date)));
+    const revived = existing.filter((s) => s.status === "CANCELLED" && wanted.has(localDateKey(s.date)));
     const createDays = [...wanted.entries()].filter(([key]) => !byKey.has(key)).map(([, d]) => d);
+
+    // Adding or dropping a day only works while that day is still bookable (matters for a week that is
+    // already under way, such as the launch week); afterwards the normal cancel button with its cutoff applies.
+    for (const date of [...dropped.map((s) => s.date), ...revived.map((s) => s.date), ...createDays]) {
+      const check = canBookSlot({ date: startOfDay(date), mealType: "LUNCH" }, now);
+      if (!check.ok) {
+        throw new Error(
+          `Ngày ${localDateKey(date).split("-").reverse().join("/")} đã quá giờ nên không thêm hoặc bỏ được nữa. ${check.reason ?? ""}`.trim(),
+        );
+      }
+    }
+    const removeIds = dropped.map((s) => s.id);
+    const reviveIds = revived.map((s) => s.id);
 
     let registration = await tx.mealRegistration.findFirst({
       where: { studentId: officerId, startDate: monday, mealPattern: "LUNCH" },

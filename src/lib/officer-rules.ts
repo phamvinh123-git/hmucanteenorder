@@ -26,8 +26,21 @@ export function mondayOf(d: Date) {
   return x;
 }
 
+/**
+ * One-off launch exception: the officer feature started mid-week, so these weeks can still be ordered
+ * after the usual Friday deadline — up to the end of `until` (inclusive). Individual days must still be
+ * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
+ */
+const LAUNCH_WEEKS = [{ monday: "2026-10-05", until: "2026-10-06" }];
+
 /** The Friday before `weekMonday`, at 23:59:59.999 — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
+  const launch = LAUNCH_WEEKS.find((w) => w.monday === localDateKey(weekMonday));
+  if (launch) {
+    const end = parseLocalDate(launch.until) ?? weekMonday;
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }
   const x = addDaysLocal(weekMonday, -3);
   x.setHours(23, 59, 59, 999);
   return x;
@@ -37,6 +50,19 @@ export function registrationDeadline(weekMonday: Date) {
 export function openWeekMonday(now: Date = new Date()) {
   const nextWeek = addDaysLocal(mondayOf(now), 7);
   return now.getTime() <= registrationDeadline(nextWeek).getTime() ? nextWeek : addDaysLocal(nextWeek, 7);
+}
+
+/** Mondays of every week that can be ordered right now: the regular one plus any launch-exception week. */
+export function openWeekMondays(now: Date = new Date()) {
+  const regular = openWeekMonday(now);
+  const mondays = [regular];
+  for (const w of LAUNCH_WEEKS) {
+    const monday = parseLocalDate(w.monday);
+    if (monday && now.getTime() <= registrationDeadline(monday).getTime() && monday.getTime() !== regular.getTime()) {
+      mondays.push(monday);
+    }
+  }
+  return mondays.sort((a, b) => a.getTime() - b.getTime());
 }
 
 /** Monday to Friday of the week starting at `weekMonday`. */
