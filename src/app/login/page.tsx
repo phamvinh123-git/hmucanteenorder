@@ -30,9 +30,11 @@ export default async function LoginPage() {
             priority
             className="mx-auto mb-5 h-28 w-28 rounded-full object-cover bg-white animate-logo-float"
           />
-          <h1 className="text-balance text-2xl font-extrabold leading-snug tracking-tight text-slate-800 sm:text-3xl">
-            HMU THC Canteen - Hệ thống quản lý đặt ăn
+          {/* One line, in the two colours of the campus logo: red, then blue. */}
+          <h1 className="whitespace-nowrap text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+            <span className="text-[#be1651]">HMU THC</span> <span className="text-[#0556a2]">Canteen</span>
           </h1>
+          <p className="mt-2 text-base font-medium text-slate-500 sm:text-lg">Hệ thống đặt ăn tại Canteen</p>
         </div>
         <LoginForm />
       </div>
