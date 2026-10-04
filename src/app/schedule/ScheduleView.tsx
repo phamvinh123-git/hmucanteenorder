@@ -43,15 +43,17 @@ export default function ScheduleView() {
   const [sessions, setSessions] = useState<ScheduleSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCell, setSelectedCell] = useState<{ date: string; mealType: MealType } | null>(null);
+  // Sinh viên and cán bộ (staff) have separate lists, grids and printouts.
+  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reload indicator when the visible week changes
     setLoading(true);
-    fetch(`/api/schedule?weekStart=${localDateKey(weekStart)}`)
+    fetch(`/api/schedule?weekStart=${localDateKey(weekStart)}&group=${group}`)
       .then((res) => res.json())
       .then((data) => setSessions(data.sessions ?? []))
       .finally(() => setLoading(false));
-  }, [weekStart]);
+  }, [weekStart, group]);
 
   const byCell = useMemo(() => {
     const map = new Map<string, ScheduleSession[]>();
@@ -109,8 +111,30 @@ export default function ScheduleView() {
     <div className="space-y-4">
       <PageHeader title="Lịch tuần" subtitle="Tổng quan số suất ăn Trưa/Tối mỗi ngày. Nhấp vào 1 ô để xem danh sách, tích đã lấy đồ ăn, hoặc in danh sách." />
 
+      <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm">
+        {(
+          [
+            ["STUDENT", "Sinh viên"],
+            ["OFFICER", "Cán bộ"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => {
+              setGroup(value);
+              setSelectedCell(null);
+            }}
+            className={`px-4 py-1.5 ${
+              group === value ? "bg-red-600 text-white" : "bg-white text-slate-600 hover:bg-red-50 hover:text-red-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <WeekMealGrid
-        title="Số suất ăn theo tuần"
+        title={group === "OFFICER" ? "Số suất cơm trưa cán bộ theo tuần" : "Số suất ăn theo tuần"}
         weekStart={weekStart}
         onWeekStartChange={(w) => {
           setWeekStart(w);
@@ -182,7 +206,7 @@ export default function ScheduleView() {
                   </button>
                 ))}
               <a
-                href={`/schedule/print?date=${selectedCell.date}&mealType=${selectedCell.mealType}`}
+                href={`/schedule/print?date=${selectedCell.date}&mealType=${selectedCell.mealType}&group=${group}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"

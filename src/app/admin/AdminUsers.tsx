@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { foldText } from "@/lib/text";
 
-type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT";
+type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER";
 
 type UserRow = {
   id: string;
@@ -21,9 +21,10 @@ const ROLE_LABEL: Record<Role, string> = {
   MANAGER: "Quản lý",
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
+  OFFICER: "Cán bộ",
 };
 
-const emptyForm = { name: "", phone: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" };
+const emptyForm = { name: "", phone: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -137,6 +138,7 @@ export default function AdminUsers() {
               <option value="ADMIN">Quản trị viên</option>
               <option value="MANAGER">Quản lý</option>
               <option value="SALES">Bán hàng</option>
+              <option value="OFFICER">Cán bộ</option>
             </select>
           </div>
           <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
@@ -176,6 +178,7 @@ export default function AdminUsers() {
             <option value="MANAGER">Quản lý</option>
             <option value="SALES">Bán hàng</option>
             <option value="STUDENT">Sinh viên</option>
+<option value="OFFICER">Cán bộ</option>
           </select>
           </div>
         </div>
@@ -255,6 +258,7 @@ export default function AdminUsers() {
                   <option value="MANAGER">Quản lý</option>
                   <option value="SALES">Bán hàng</option>
                   <option value="STUDENT">Sinh viên</option>
+<option value="OFFICER">Cán bộ</option>
                 </select>
               </div>
             </div>

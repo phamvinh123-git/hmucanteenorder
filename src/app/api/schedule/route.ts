@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
   }
 
   const weekStart = parseWeekStart(req.nextUrl.searchParams.get("weekStart"));
+  // Students and officers (cán bộ) are listed separately; students are the default.
+  const role = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
@@ -27,6 +29,7 @@ export async function GET(req: NextRequest) {
     where: {
       date: { gte: weekStart, lt: weekEnd },
       status: { in: ["SCHEDULED", "COMPLETED"] },
+      student: { role },
     },
     select: {
       id: true,

@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   // Registrations created in this range, split into brand-new students vs. returning students
   // renewing — "new" means this is the very first registration that student ever had.
   const regsInRange = await prisma.mealRegistration.findMany({
-    where: { createdAt: { gte: start, lte: end } },
+    where: { createdAt: { gte: start, lte: end }, student: { role: "STUDENT" } },
     select: {
       id: true,
       studentId: true,
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   const renewals = registrationRows.filter((r) => !r.isFirstEver);
 
   const sessions = await prisma.mealSession.findMany({
-    where: { date: { gte: start, lte: end } },
+    where: { date: { gte: start, lte: end }, student: { role: "STUDENT" } },
     select: {
       studentId: true,
       status: true,

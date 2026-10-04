@@ -18,11 +18,13 @@ function sortByOrderCode(a: { orderCode: number | null; name: string }, b: { ord
 export default async function SchedulePrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; mealType?: string }>;
+  searchParams: Promise<{ date?: string; mealType?: string; group?: string }>;
 }) {
   await requireUser({ roles: ["SALES", "MANAGER", "ADMIN"] });
 
-  const { date: dateParam, mealType: mealTypeParam } = await searchParams;
+  const { date: dateParam, mealType: mealTypeParam, group: groupParam } = await searchParams;
+  // Officers (cán bộ) sign on the printout instead of being ticked off as picked up.
+  const isOfficers = groupParam === "OFFICER";
   const mealType = mealTypeParam === "DINNER" ? "DINNER" : "LUNCH";
   const date = dateParam ? new Date(dateParam) : new Date();
   const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -34,6 +36,7 @@ export default async function SchedulePrintPage({
       date: { gte: dayStart, lt: dayEnd },
       mealType,
       status: { in: ["SCHEDULED", "COMPLETED"] },
+      student: { role: isOfficers ? "OFFICER" : "STUDENT" },
     },
     select: {
       id: true,
@@ -85,7 +88,7 @@ export default async function SchedulePrintPage({
         <div className="px-2 pb-1">
           <p className="text-[13px] font-bold text-center leading-tight">CĂNG TIN ĐHYHN THANH HÓA</p>
           <p className="text-[11px] text-center leading-tight">
-            Danh sách suất ăn Bữa {MEAL_LABEL[mealType]} &middot; {dateFmt.format(dayStart)}
+            {isOfficers ? "Danh sách cán bộ" : "Danh sách suất ăn"} Bữa {MEAL_LABEL[mealType]} &middot; {dateFmt.format(dayStart)}
           </p>
           <p className="text-[10px] leading-tight mt-1">
             {timeFmt.format(now)} {dateFmt.format(now)}
@@ -94,7 +97,7 @@ export default async function SchedulePrintPage({
 
         <div className="border-t border-black" />
 
-        {rows.length === 0 && <p className="text-[11px] text-center py-4">Không có sinh viên nào đăng ký bữa này.</p>}
+        {rows.length === 0 && <p className="text-[11px] text-center py-4">Không có {isOfficers ? "cán bộ" : "sinh viên"} nào đăng ký bữa này.</p>}
 
         {rows.map((r, i) => (
           <div key={r.id} className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
@@ -109,9 +112,14 @@ export default async function SchedulePrintPage({
               </p>
               {r.note && <p className="text-[10px] italic leading-tight">{r.note}</p>}
             </div>
-            <div className="w-4 h-4 border border-black flex-shrink-0 mt-0.5">
-              {r.pickedUp && <div className="w-full h-full bg-black" />}
-            </div>
+            {isOfficers ? (
+              // A blank box to sign in, instead of the pickup tick.
+              <div className="w-20 h-9 border border-black flex-shrink-0" />
+            ) : (
+              <div className="w-4 h-4 border border-black flex-shrink-0 mt-0.5">
+                {r.pickedUp && <div className="w-full h-full bg-black" />}
+              </div>
+            )}
           </div>
         ))}
 

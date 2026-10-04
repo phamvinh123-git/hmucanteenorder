@@ -1,4 +1,4 @@
-import { startOfDay } from "date-fns";
+import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { MealPattern, MealType } from "@prisma/client";
 import {
@@ -9,6 +9,8 @@ import {
   generateSessionPlan,
   nextSlot,
 } from "@/lib/session-rules";
+import { localDateKey } from "@/lib/client-session-rules";
+import { OFFICER_MEAL_PRICE, officerWeekDays, registrationDeadline } from "@/lib/officer-rules";
 
 export {
   LUNCH_CUTOFF_HOUR,
@@ -361,5 +363,127 @@ export async function removeSession(sessionId: string) {
           ? "Xóa thủ công buổi đã ăn để chỉnh lại số buổi/doanh thu bị sai"
           : "Xóa thủ công để chỉnh lại số buổi bị dư",
     },
+  });
+}
+
+/**
+ * Officer ("cán bộ") ordering: saves which weekdays of the week starting `weekMonday` they want
+ * lunch. Only allowed until the end of the Friday before that week. Days dropped before the
+ * deadline are simply removed (the officer never committed to them); days that were cancelled
+ * earlier and are picked again are switched back on.
+ */
+export async function saveOfficerWeek(params: { officerId: string; weekMonday: Date; days: Date[] }) {
+  const now = new Date();
+  const monday = startOfDay(params.weekMonday);
+  if (monday.getDay() !== 1) throw new Error("Tuần đăng ký không hợp lệ.");
+  if (now.getTime() > registrationDeadline(monday).getTime()) {
+    throw new Error("Đã hết hạn đăng ký cho tuần này. Cán bộ phải đăng ký trước hết thứ 6 của tuần trước đó.");
+  }
+
+  const allowed = new Map(officerWeekDays(monday).map((d) => [localDateKey(d), d]));
+  const wanted = new Map<string, Date>();
+  for (const d of params.days) {
+    const key = localDateKey(d);
+    const day = allowed.get(key);
+    if (!day) throw new Error("Chỉ đăng ký được từ thứ 2 đến thứ 6 của tuần đã chọn.");
+    wanted.set(key, day);
+  }
+
+  const weekEnd = addDays(monday, 7);
+  const { officerId } = params;
+
+  return prisma.$transaction(async (tx) => {
+    const inWeek = { studentId: officerId, mealType: "LUNCH" as const, date: { gte: monday, lt: weekEnd } };
+    const existing = await tx.mealSession.findMany({ where: inWeek });
+    const byKey = new Map(existing.map((s) => [localDateKey(s.date), s]));
+
+    const removeIds = existing
+      .filter((s) => s.status === "SCHEDULED" && !wanted.has(localDateKey(s.date)))
+      .map((s) => s.id);
+    const reviveIds = existing
+      .filter((s) => s.status === "CANCELLED" && wanted.has(localDateKey(s.date)))
+      .map((s) => s.id);
+    const createDays = [...wanted.entries()].filter(([key]) => !byKey.has(key)).map(([, d]) => d);
+
+    let registration = await tx.mealRegistration.findFirst({
+      where: { studentId: officerId, startDate: monday, mealPattern: "LUNCH" },
+    });
+    if (!registration && createDays.length > 0) {
+      registration = await tx.mealRegistration.create({
+        data: {
+          studentId: officerId,
+          startDate: monday,
+          totalSessions: 0,
+          mealPattern: "LUNCH",
+          pricePerMeal: OFFICER_MEAL_PRICE,
+          createdById: officerId,
+        },
+      });
+    }
+
+    if (removeIds.length > 0) await tx.mealSession.deleteMany({ where: { id: { in: removeIds } } });
+    if (reviveIds.length > 0) {
+      await tx.mealSession.updateMany({
+        where: { id: { in: reviveIds } },
+        data: { status: "SCHEDULED", cancelledAt: null },
+      });
+    }
+    if (createDays.length > 0 && registration) {
+      await tx.mealSession.createMany({
+        data: createDays.map((date) => ({
+          registrationId: registration.id,
+          studentId: officerId,
+          date,
+          mealType: "LUNCH" as const,
+          price: OFFICER_MEAL_PRICE,
+        })),
+      });
+    }
+
+    const total = await tx.mealSession.count({ where: { ...inWeek, status: { not: "CANCELLED" } } });
+    if (registration) {
+      const anyLeft = await tx.mealSession.count({ where: { registrationId: registration.id } });
+      if (anyLeft === 0) await tx.mealRegistration.delete({ where: { id: registration.id } });
+      else await tx.mealRegistration.update({ where: { id: registration.id }, data: { totalSessions: total } });
+    }
+
+    // The week as it now stands, so the caller can refresh its view without another round trip.
+    const sessions = await tx.mealSession.findMany({
+      where: inWeek,
+      orderBy: { date: "asc" },
+      select: { id: true, date: true, status: true, pickedUp: true },
+    });
+
+    return { added: createDays.length, removed: removeIds.length, revived: reviveIds.length, total, sessions };
+  });
+}
+
+/** Cancel one officer lunch. No make-up slot is added: officers order week by week, not by package. */
+export async function cancelOfficerSession(sessionId: string, opts: { bypassDeadline?: boolean } = {}) {
+  const session = await prisma.mealSession.findUniqueOrThrow({ where: { id: sessionId } });
+  if (opts.bypassDeadline) {
+    if (session.status !== "SCHEDULED") throw new Error("Buổi ăn này không còn ở trạng thái có thể hủy.");
+  } else {
+    const check = canCancelSession(session);
+    if (!check.ok) throw new Error(check.reason ?? "Không thể hủy buổi ăn này.");
+  }
+  return prisma.mealSession.update({
+    where: { id: sessionId },
+    data: { status: "CANCELLED", cancelledAt: new Date() },
+  });
+}
+
+/** Undo cancelOfficerSession. */
+export async function restoreOfficerSession(sessionId: string, opts: { bypassDeadline?: boolean } = {}) {
+  const session = await prisma.mealSession.findUniqueOrThrow({ where: { id: sessionId } });
+  if (opts.bypassDeadline) {
+    if (session.status !== "CANCELLED") throw new Error("Buổi ăn này không ở trạng thái đã hủy.");
+  } else {
+    const check = canRestoreSession(session);
+    if (!check.ok) throw new Error(check.reason ?? "Không thể khôi phục buổi ăn này.");
+  }
+  return prisma.mealSession.update({
+    where: { id: sessionId },
+    data: { status: "SCHEDULED", cancelledAt: null },
   });
 }

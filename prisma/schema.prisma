@@ -12,6 +12,7 @@ enum Role {
   MANAGER
   SALES
   STUDENT
+  OFFICER
 }
 
 enum MealPattern {

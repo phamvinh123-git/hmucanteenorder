@@ -37,6 +37,7 @@ export default function LoginForm() {
           MANAGER: "/manager",
           SALES: "/sales",
           STUDENT: "/student",
+          OFFICER: "/officer",
         };
         router.push(homeByRole[data.role] ?? "/");
       }

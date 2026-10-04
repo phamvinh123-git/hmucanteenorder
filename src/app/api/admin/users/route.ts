@@ -12,7 +12,7 @@ const schema = z.object({
     .max(15)
     .regex(/^[0-9]+$/, "Số điện thoại chỉ gồm chữ số."),
   password: z.string().min(4),
-  role: z.enum(["ADMIN", "MANAGER", "SALES"]),
+  role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER"]),
 });
 
 export async function GET() {

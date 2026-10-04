@@ -16,6 +16,7 @@ const ACTION_LABEL: Record<string, string> = {
   RECORD_MISSED_SESSION: "Ghi nhận buổi ăn bị bỏ sót",
   REMOVE_SESSION: "Xóa buổi ăn",
   FIX_STUDENT_SCHEDULE: "Sửa lịch ăn của sinh viên",
+  OFFICER_SAVE_WEEK: "Cán bộ đăng ký cơm tuần",
   CANCEL_SESSION: "Hủy buổi ăn",
   RESTORE_SESSION: "Khôi phục buổi ăn",
   CANCEL_SESSIONS_BULK: "Hủy nhiều buổi ăn",

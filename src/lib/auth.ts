@@ -66,6 +66,11 @@ export function canAccessAdmin(role: Role) {
   return role === "ADMIN";
 }
 
+/** Roles that order meals for themselves (students by package, officers week by week). */
+export function isDiner(role: Role) {
+  return role === "STUDENT" || role === "OFFICER";
+}
+
 export const DEFAULT_STUDENT_PASSWORD = "123";
 
 export function homePathForRole(role: Role) {
@@ -78,5 +83,7 @@ export function homePathForRole(role: Role) {
       return "/sales";
     case "STUDENT":
       return "/student";
+    case "OFFICER":
+      return "/officer";
   }
 }

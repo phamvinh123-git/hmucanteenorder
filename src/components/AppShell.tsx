@@ -5,6 +5,7 @@ import { Role } from "@prisma/client";
 
 const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "STUDENT", href: "/student", label: "Đặt suất ăn" },
+  { role: "OFFICER", href: "/officer", label: "Đặt cơm trưa" },
   { role: "SALES", href: "/sales", label: "Bán hàng" },
   { role: "SALES", href: "/schedule", label: "Lịch tuần" },
   { role: "SALES", href: "/report", label: "Báo cáo" },
@@ -26,6 +27,7 @@ const ROLE_LABEL: Record<Role, string> = {
   MANAGER: "Quản lý",
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
+  OFFICER: "Cán bộ",
 };
 
 export default function AppShell({

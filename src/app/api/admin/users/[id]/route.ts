@@ -6,7 +6,7 @@ import { logActivity } from "@/lib/log";
 
 const schema = z.object({
   active: z.boolean().optional(),
-  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT"]).optional(),
+  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER"]).optional(),
   resetPassword: z.boolean().optional(),
 });
 
