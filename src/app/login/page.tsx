@@ -30,12 +30,13 @@ export default async function LoginPage() {
             priority
             className="mx-auto mb-5 h-28 w-28 rounded-full object-cover bg-white animate-logo-float"
           />
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-red-600">Đại học Y Hà Nội</p>
-          <h1 className="mt-1 text-3xl font-extrabold leading-tight tracking-tight text-slate-800 sm:text-4xl">
-            Phân hiệu Thanh Hóa
+          <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-slate-800 sm:text-5xl">
+            HMU THC Canteen
           </h1>
-          <p className="mt-2 text-lg font-semibold text-red-600 sm:text-xl">Hệ thống đặt suất ăn căng tin</p>
-          <p className="mt-3 text-sm text-slate-500">Đăng nhập để đăng ký và quản lý suất ăn của bạn</p>
+          <p className="mt-2 text-base font-semibold text-red-600 sm:text-lg">
+            Đại học Y Hà Nội – Phân hiệu Thanh Hóa
+          </p>
+          <p className="mt-3 text-sm text-slate-500">Hệ thống đặt suất ăn</p>
         </div>
         <LoginForm />
       </div>
