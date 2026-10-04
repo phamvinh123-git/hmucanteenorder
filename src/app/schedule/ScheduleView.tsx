@@ -5,6 +5,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import WeekMealGrid, { startOfWeekMonday } from "@/components/WeekMealGrid";
 import { localDateKey } from "@/lib/client-session-rules";
 import { isPremiumPrice } from "@/lib/pricing";
+import { compareVietnameseNames } from "@/lib/text";
 
 type MealType = "LUNCH" | "DINNER";
 type SessionStatus = "SCHEDULED" | "COMPLETED";
@@ -39,6 +40,7 @@ function sortByOrderCode(a: ScheduleSession, b: ScheduleSession) {
   const aOfficer = a.studentRole === "OFFICER";
   const bOfficer = b.studentRole === "OFFICER";
   if (aOfficer !== bOfficer) return aOfficer ? -1 : 1;
+  if (aOfficer && bOfficer) return compareVietnameseNames(a.studentName, b.studentName);
   if (a.orderCode != null && b.orderCode != null) return a.orderCode - b.orderCode;
   if (a.orderCode != null) return -1;
   if (b.orderCode != null) return 1;

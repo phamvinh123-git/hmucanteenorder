@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { Fragment } from "react";
+import { compareVietnameseNames } from "@/lib/text";
 import PrintButton from "./PrintButton";
 import { isPremiumPrice } from "@/lib/pricing";
 
@@ -11,9 +12,10 @@ const timeFmt = new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-d
 
 type SortRow = { orderCode: number | null; name: string; isOfficer: boolean };
 
-// Officers (cán bộ) first, by name; then students by their order number.
+// Officers (cán bộ) first, in alphabetical order of name; then students by their order number.
 function sortByOrderCode(a: SortRow, b: SortRow) {
   if (a.isOfficer !== b.isOfficer) return a.isOfficer ? -1 : 1;
+  if (a.isOfficer && b.isOfficer) return compareVietnameseNames(a.name, b.name);
   if (a.orderCode != null && b.orderCode != null) return a.orderCode - b.orderCode;
   if (a.orderCode != null) return -1;
   if (b.orderCode != null) return 1;
@@ -121,8 +123,9 @@ export default async function SchedulePrintPage({
           <div className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
             <div className="w-9 flex-shrink-0 flex text-[12px] font-bold pt-0.5">
               <span className="w-3 flex-shrink-0 text-center">{isPremiumPrice(r.price) ? "★" : ""}</span>
-              {/* Officers have no student number, so they are simply numbered 1, 2, 3... within their own block. */}
-              <span>{r.orderCode != null ? r.orderCode : i + 1}</span>
+              {/* The number is a student's order code. Officers are identified by their staff code under the
+                  name instead, so they get no number here. */}
+              <span>{r.isOfficer ? "" : r.orderCode != null ? r.orderCode : i + 1}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold leading-tight">{r.name}</p>
