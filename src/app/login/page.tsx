@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Be_Vietnam_Pro } from "next/font/google";
 import LoginForm from "./LoginForm";
+import AnimatedTitle from "./AnimatedTitle";
 
 // A font drawn for Vietnamese, so every tone mark renders correctly (the default font lacks glyphs for them).
 const titleFont = Be_Vietnam_Pro({ subsets: ["vietnamese", "latin"], weight: ["600", "800"], display: "swap" });
@@ -23,7 +24,7 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center overflow-x-clip px-4">
       <div className="w-full max-w-md animate-rise-in">
         <div className="text-center mb-8">
           <Image
@@ -34,15 +35,12 @@ export default async function LoginPage() {
             priority
             className="mx-auto mb-5 h-28 w-28 rounded-full object-cover bg-white animate-logo-float"
           />
-          {/* Red-to-blue text (the campus logo colours) with the colours sweeping left to right. */}
-          <h1
-            className={`${titleFont.className} title-gradient whitespace-nowrap pb-1 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl`}
-          >
-            HMU THC Canteen
-          </h1>
-          <p className={`${titleFont.className} title-gradient mt-1 pb-1 text-base font-bold uppercase tracking-wide sm:text-lg`}>
-            Hệ thống đặt ăn tại Canteen
-          </p>
+          {/* Letters trot in, then join into one red-to-blue line whose colours sweep left to right. */}
+          <AnimatedTitle
+            title="HMU THC Canteen"
+            subtitle="Hệ thống đặt ăn tại Canteen"
+            fontClassName={titleFont.className}
+          />
         </div>
         <LoginForm />
       </div>
