@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
 
   const weekStart = parseWeekStart(req.nextUrl.searchParams.get("weekStart"));
   // Students and officers (cán bộ) are listed separately; students are the default.
-  const role = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
+  const groupParam = req.nextUrl.searchParams.get("group");
+  const roleFilter =
+    groupParam === "OFFICER" ? "OFFICER" : groupParam === "ALL" ? { in: ["STUDENT", "OFFICER"] as ("STUDENT" | "OFFICER")[] } : "STUDENT";
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
     where: {
       date: { gte: weekStart, lt: weekEnd },
       status: { in: ["SCHEDULED", "COMPLETED"] },
-      student: { role },
+      student: { role: roleFilter },
     },
     select: {
       id: true,
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest) {
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { id: true, name: true, phone: true, staffCode: true, orderCode: true, major: true, className: true } },
+      student: { select: { id: true, name: true, phone: true, staffCode: true, role: true, orderCode: true, major: true, className: true } },
     },
     orderBy: [{ student: { orderCode: "asc" } }, { student: { name: "asc" } }],
   });
@@ -58,6 +60,7 @@ export async function GET(req: NextRequest) {
       studentName: s.student.name,
       studentPhone: s.student.phone,
       staffCode: s.student.staffCode,
+      studentRole: s.student.role,
       orderCode: s.student.orderCode,
       major: s.student.major,
       className: s.student.className,

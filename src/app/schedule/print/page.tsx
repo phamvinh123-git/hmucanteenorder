@@ -23,8 +23,9 @@ export default async function SchedulePrintPage({
   await requireUser({ roles: ["SALES", "MANAGER", "ADMIN"] });
 
   const { date: dateParam, mealType: mealTypeParam, group: groupParam } = await searchParams;
+  // group=OFFICER: staff only; group=ALL: students and staff together; otherwise students only.
   // Officers (cán bộ) sign on the printout instead of being ticked off as picked up.
-  const isOfficers = groupParam === "OFFICER";
+  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "ALL" ? "ALL" : "STUDENT";
   const mealType = mealTypeParam === "DINNER" ? "DINNER" : "LUNCH";
   const date = dateParam ? new Date(dateParam) : new Date();
   const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -36,14 +37,14 @@ export default async function SchedulePrintPage({
       date: { gte: dayStart, lt: dayEnd },
       mealType,
       status: { in: ["SCHEDULED", "COMPLETED"] },
-      student: { role: isOfficers ? "OFFICER" : "STUDENT" },
+      student: { role: group === "OFFICER" ? "OFFICER" : group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : "STUDENT" },
     },
     select: {
       id: true,
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { name: true, phone: true, staffCode: true, orderCode: true } },
+      student: { select: { name: true, phone: true, staffCode: true, role: true, orderCode: true } },
     },
   });
 
@@ -57,6 +58,7 @@ export default async function SchedulePrintPage({
       // Officers are listed by staff code, students by phone number.
       phone: s.student.staffCode ?? s.student.phone,
       orderCode: s.student.orderCode,
+      isOfficer: s.student.role === "OFFICER",
     }))
     .sort(sortByOrderCode);
 
@@ -89,7 +91,7 @@ export default async function SchedulePrintPage({
         <div className="px-2 pb-1">
           <p className="text-[13px] font-bold text-center leading-tight">CĂNG TIN ĐHYHN THANH HÓA</p>
           <p className="text-[11px] text-center leading-tight">
-            {isOfficers ? "Danh sách cán bộ" : "Danh sách suất ăn"} Bữa {MEAL_LABEL[mealType]} &middot; {dateFmt.format(dayStart)}
+            {group === "OFFICER" ? "Danh sách cán bộ" : "Danh sách suất ăn"} Bữa {MEAL_LABEL[mealType]} &middot; {dateFmt.format(dayStart)}
           </p>
           <p className="text-[10px] leading-tight mt-1">
             {timeFmt.format(now)} {dateFmt.format(now)}
@@ -98,13 +100,14 @@ export default async function SchedulePrintPage({
 
         <div className="border-t border-black" />
 
-        {rows.length === 0 && <p className="text-[11px] text-center py-4">Không có {isOfficers ? "cán bộ" : "sinh viên"} nào đăng ký bữa này.</p>}
+        {rows.length === 0 && <p className="text-[11px] text-center py-4">Không có {group === "OFFICER" ? "cán bộ" : group === "ALL" ? "ai" : "sinh viên"} nào đăng ký bữa này.</p>}
 
         {rows.map((r, i) => (
           <div key={r.id} className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
             <div className="w-9 flex-shrink-0 flex text-[12px] font-bold pt-0.5">
               <span className="w-3 flex-shrink-0 text-center">{isPremiumPrice(r.price) ? "★" : ""}</span>
-              <span>{r.orderCode != null ? r.orderCode : i + 1}</span>
+              {/* Officers have no student number: number them in an officers-only list, mark them CB in a mixed one. */}
+              <span>{r.orderCode != null ? r.orderCode : r.isOfficer && group === "ALL" ? "CB" : i + 1}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold leading-tight">{r.name}</p>
@@ -113,7 +116,7 @@ export default async function SchedulePrintPage({
               </p>
               {r.note && <p className="text-[10px] italic leading-tight">{r.note}</p>}
             </div>
-            {isOfficers ? (
+            {r.isOfficer ? (
               // A blank box to sign in, instead of the pickup tick.
               <div className="w-20 h-9 border border-black flex-shrink-0" />
             ) : (

@@ -22,6 +22,7 @@ type ScheduleSession = {
   studentPhone: string;
   /** Officers (cán bộ) are identified by their fixed staff code. */
   staffCode: string | null;
+  studentRole: "STUDENT" | "OFFICER";
   orderCode: number | null;
   major: string | null;
   className: string | null;
@@ -45,8 +46,9 @@ export default function ScheduleView() {
   const [sessions, setSessions] = useState<ScheduleSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCell, setSelectedCell] = useState<{ date: string; mealType: MealType } | null>(null);
-  // Sinh viên and cán bộ (staff) have separate lists, grids and printouts.
-  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
+  // Show everyone together, or only cán bộ (staff), or only sinh viên.
+  const [group, setGroup] = useState<"ALL" | "OFFICER" | "STUDENT">("ALL");
+  const noun = group === "ALL" ? "người" : group === "OFFICER" ? "cán bộ" : "sinh viên";
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reload indicator when the visible week changes
@@ -116,8 +118,9 @@ export default function ScheduleView() {
       <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm">
         {(
           [
-            ["STUDENT", "Sinh viên"],
+            ["ALL", "Tất cả"],
             ["OFFICER", "Cán bộ"],
+            ["STUDENT", "Sinh viên"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -136,7 +139,13 @@ export default function ScheduleView() {
       </div>
 
       <WeekMealGrid
-        title={group === "OFFICER" ? "Số suất cơm trưa cán bộ theo tuần" : "Số suất ăn theo tuần"}
+        title={
+          group === "OFFICER"
+            ? "Số suất cơm trưa cán bộ theo tuần"
+            : group === "STUDENT"
+              ? "Số suất ăn sinh viên theo tuần"
+              : "Số suất ăn theo tuần (sinh viên và cán bộ)"
+        }
         weekStart={weekStart}
         onWeekStartChange={(w) => {
           setWeekStart(w);
@@ -168,7 +177,7 @@ export default function ScheduleView() {
             >
               <p className="text-lg font-bold text-red-700">{list.length}</p>
               <p className="text-[11px] text-red-500">
-                sinh viên{pickedCount > 0 ? ` · ${pickedCount} đã lấy` : ""}
+                {noun}{pickedCount > 0 ? ` · ${pickedCount} đã lấy` : ""}
               </p>
             </button>
           );
@@ -185,7 +194,7 @@ export default function ScheduleView() {
                 {dateFmt.format(new Date(selectedCell.date))} &middot; Bữa {MEAL_LABEL[selectedCell.mealType]}
               </p>
               <p className="text-xs text-slate-400 mt-0.5">
-                {selectedList.length} sinh viên &middot; {selectedList.filter((s) => s.pickedUp).length} đã lấy đồ ăn
+                {selectedList.length} {noun} &middot; {selectedList.filter((s) => s.pickedUp).length} đã lấy đồ ăn
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -221,7 +230,7 @@ export default function ScheduleView() {
             </div>
           </div>
           <div className="divide-y divide-slate-100">
-            {selectedList.length === 0 && <p className="text-sm text-slate-400 py-2">Chưa có sinh viên nào đăng ký bữa này.</p>}
+            {selectedList.length === 0 && <p className="text-sm text-slate-400 py-2">Chưa có {noun} nào đăng ký bữa này.</p>}
             {selectedList.map((s) => (
               <div
                 key={s.id}
@@ -236,7 +245,7 @@ export default function ScheduleView() {
                   >
                     {isPremiumPrice(s.price) ? "★" : ""}
                   </span>
-                  {s.orderCode ?? "—"}
+                  {s.orderCode ?? (s.studentRole === "OFFICER" ? "CB" : "—")}
                 </span>
                 <span className="font-medium text-slate-800 w-40 flex-shrink-0">{s.studentName}</span>
                 <span className="text-slate-400 w-28 flex-shrink-0 truncate" title={s.major ?? undefined}>
