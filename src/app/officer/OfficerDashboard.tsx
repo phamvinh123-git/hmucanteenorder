@@ -9,7 +9,7 @@ import {
   canRestoreSession,
   localDateKey,
 } from "@/lib/client-session-rules";
-import { OFFICER_MEAL_PRICE, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
+import { officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
 
 type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
@@ -23,7 +23,6 @@ type OfficerSession = {
 const shortDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" });
 const fullDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const weekdayLong = new Intl.DateTimeFormat("vi-VN", { weekday: "long" });
-const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
 
 const keyOf = (iso: string) => localDateKey(new Date(iso));
 
@@ -157,7 +156,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
     <div className="space-y-6">
       <PageHeader
         title="Đặt cơm trưa cho cán bộ"
-        subtitle={`Mỗi suất ${currency.format(OFFICER_MEAL_PRICE)} · đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
+        subtitle={`Đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
       />
 
       {weeks.map((week) => {
@@ -220,7 +219,6 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
                     )}
                     <p className={`text-xs capitalize ${on ? "text-red-100" : "text-slate-500"}`}>{weekdayLong.format(d)}</p>
                     <p className={`text-lg font-bold ${on ? "text-white" : "text-slate-800"}`}>{shortDate.format(d)}</p>
-                    <p className={`text-xs ${on ? "text-red-100" : "text-slate-500"}`}>{currency.format(OFFICER_MEAL_PRICE)}</p>
                     <p className={`mt-1 text-xs font-semibold ${on ? "text-white" : "text-slate-400"}`}>
                       {on ? "Đã đăng ký" : locked ? "Đã quá hạn" : "Chưa đăng ký"}
                     </p>
@@ -240,16 +238,6 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
                   ? "Đang lưu..."
                   : `Lưu đăng ký (${picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length} ngày)`}
               </button>
-              {picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length > 0 && (
-                <span className="text-sm text-slate-600">
-                  Tạm tính:{" "}
-                  <b className="text-red-700">
-                    {currency.format(
-                      picked.filter((k) => week.days.some((d) => localDateKey(d) === k)).length * OFFICER_MEAL_PRICE,
-                    )}
-                  </b>
-                </span>
-              )}
               {messages[week.key] && (
                 <span className={`text-sm animate-pop-in ${messages[week.key]!.ok ? "text-green-600" : "text-red-600"}`}>
                   {messages[week.key]!.text}
@@ -283,9 +271,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
                   <span className="text-[11px] uppercase">Th{d.getMonth() + 1}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800">
-                    Bữa trưa <span className="font-normal text-slate-500">· {currency.format(OFFICER_MEAL_PRICE)}</span>
-                  </p>
+                  <p className="text-sm font-semibold text-slate-800">Bữa trưa</p>
                   <p className="mb-2 text-xs capitalize text-slate-500">{weekdayLong.format(d)}</p>
                   {confirmingId === s.id ? (
                     <div className="flex flex-wrap gap-2">
