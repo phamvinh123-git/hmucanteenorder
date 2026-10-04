@@ -40,7 +40,7 @@ export default async function LoginPage() {
           >
             HMU THC Canteen
           </h1>
-          <p className={`${titleFont.className} title-gradient mt-1 pb-1 text-base font-semibold sm:text-lg`}>
+          <p className={`${titleFont.className} title-gradient mt-1 pb-1 text-base font-bold uppercase tracking-wide sm:text-lg`}>
             Hệ thống đặt ăn tại Canteen
           </p>
         </div>
