@@ -2,7 +2,11 @@ import { getSession, homePathForRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import { Be_Vietnam_Pro } from "next/font/google";
 import LoginForm from "./LoginForm";
+
+// A font drawn for Vietnamese, so every tone mark renders correctly (the default font lacks glyphs for them).
+const titleFont = Be_Vietnam_Pro({ subsets: ["vietnamese", "latin"], weight: ["600", "800"], display: "swap" });
 
 export default async function LoginPage() {
   const session = await getSession();
@@ -30,11 +34,15 @@ export default async function LoginPage() {
             priority
             className="mx-auto mb-5 h-28 w-28 rounded-full object-cover bg-white animate-logo-float"
           />
-          {/* One line, in the two colours of the campus logo: red, then blue. */}
-          <h1 className="whitespace-nowrap text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-            <span className="text-[#be1651]">HMU THC</span> <span className="text-[#0556a2]">Canteen</span>
+          {/* Red-to-blue text (the campus logo colours) with the colours sweeping left to right. */}
+          <h1
+            className={`${titleFont.className} title-gradient whitespace-nowrap pb-1 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl`}
+          >
+            HMU THC Canteen
           </h1>
-          <p className="mt-2 text-base font-medium text-slate-500 sm:text-lg">Hệ thống đặt ăn tại Canteen</p>
+          <p className={`${titleFont.className} title-gradient mt-1 pb-1 text-base font-semibold sm:text-lg`}>
+            Hệ thống đặt ăn tại Canteen
+          </p>
         </div>
         <LoginForm />
       </div>
