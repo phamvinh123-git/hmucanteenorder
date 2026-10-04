@@ -10,6 +10,7 @@ type ReportRow = {
   studentId: string;
   name: string;
   orderCode: number | null;
+  staffCode: string | null;
   major: string | null;
   className: string | null;
   booked: number;
@@ -77,6 +78,9 @@ export default function ReportView() {
   const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Sinh viên and cán bộ (staff) are reported separately.
+  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
+  const isOfficer = group === "OFFICER";
 
   useEffect(() => {
     if (range === "custom" && customStart > customEnd) {
@@ -88,19 +92,20 @@ export default function ReportView() {
     setLoading(true);
     const url =
       range === "custom"
-        ? `/api/reports?range=custom&start=${customStart}&end=${customEnd}`
-        : `/api/reports?range=${range}`;
+        ? `/api/reports?range=custom&start=${customStart}&end=${customEnd}&group=${group}`
+        : `/api/reports?range=${range}&group=${group}`;
     fetch(url)
       .then((res) => res.json())
       .then((d) => (d.error ? setCustomError(d.error) : setData(d)))
       .finally(() => setLoading(false));
-  }, [range, customStart, customEnd]);
+  }, [range, customStart, customEnd, group]);
 
-  function matchesSearch(r: { name: string; major: string | null; className: string | null }) {
+  function matchesSearch(r: { name: string; major: string | null; className: string | null; staffCode?: string | null }) {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
     return (
       r.name.toLowerCase().includes(q) ||
+      (r.staffCode ?? "").toLowerCase().includes(q) ||
       (r.major ?? "").toLowerCase().includes(q) ||
       (r.className ?? "").toLowerCase().includes(q)
     );
@@ -117,16 +122,38 @@ export default function ReportView() {
   return (
     <div className="space-y-6">
       <div className="print:hidden">
-        <PageHeader title="Báo cáo" subtitle="Số suất đã đặt và đã ăn của từng sinh viên theo thời gian." />
+        <PageHeader
+          title="Báo cáo"
+          subtitle={`Số suất đã đặt và đã ăn của từng ${isOfficer ? "cán bộ" : "sinh viên"} theo thời gian.`}
+        />
       </div>
       <div className="hidden print:block text-center">
         <p className="text-sm">Đại học Y Hà Nội – Phân hiệu Thanh Hóa</p>
-        <h1 className="text-xl font-bold uppercase">Báo cáo suất ăn căng tin</h1>
+        <h1 className="text-xl font-bold uppercase">Báo cáo suất ăn căng tin — {isOfficer ? "cán bộ" : "sinh viên"}</h1>
         {data && (
           <p className="text-sm">
             Từ {dateFmt.format(new Date(data.start))} đến {dateFmt.format(new Date(data.end))}
           </p>
         )}
+      </div>
+
+      <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm print:hidden">
+        {(
+          [
+            ["STUDENT", "Sinh viên"],
+            ["OFFICER", "Cán bộ"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setGroup(value)}
+            className={`px-4 py-1.5 ${
+              group === value ? "bg-red-600 text-white" : "bg-white text-slate-600 hover:bg-red-50 hover:text-red-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 animate-rise-in print:hidden">
@@ -166,7 +193,7 @@ export default function ReportView() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo tên, ngành hoặc lớp..."
+          placeholder={isOfficer ? "Tìm theo tên hoặc mã cán bộ..." : "Tìm theo tên, ngành hoặc lớp..."}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-full sm:w-56 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
         />
         <button
@@ -183,9 +210,9 @@ export default function ReportView() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 print:gap-2">
+          <div className={`grid grid-cols-2 gap-3 print:gap-2 ${isOfficer ? "sm:grid-cols-3" : "sm:grid-cols-5"}`}>
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in">
-              <p className="text-xs text-slate-500">Số sinh viên</p>
+              <p className="text-xs text-slate-500">{isOfficer ? "Số cán bộ" : "Số sinh viên"}</p>
               <p className="text-xl font-bold text-slate-800">{data.summary.totalStudents}</p>
             </div>
             <div className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "40ms" }}>
@@ -196,6 +223,8 @@ export default function ReportView() {
               <p className="text-xs text-slate-500">Tổng suất đã ăn</p>
               <p className="text-xl font-bold text-green-600">{data.summary.totalEaten}</p>
             </div>
+            {!isOfficer && (
+            <>
             <button
               type="button"
               onClick={() => scrollToSection("report-new-registrations")}
@@ -216,6 +245,8 @@ export default function ReportView() {
               <p className="text-xs text-slate-500">Gia hạn ↓</p>
               <p className="text-xl font-bold text-slate-800">{data.renewals.length}</p>
             </button>
+            </>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in print:border-0 print:shadow-none print:p-0" style={{ animationDelay: "120ms" }}>
@@ -226,10 +257,10 @@ export default function ReportView() {
               <table className="w-full text-sm print:text-xs print:[&_td]:border print:[&_th]:border print:[&_td]:border-slate-400 print:[&_th]:border-slate-400 print:[&_td]:px-2 print:[&_th]:px-2">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100 print:text-black">
-                    <th className="py-2 pr-4">STT</th>
+                    <th className="py-2 pr-4">{isOfficer ? "Mã CB" : "STT"}</th>
                     <th className="py-2 pr-4">Họ và tên</th>
-                    <th className="py-2 pr-4">Ngành</th>
-                    <th className="py-2 pr-4">Lớp</th>
+                    {!isOfficer && <th className="py-2 pr-4">Ngành</th>}
+                    {!isOfficer && <th className="py-2 pr-4">Lớp</th>}
                     <th className="py-2 pr-4 text-right">Suất đã đặt</th>
                     <th className="py-2 pr-4 text-right">Suất đã ăn</th>
                   </tr>
@@ -237,17 +268,17 @@ export default function ReportView() {
                 <tbody>
                   {rows && rows.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-slate-400">
+                      <td colSpan={isOfficer ? 4 : 6} className="py-6 text-center text-slate-400">
                         Không có dữ liệu trong khoảng thời gian này.
                       </td>
                     </tr>
                   )}
                   {rows?.map((r) => (
                     <tr key={r.studentId} className="border-b border-slate-50 hover:bg-red-50/40 transition-colors">
-                      <td className="py-1.5 pr-4 font-mono">{r.orderCode ?? "—"}</td>
+                      <td className="py-1.5 pr-4 font-mono">{isOfficer ? (r.staffCode ?? "—") : (r.orderCode ?? "—")}</td>
                       <td className="py-1.5 pr-4">{r.name}</td>
-                      <td className="py-1.5 pr-4 text-slate-500">{r.major || "—"}</td>
-                      <td className="py-1.5 pr-4 text-slate-500">{r.className || "—"}</td>
+                      {!isOfficer && <td className="py-1.5 pr-4 text-slate-500">{r.major || "—"}</td>}
+                      {!isOfficer && <td className="py-1.5 pr-4 text-slate-500">{r.className || "—"}</td>}
                       <td className="py-1.5 pr-4 text-right">{r.booked}</td>
                       <td className="py-1.5 pr-4 text-right text-green-600 font-medium">{r.eaten}</td>
                     </tr>
@@ -257,6 +288,8 @@ export default function ReportView() {
             </div>
           </div>
 
+          {!isOfficer && (
+          <>
           <div id="report-new-registrations" className="scroll-mt-4 animate-rise-in print:break-before-page" style={{ animationDelay: "160ms" }}>
             <p className="mb-2 text-sm font-semibold text-slate-700">
               Sinh viên mới đăng ký ({newRegistrations?.length ?? 0})
@@ -274,6 +307,8 @@ export default function ReportView() {
             </p>
             <RegistrationList rows={renewals} emptyLabel="Không có sinh viên nào gia hạn trong khoảng thời gian này." />
           </div>
+          </>
+          )}
         </>
       )}
     </div>

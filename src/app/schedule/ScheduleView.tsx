@@ -1,7 +1,7 @@
 "use client";
 
 import PageHeader from "@/components/PageHeader";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import WeekMealGrid, { startOfWeekMonday } from "@/components/WeekMealGrid";
 import { localDateKey } from "@/lib/client-session-rules";
 import { isPremiumPrice } from "@/lib/pricing";
@@ -34,7 +34,11 @@ const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "
 
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
 
+// Officers (cán bộ) first, by name; then students by their order number.
 function sortByOrderCode(a: ScheduleSession, b: ScheduleSession) {
+  const aOfficer = a.studentRole === "OFFICER";
+  const bOfficer = b.studentRole === "OFFICER";
+  if (aOfficer !== bOfficer) return aOfficer ? -1 : 1;
   if (a.orderCode != null && b.orderCode != null) return a.orderCode - b.orderCode;
   if (a.orderCode != null) return -1;
   if (b.orderCode != null) return 1;
@@ -168,6 +172,8 @@ export default function ScheduleView() {
             );
           }
           const pickedCount = list.filter((s) => s.pickedUp).length;
+          const officerCount = list.filter((s) => s.studentRole === "OFFICER").length;
+          const studentCount = list.length - officerCount;
           return (
             <button
               onClick={() => setSelectedCell({ date: localDateKey(date), mealType })}
@@ -179,6 +185,12 @@ export default function ScheduleView() {
               <p className="text-[11px] text-red-500">
                 {noun}{pickedCount > 0 ? ` · ${pickedCount} đã lấy` : ""}
               </p>
+              {group === "ALL" && (
+                // Total first, then how it splits between students and staff.
+                <p className="text-[11px] font-medium text-slate-600">
+                  {studentCount} SV · {officerCount} CB
+                </p>
+              )}
             </button>
           );
         }}
@@ -194,7 +206,15 @@ export default function ScheduleView() {
                 {dateFmt.format(new Date(selectedCell.date))} &middot; Bữa {MEAL_LABEL[selectedCell.mealType]}
               </p>
               <p className="text-xs text-slate-400 mt-0.5">
-                {selectedList.length} {noun} &middot; {selectedList.filter((s) => s.pickedUp).length} đã lấy đồ ăn
+                {selectedList.length} {noun}
+                {group === "ALL" && (
+                  <>
+                    {" "}
+                    ({selectedList.filter((s) => s.studentRole !== "OFFICER").length} sinh viên,{" "}
+                    {selectedList.filter((s) => s.studentRole === "OFFICER").length} cán bộ)
+                  </>
+                )}{" "}
+                &middot; {selectedList.filter((s) => s.pickedUp).length} đã lấy đồ ăn
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -231,9 +251,17 @@ export default function ScheduleView() {
           </div>
           <div className="divide-y divide-slate-100">
             {selectedList.length === 0 && <p className="text-sm text-slate-400 py-2">Chưa có {noun} nào đăng ký bữa này.</p>}
-            {selectedList.map((s) => (
+            {selectedList.map((s, i) => (
+              <Fragment key={s.id}>
+              {group === "ALL" && (i === 0 || (selectedList[i - 1].studentRole === "OFFICER") !== (s.studentRole === "OFFICER")) && (
+                // A light rule and caption separate the staff block from the student block.
+                <div className={`pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-slate-500 ${i > 0 ? "mt-1 border-t-2 border-slate-200" : ""}`}>
+                  {s.studentRole === "OFFICER"
+                    ? `Cán bộ (${selectedList.filter((x) => x.studentRole === "OFFICER").length})`
+                    : `Sinh viên (${selectedList.filter((x) => x.studentRole !== "OFFICER").length})`}
+                </div>
+              )}
               <div
-                key={s.id}
                 className={`py-2 flex items-center gap-3 sm:gap-4 text-sm flex-wrap transition-colors ${
                   s.pickedUp ? "bg-red-600 px-3 rounded-lg [&_*]:!text-white" : ""
                 }`}
@@ -253,7 +281,12 @@ export default function ScheduleView() {
                   {s.major ? ` · ${s.major.replace(/^Cử nhân /, "")}` : ""}
                 </span>
                 <span className="text-slate-400 w-32 flex-shrink-0">{s.staffCode ?? s.studentPhone}</span>
-                <span className="text-slate-600 w-24 flex-shrink-0">{currency.format(s.price)}</span>
+                {/* Officers' meal prices are never shown. */}
+                {s.studentRole === "OFFICER" ? (
+                  <span className="w-24 flex-shrink-0" />
+                ) : (
+                  <span className="text-slate-600 w-24 flex-shrink-0">{currency.format(s.price)}</span>
+                )}
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
                     s.pickedUp
@@ -276,6 +309,7 @@ export default function ScheduleView() {
                   Đã lấy
                 </label>
               </div>
+              </Fragment>
             ))}
           </div>
         </div>

@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
   }
 
   const range = req.nextUrl.searchParams.get("range") ?? "week";
+  // Students and officers (cán bộ) are reported separately; students are the default.
+  const group = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
   const dateParam = req.nextUrl.searchParams.get("date");
   const refDate = dateParam ? new Date(dateParam) : new Date();
 
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest) {
 
   // Registrations created in this range, split into brand-new students vs. returning students
   // renewing — "new" means this is the very first registration that student ever had.
+  // (Officers order week by week, so "new" and "renewal" only apply to students.)
   const regsInRange = await prisma.mealRegistration.findMany({
     where: { createdAt: { gte: start, lte: end }, student: { role: "STUDENT" } },
     select: {
@@ -65,7 +68,7 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
-  const studentIds = Array.from(new Set(regsInRange.map((r) => r.studentId)));
+  const studentIds = group === "STUDENT" ? Array.from(new Set(regsInRange.map((r) => r.studentId))) : [];
   const earliestEver =
     studentIds.length > 0
       ? await prisma.mealRegistration.groupBy({
@@ -90,16 +93,16 @@ export async function GET(req: NextRequest) {
     createdAt: r.createdAt,
     isFirstEver: firstEverByStudent.get(r.studentId) === r.createdAt.getTime(),
   }));
-  const newRegistrations = registrationRows.filter((r) => r.isFirstEver);
-  const renewals = registrationRows.filter((r) => !r.isFirstEver);
+  const newRegistrations = group === "STUDENT" ? registrationRows.filter((r) => r.isFirstEver) : [];
+  const renewals = group === "STUDENT" ? registrationRows.filter((r) => !r.isFirstEver) : [];
 
   const sessions = await prisma.mealSession.findMany({
-    where: { date: { gte: start, lte: end }, student: { role: "STUDENT" } },
+    where: { date: { gte: start, lte: end }, student: { role: group } },
     select: {
       studentId: true,
       status: true,
       pickedUp: true,
-      student: { select: { name: true, orderCode: true, major: true, className: true } },
+      student: { select: { name: true, staffCode: true, orderCode: true, major: true, className: true } },
     },
   });
 
@@ -107,6 +110,7 @@ export async function GET(req: NextRequest) {
     studentId: string;
     name: string;
     orderCode: number | null;
+    staffCode: string | null;
     major: string | null;
     className: string | null;
     booked: number;
@@ -121,6 +125,7 @@ export async function GET(req: NextRequest) {
         studentId: s.studentId,
         name: s.student.name,
         orderCode: s.student.orderCode,
+        staffCode: s.student.staffCode,
         major: s.student.major,
         className: s.student.className,
         booked: 0,
@@ -129,7 +134,9 @@ export async function GET(req: NextRequest) {
       byStudent.set(s.studentId, row);
     }
     if (s.status !== "CANCELLED") row.booked += 1;
-    if (s.pickedUp) row.eaten += 1;
+    // Students are ticked off as "picked up"; officers sign a paper list instead, so for them a meal
+    // counts as eaten once it has gone by (status COMPLETED) without being cancelled.
+    if (group === "OFFICER" ? s.status === "COMPLETED" : s.pickedUp) row.eaten += 1;
   }
 
   const rows = Array.from(byStudent.values())
@@ -143,6 +150,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     range,
+    group,
     start: start.toISOString(),
     end: end.toISOString(),
     rows,

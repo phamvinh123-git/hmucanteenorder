@@ -54,10 +54,14 @@ export async function GET(req: NextRequest) {
     end = endOfWeek(refDate, { weekStartsOn: 1 });
   }
 
+  // Students and officers (cán bộ) are reported separately; students are the default.
+  const group = req.nextUrl.searchParams.get("group") === "OFFICER" ? "OFFICER" : "STUDENT";
+
   const sessions = await prisma.mealSession.findMany({
     where: {
       date: { gte: start, lte: end },
       status: { in: ["SCHEDULED", "COMPLETED"] },
+      student: { role: group },
     },
     select: { date: true, mealType: true, price: true, status: true },
   });
@@ -75,7 +79,8 @@ export async function GET(req: NextRequest) {
     if (!bucket) continue;
     if (s.mealType === "LUNCH") bucket.lunch += 1;
     else bucket.dinner += 1;
-    bucket.revenue += s.price;
+    // Officers' meal prices are not shown anywhere, so they add nothing to the revenue figure.
+    if (group === "STUDENT") bucket.revenue += s.price;
   }
 
   const series = Array.from(buckets.values());
@@ -92,6 +97,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     range,
+    group,
     start: start.toISOString(),
     end: end.toISOString(),
     series,

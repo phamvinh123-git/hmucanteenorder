@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
       mealType: s.mealType,
       status: s.status,
       note: s.note,
-      price: s.price,
+      // Officers' meal prices are not shown anywhere.
+      price: s.student.role === "OFFICER" ? 0 : s.price,
       pickedUp: s.pickedUp,
       studentId: s.student.id,
       studentName: s.student.name,

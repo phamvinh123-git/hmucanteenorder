@@ -58,6 +58,9 @@ export default function StatsView() {
   const [customError, setCustomError] = useState<string | null>(null);
   const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // Sinh viên and cán bộ (staff) are reported separately. Officers' prices are never shown.
+  const [group, setGroup] = useState<"STUDENT" | "OFFICER">("STUDENT");
+  const showRevenue = group === "STUDENT";
 
   useEffect(() => {
     if (range === "custom" && customStart > customEnd) {
@@ -69,29 +72,48 @@ export default function StatsView() {
     setLoading(true);
     const url =
       range === "custom"
-        ? `/api/stats?range=custom&start=${customStart}&end=${customEnd}`
-        : `/api/stats?range=${range}`;
+        ? `/api/stats?range=custom&start=${customStart}&end=${customEnd}&group=${group}`
+        : `/api/stats?range=${range}&group=${group}`;
     fetch(url)
       .then((res) => res.json())
       .then((d) => (d.error ? setCustomError(d.error) : setData(d)))
       .finally(() => setLoading(false));
-  }, [range, customStart, customEnd]);
+  }, [range, customStart, customEnd, group]);
 
   const isSingleDay = range === "day" || (range === "custom" && (data?.series.length ?? 0) <= 1);
   const chartTitle =
     range === "day"
       ? "Số suất ăn theo buổi trong ngày"
       : range === "week"
-        ? "Số suất ăn & doanh thu theo ngày trong tuần"
+        ? `Số suất ăn${showRevenue ? " & doanh thu" : ""} theo ngày trong tuần`
         : range === "month"
-          ? "Số suất ăn & doanh thu theo ngày trong tháng"
+          ? `Số suất ăn${showRevenue ? " & doanh thu" : ""} theo ngày trong tháng`
           : isSingleDay
             ? "Số suất ăn theo buổi trong ngày"
-            : "Số suất ăn & doanh thu theo ngày đã chọn";
+            : `Số suất ăn${showRevenue ? " & doanh thu" : ""} theo ngày đã chọn`;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Thống kê" subtitle="Số suất ăn và doanh thu theo thời gian." />
+
+      <div className="flex w-fit overflow-hidden rounded-lg border border-slate-300 text-sm">
+        {(
+          [
+            ["STUDENT", "Sinh viên"],
+            ["OFFICER", "Cán bộ"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setGroup(value)}
+            className={`px-4 py-1.5 ${
+              group === value ? "bg-red-600 text-white" : "bg-white text-slate-600 hover:bg-red-50 hover:text-red-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 animate-rise-in">
         <div className="flex rounded-lg border border-slate-300 overflow-hidden text-sm">
@@ -134,7 +156,7 @@ export default function StatsView() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-2 gap-3 ${showRevenue ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
             <div
               className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
               style={{ animationDelay: "0ms" }}
@@ -156,13 +178,15 @@ export default function StatsView() {
               <p className="text-xs text-slate-500">Bữa tối</p>
               <p className="text-xl font-bold text-indigo-600">{data.summary.dinnerMeals}</p>
             </div>
-            <div
-              className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
-              style={{ animationDelay: "120ms" }}
-            >
-              <p className="text-xs text-slate-500">Doanh thu</p>
-              <p className="text-xl font-bold text-green-600">{currency.format(data.summary.totalRevenue)}</p>
-            </div>
+            {showRevenue && (
+              <div
+                className="bg-white border border-slate-200 border-l-4 border-l-red-500 rounded-2xl p-4 animate-rise-in hover:shadow-md transition-shadow"
+                style={{ animationDelay: "120ms" }}
+              >
+                <p className="text-xs text-slate-500">Doanh thu</p>
+                <p className="text-xl font-bold text-green-600">{currency.format(data.summary.totalRevenue)}</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 animate-rise-in" style={{ animationDelay: "160ms" }}>
@@ -194,7 +218,9 @@ export default function StatsView() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="date" tickFormatter={fmtShort} tick={{ fontSize: 12 }} />
                   <YAxis yAxisId="left" tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(v) => `${v / 1000}k`} />
+                  {showRevenue && (
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(v) => `${v / 1000}k`} />
+                  )}
                   <Tooltip
                     labelFormatter={(l: React.ReactNode) => new Date(String(l)).toLocaleDateString("vi-VN")}
                     formatter={(value, name) =>
@@ -206,7 +232,9 @@ export default function StatsView() {
                   <Bar yAxisId="left" dataKey="dinner" name="Tối" stackId="meals" fill={DINNER_COLOR} radius={[4, 4, 0, 0]} />
                   {/* linear, not monotone: monotone smoothing overshoots between sparse points
                       and draws a misleading peak that doesn't correspond to any real value. */}
-                  <Line yAxisId="right" type="linear" dataKey="revenue" name="Doanh thu" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+                  {showRevenue && (
+                    <Line yAxisId="right" type="linear" dataKey="revenue" name="Doanh thu" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+                  )}
                 </ComposedChart>
               </ResponsiveContainer>
             )}
@@ -222,7 +250,7 @@ export default function StatsView() {
                     <th className="py-2 pr-4">Trưa</th>
                     <th className="py-2 pr-4">Tối</th>
                     <th className="py-2 pr-4">Tổng</th>
-                    <th className="py-2 pr-4">Doanh thu</th>
+                    {showRevenue && <th className="py-2 pr-4">Doanh thu</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -232,7 +260,7 @@ export default function StatsView() {
                       <td className="py-1.5 pr-4">{row.lunch}</td>
                       <td className="py-1.5 pr-4">{row.dinner}</td>
                       <td className="py-1.5 pr-4 font-medium">{row.lunch + row.dinner}</td>
-                      <td className="py-1.5 pr-4">{currency.format(row.revenue)}</td>
+                      {showRevenue && <td className="py-1.5 pr-4">{currency.format(row.revenue)}</td>}
                     </tr>
                   ))}
                 </tbody>

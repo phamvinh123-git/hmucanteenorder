@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/guard";
 import { prisma } from "@/lib/db";
+import { Fragment } from "react";
 import PrintButton from "./PrintButton";
 import { isPremiumPrice } from "@/lib/pricing";
 
@@ -8,7 +9,11 @@ const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 const timeFmt = new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" });
 
-function sortByOrderCode(a: { orderCode: number | null; name: string }, b: { orderCode: number | null; name: string }) {
+type SortRow = { orderCode: number | null; name: string; isOfficer: boolean };
+
+// Officers (cán bộ) first, by name; then students by their order number.
+function sortByOrderCode(a: SortRow, b: SortRow) {
+  if (a.isOfficer !== b.isOfficer) return a.isOfficer ? -1 : 1;
   if (a.orderCode != null && b.orderCode != null) return a.orderCode - b.orderCode;
   if (a.orderCode != null) return -1;
   if (b.orderCode != null) return 1;
@@ -62,7 +67,10 @@ export default async function SchedulePrintPage({
     }))
     .sort(sortByOrderCode);
 
-  const totalAmount = rows.reduce((sum, r) => sum + r.price, 0);
+  // Officers' meal prices are never shown, so the money total only covers students.
+  const officerCount = rows.filter((r) => r.isOfficer).length;
+  const studentCount = rows.length - officerCount;
+  const totalAmount = rows.filter((r) => !r.isOfficer).reduce((sum, r) => sum + r.price, 0);
   const premiumPrices = Array.from(new Set(rows.filter((r) => isPremiumPrice(r.price)).map((r) => r.price))).sort(
     (a, b) => a - b,
   );
@@ -103,16 +111,24 @@ export default async function SchedulePrintPage({
         {rows.length === 0 && <p className="text-[11px] text-center py-4">Không có {group === "OFFICER" ? "cán bộ" : group === "ALL" ? "ai" : "sinh viên"} nào đăng ký bữa này.</p>}
 
         {rows.map((r, i) => (
-          <div key={r.id} className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
+          <Fragment key={r.id}>
+          {group === "ALL" && (i === 0 || rows[i - 1].isOfficer !== r.isOfficer) && (
+            // A light rule and a small caption mark where officers end and students begin.
+            <div className={`px-2 pb-0.5 pt-1.5 text-[10px] font-bold uppercase tracking-wide ${i > 0 ? "border-t border-slate-400" : ""}`}>
+              {r.isOfficer ? `Cán bộ (${officerCount})` : `Sinh viên (${studentCount})`}
+            </div>
+          )}
+          <div className="flex gap-1.5 px-2 py-1.5 border-b border-dashed border-slate-400">
             <div className="w-9 flex-shrink-0 flex text-[12px] font-bold pt-0.5">
               <span className="w-3 flex-shrink-0 text-center">{isPremiumPrice(r.price) ? "★" : ""}</span>
-              {/* Officers have no student number: number them in an officers-only list, mark them CB in a mixed one. */}
-              <span>{r.orderCode != null ? r.orderCode : r.isOfficer && group === "ALL" ? "CB" : i + 1}</span>
+              {/* Officers have no student number, so they are simply numbered 1, 2, 3... within their own block. */}
+              <span>{r.orderCode != null ? r.orderCode : i + 1}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold leading-tight">{r.name}</p>
               <p className="text-[10px] leading-tight">
-                {r.phone} &middot; {currency.format(r.price)}
+                {r.phone}
+                {!r.isOfficer && <> &middot; {currency.format(r.price)}</>}
               </p>
               {r.note && <p className="text-[10px] italic leading-tight">{r.note}</p>}
             </div>
@@ -125,6 +141,7 @@ export default async function SchedulePrintPage({
               </div>
             )}
           </div>
+          </Fragment>
         ))}
 
         {rows.length > 0 && (
@@ -136,7 +153,20 @@ export default async function SchedulePrintPage({
               </p>
             )}
             <div className="px-2 py-1.5 text-[11px] font-semibold">
-              Tổng: {rows.length} suất &middot; {currency.format(totalAmount)}
+              Tổng: {rows.length} suất
+              {group === "ALL" && (
+                <>
+                  {" "}
+                  ({studentCount} sinh viên, {officerCount} cán bộ)
+                </>
+              )}
+              {studentCount > 0 && (
+                <>
+                  {" "}
+                  &middot; {group === "ALL" ? "Tiền sinh viên: " : ""}
+                  {currency.format(totalAmount)}
+                </>
+              )}
             </div>
           </>
         )}
