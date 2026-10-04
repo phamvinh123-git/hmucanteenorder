@@ -9,6 +9,8 @@ import { classLevelsFor, MAJORS } from "@/lib/student-info";
 type Initial = {
   name: string;
   phone: string;
+  /** Fixed staff code of an officer (cán bộ); null for everyone else. */
+  staffCode: string | null;
   orderCode: number | null;
   major: string | null;
   className: string | null;
@@ -22,6 +24,9 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
   const router = useRouter();
   const isStudent = role === "STUDENT";
   const isAdmin = role === "ADMIN";
+  const isOfficer = role === "OFFICER";
+  // Admins and officers may change their own phone number (it is a login name); an officer keeps the fixed staff code as a second login.
+  const canEditPhone = isAdmin || isOfficer;
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone);
   const [major, setMajor] = useState(initial.major ?? "");
@@ -44,7 +49,9 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
             ? { name, major: major || null, className: className || null }
             : isAdmin
               ? { name, phone }
-              : { name },
+              : isOfficer
+                ? { name, ...(phone ? { phone } : {}) }
+                : { name },
         ),
       });
       const data = await res.json();
@@ -71,8 +78,8 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelCls}>{role === "OFFICER" ? "Mã cán bộ (tên đăng nhập)" : "Số điện thoại (tên đăng nhập)"}</label>
-            {isAdmin ? (
+            <label className={labelCls}>{isOfficer ? "Số điện thoại (đăng nhập, có thể đổi)" : "Số điện thoại (tên đăng nhập)"}</label>
+            {canEditPhone ? (
               <>
                 <input
                   value={phone}
@@ -80,7 +87,11 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
                   inputMode="numeric"
                   className={inputCls}
                 />
-                <p className="mt-1 text-xs text-slate-400">Lần đăng nhập sau dùng số này.</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {isOfficer
+                    ? "Có thể đăng nhập bằng số này hoặc mã cán bộ. Đổi số thì lần sau dùng số mới."
+                    : "Lần đăng nhập sau dùng số này."}
+                </p>
               </>
             ) : (
               <>
@@ -89,6 +100,13 @@ export default function ProfileForm({ role, initial }: { role: string; initial: 
               </>
             )}
           </div>
+          {isOfficer && (
+            <div>
+              <label className={labelCls}>Mã cán bộ (đăng nhập)</label>
+              <input value={initial.staffCode ?? ""} readOnly className={`${inputCls} bg-slate-50 font-mono text-slate-500`} />
+              <p className="mt-1 text-xs text-slate-400">Cố định theo danh sách cán bộ, không đổi được.</p>
+            </div>
+          )}
           {isStudent && (
             <div>
               <label className={labelCls}>Số thứ tự</label>

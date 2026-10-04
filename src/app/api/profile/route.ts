@@ -5,7 +5,7 @@ import { createSessionCookie, getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/log";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
 
-const select = { name: true, phone: true, role: true, orderCode: true, major: true, className: true } as const;
+const select = { name: true, phone: true, staffCode: true, role: true, orderCode: true, major: true, className: true } as const;
 
 export async function GET() {
   const session = await getSession();
@@ -16,7 +16,7 @@ export async function GET() {
   return NextResponse.json(user);
 }
 
-// Phone is the login name: only admins may change their own (staff/students go through admin/sales).
+// Phone is a login name: admins and officers (cán bộ) may change their own; for students it goes through sales.
 const patchSchema = z.object({
   name: z.string().trim().min(1, "Họ tên không được để trống.").max(100, "Họ tên quá dài.").optional(),
   phone: z
@@ -45,10 +45,13 @@ export async function PATCH(req: NextRequest) {
   if (body.name !== undefined) data.name = body.name;
 
   if (body.phone !== undefined && body.phone !== user.phone) {
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "OFFICER") {
       return NextResponse.json({ error: "Bạn không thể tự đổi số điện thoại." }, { status: 403 });
     }
-    const taken = await prisma.user.findUnique({ where: { phone: body.phone } });
+    // A phone number must not equal anyone else's phone or staff code, since both are logins.
+    const taken = await prisma.user.findFirst({
+      where: { OR: [{ phone: body.phone }, { staffCode: body.phone }], id: { not: user.id } },
+    });
     if (taken) return NextResponse.json({ error: "Số điện thoại này đã được dùng." }, { status: 409 });
     data.phone = body.phone;
   }

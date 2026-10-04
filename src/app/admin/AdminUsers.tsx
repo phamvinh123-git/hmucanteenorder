@@ -10,6 +10,7 @@ type UserRow = {
   id: string;
   name: string;
   phone: string;
+  staffCode: string | null;
   role: Role;
   active: boolean;
   mustChangePassword: boolean;
@@ -24,7 +25,7 @@ const ROLE_LABEL: Record<Role, string> = {
   OFFICER: "Cán bộ",
 };
 
-const emptyForm = { name: "", phone: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
+const emptyForm = { name: "", phone: "", staffCode: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -88,7 +89,10 @@ export default function AdminUsers() {
   const visible = users.filter(
     (u) =>
       (roleFilter === "ALL" || u.role === roleFilter) &&
-      (!q || foldText(u.name).includes(q) || u.phone.includes(search.trim())),
+      (!q ||
+        foldText(u.name).includes(q) ||
+        u.phone.includes(search.trim()) ||
+        (u.staffCode ?? "").toLowerCase().includes(search.trim().toLowerCase())),
   );
 
   return (
@@ -110,12 +114,23 @@ export default function AdminUsers() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
             />
           </div>
+          {form.role === "OFFICER" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Mã cán bộ (đăng nhập)</label>
+              <input
+                required
+                value={form.staffCode}
+                onChange={(e) => setForm({ ...form, staffCode: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              {form.role === "OFFICER" ? "Mã cán bộ (tên đăng nhập)" : "Số điện thoại"}
+              {form.role === "OFFICER" ? "Số điện thoại (không bắt buộc)" : "Số điện thoại"}
             </label>
             <input
-              required
+              required={form.role !== "OFFICER"}
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -199,7 +214,9 @@ export default function AdminUsers() {
             >
               <div className="sm:w-56">
                 <p className="text-sm font-medium text-slate-800">{u.name}</p>
-                <p className="text-xs text-slate-400">{u.phone}</p>
+                <p className="text-xs text-slate-400">
+                  {u.staffCode ? `Mã CB: ${u.staffCode}${u.phone !== u.staffCode ? ` · ${u.phone}` : ""}` : u.phone}
+                </p>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">{ROLE_LABEL[u.role]}</span>
               {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit">Đã khóa</span>}

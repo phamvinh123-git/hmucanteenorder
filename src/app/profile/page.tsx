@@ -11,7 +11,9 @@ export default async function ProfilePage() {
         role={user.role}
         initial={{
           name: user.name,
-          phone: user.phone,
+          // An officer without a phone number of their own has the staff code as a placeholder; show it blank.
+          phone: user.staffCode && user.phone === user.staffCode ? "" : user.phone,
+          staffCode: user.staffCode,
           orderCode: user.orderCode,
           major: user.major,
           className: user.className,

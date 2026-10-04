@@ -20,6 +20,8 @@ type ScheduleSession = {
   studentId: string;
   studentName: string;
   studentPhone: string;
+  /** Officers (cán bộ) are identified by their fixed staff code. */
+  staffCode: string | null;
   orderCode: number | null;
   major: string | null;
   className: string | null;
@@ -241,7 +243,7 @@ export default function ScheduleView() {
                   {s.className || "—"}
                   {s.major ? ` · ${s.major.replace(/^Cử nhân /, "")}` : ""}
                 </span>
-                <span className="text-slate-400 w-32 flex-shrink-0">{s.studentPhone}</span>
+                <span className="text-slate-400 w-32 flex-shrink-0">{s.staffCode ?? s.studentPhone}</span>
                 <span className="text-slate-600 w-24 flex-shrink-0">{currency.format(s.price)}</span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${

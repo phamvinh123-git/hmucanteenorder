@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
 
   const login = body.data.phone.trim();
   const { password } = body.data;
-  // Staff ("cán bộ") sign in with their staff code, stored in upper case; accept it in any case.
+  // Officers ("cán bộ") can sign in with either their phone number or their staff code (any case).
   const user =
     (await prisma.user.findUnique({ where: { phone: login } })) ??
-    (await prisma.user.findUnique({ where: { phone: login.toUpperCase() } }));
+    (await prisma.user.findUnique({ where: { staffCode: login.toUpperCase() } }));
 
   if (!user || !user.active) {
     return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });

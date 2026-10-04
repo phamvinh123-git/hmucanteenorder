@@ -43,7 +43,7 @@ export default async function SchedulePrintPage({
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { name: true, phone: true, orderCode: true } },
+      student: { select: { name: true, phone: true, staffCode: true, orderCode: true } },
     },
   });
 
@@ -54,7 +54,8 @@ export default async function SchedulePrintPage({
       price: s.price,
       pickedUp: s.pickedUp,
       name: s.student.name,
-      phone: s.student.phone,
+      // Officers are listed by staff code, students by phone number.
+      phone: s.student.staffCode ?? s.student.phone,
       orderCode: s.student.orderCode,
     }))
     .sort(sortByOrderCode);
