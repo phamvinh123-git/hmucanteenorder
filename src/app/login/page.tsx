@@ -20,21 +20,22 @@ export default async function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm animate-rise-in">
+      <div className="w-full max-w-md animate-rise-in">
         <div className="text-center mb-8">
           <Image
             src="/logo.webp"
             alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
-            width={96}
-            height={96}
+            width={120}
+            height={120}
             priority
-            className="mx-auto mb-4 h-24 w-24 rounded-full object-cover bg-white animate-logo-float"
+            className="mx-auto mb-5 h-28 w-28 rounded-full object-cover bg-white animate-logo-float"
           />
-          <h1 className="text-xl font-bold text-slate-800">
-            Căng tin Phân hiệu Đại học Y Hà Nội
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-red-600">Đại học Y Hà Nội</p>
+          <h1 className="mt-1 text-3xl font-extrabold leading-tight tracking-tight text-slate-800 sm:text-4xl">
+            Phân hiệu Thanh Hóa
           </h1>
-          <p className="text-red-600 text-sm mt-1 font-medium">tại Thanh Hóa</p>
-          <p className="text-slate-400 text-xs mt-3">Hệ thống đặt suất ăn</p>
+          <p className="mt-2 text-lg font-semibold text-red-600 sm:text-xl">Hệ thống đặt suất ăn căng tin</p>
+          <p className="mt-3 text-sm text-slate-500">Đăng nhập để đăng ký và quản lý suất ăn của bạn</p>
         </div>
         <LoginForm />
       </div>
