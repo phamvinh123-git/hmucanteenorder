@@ -204,16 +204,16 @@ body::before {
   animation: title-sweep 4s linear infinite;
 }
 
-/* Idle screen: a grid of hidden cells that appear one column after another from left to right, alternating
-   red and white up, down, left and right. Each cell pops in when the wave reaches it (its animation-delay is set
-   from its column and a small row offset, so the front is wavy), stays for a while, then disappears in the same
-   left-to-right order before the next wave starts. */
+/* Idle screen: a grid of hidden cells, alternating red and white up, down, left and right. A band of them runs
+   from left to right like a snake: each cell pops in when the head of the band reaches it (its animation-delay
+   comes from its column and a small row offset, so the front is wavy) and shrinks away a couple of seconds later,
+   so the tail follows right behind the head and the cells are only ever visible inside the moving band. */
 .wave-cell {
   border-radius: 22%;
   background: var(--tone);
   box-shadow: 0 2px 8px rgba(190, 22, 81, 0.22);
   opacity: 0;
-  animation: cell-appear 14s ease-in-out infinite backwards;
+  animation: cell-appear 8.5s ease-in-out infinite backwards;
 }
 
 @keyframes cell-appear {
@@ -221,16 +221,16 @@ body::before {
     opacity: 0;
     transform: scale(0.3);
   }
-  4% {
+  5% {
     opacity: 1;
     transform: scale(1.08);
   }
-  7%,
-  62% {
+  8%,
+  24% {
     opacity: 1;
     transform: scale(1);
   }
-  68%,
+  32%,
   100% {
     opacity: 0;
     transform: scale(0.3);
