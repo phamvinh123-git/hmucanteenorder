@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: "Cách đăng ký, hủy và nhận cơm trưa dành cho cán bộ, viên chức tại HMU THC Canteen.",
 };
 
+const SITE_URL = "https://hmu-canteen.onrender.com";
+
 // A public page (no login needed) so it can be sent to staff before they have signed in once.
 // It deliberately does not state the initial password.
 
@@ -78,6 +80,14 @@ export default function GuidePage() {
         </div>
       </header>
 
+      <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm print:shadow-none">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Địa chỉ truy cập</p>
+        <a href={SITE_URL} className="mt-1 block text-xl font-extrabold text-red-600 underline decoration-red-300 underline-offset-4 sm:text-2xl">
+          hmu-canteen.onrender.com
+        </a>
+        <p className="mt-1 text-xs text-slate-500">Dùng được trên điện thoại và máy tính. Bấm vào địa chỉ để mở trang đăng nhập.</p>
+      </section>
+
       <section className="break-inside-avoid rounded-2xl border-2 border-red-200 bg-red-50 p-5">
         <h2 className="text-base font-bold text-red-700">Cần nhớ</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
@@ -97,7 +107,13 @@ export default function GuidePage() {
       </section>
 
       <Step n={1} title="Đăng nhập">
-        <p>Mở trang web của căng tin trên điện thoại hoặc máy tính, rồi nhập:</p>
+        <p>
+          Mở trang web của căng tin tại{" "}
+          <a href={SITE_URL} className="font-semibold text-red-600 underline">
+            hmu-canteen.onrender.com
+          </a>{" "}
+          trên điện thoại hoặc máy tính, rồi nhập:
+        </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
             <b>Số điện thoại / Mã cán bộ</b>: dùng <b>mã cán bộ</b> của bạn, hoặc số điện thoại đã đăng ký. Gõ chữ hoa
@@ -231,7 +247,7 @@ export default function GuidePage() {
       </section>
 
       <footer className="pb-6 text-center text-xs text-slate-400">
-        HMU THC Canteen · Mọi thắc mắc xin liên hệ quản trị viên hệ thống.
+        HMU THC Canteen · hmu-canteen.onrender.com · Mọi thắc mắc xin liên hệ quản trị viên hệ thống.
       </footer>
     </main>
   );
