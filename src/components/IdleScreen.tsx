@@ -5,6 +5,42 @@ import { useEffect, useRef, useState } from "react";
 import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
+// Cells per row: more than any screen needs (the extra ones are clipped), because the number that fit
+// depends on the screen. Two rows per band.
+const WAVE_COLS = 48;
+const WAVE_ROWS = 2;
+
+/** A strip of red and white cells along one edge whose colours and height ripple from left to right. */
+function WaveBand({ position }: { position: "top" | "bottom" }) {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute inset-x-0 ${position === "top" ? "top-0" : "bottom-0"} overflow-hidden`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${WAVE_COLS}, var(--wave-cell))`,
+        gap: "4px",
+        padding: "4px 0 4px 4px",
+        // Cell size follows the smaller side of the screen, within sensible limits.
+        ["--wave-cell" as string]: "clamp(30px, 7vmin, 90px)",
+      }}
+    >
+      {Array.from({ length: WAVE_ROWS * WAVE_COLS }, (_, i) => {
+        const row = Math.floor(i / WAVE_COLS);
+        const col = i % WAVE_COLS;
+        const phase = (row + col) % 2;
+        return (
+          <div
+            key={i}
+            className="wave-cell"
+            style={{ ["--c" as string]: col, ["--p" as string]: phase, ["--tone" as string]: phase ? "#ffffff" : "#be1651" }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 /** How long without any input before the idle screen takes over. */
 const IDLE_MS = 45 * 1000;
 
@@ -71,6 +107,8 @@ export default function IdleScreen() {
         className="pointer-events-none absolute inset-0 opacity-[0.08]"
         style={{ background: 'url("/logo.webp") center / min(75vmin, 640px) no-repeat' }}
       />
+      <WaveBand position="top" />
+      <WaveBand position="bottom" />
       <div className="relative">
         <Image
           src="/logo.webp"
