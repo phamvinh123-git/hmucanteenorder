@@ -26,7 +26,7 @@ const ROLE_LABEL: Record<Role, string> = {
   OFFICER: "Cán bộ",
 };
 
-const emptyForm = { name: "", phone: "", staffCode: "", password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
+const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -116,11 +116,13 @@ export default function AdminUsers() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
             />
           </div>
-          {form.role === "OFFICER" && (
+          {(form.role === "OFFICER" || form.alsoOfficer) && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Mã cán bộ (đăng nhập)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Mã cán bộ (đăng nhập){form.role === "OFFICER" ? "" : " — không bắt buộc"}
+              </label>
               <input
-                required
+                required={form.role === "OFFICER"}
                 value={form.staffCode}
                 onChange={(e) => setForm({ ...form, staffCode: e.target.value })}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -159,6 +161,17 @@ export default function AdminUsers() {
               <option value="SALES">Bán hàng</option>
               <option value="OFFICER">Cán bộ</option>
             </select>
+            {form.role !== "OFFICER" && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.alsoOfficer}
+                  onChange={(e) => setForm({ ...form, alsoOfficer: e.target.checked })}
+                  className="h-4 w-4 accent-red-600"
+                />
+                Đồng thời là cán bộ (đặt cơm trưa)
+              </label>
+            )}
           </div>
           <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
             <button

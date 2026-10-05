@@ -14,6 +14,8 @@ const schema = z
     staffCode: z.string().trim().optional(),
     password: z.string().min(4),
     role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER"]),
+    // A manager / sales / admin who is also an officer: one login, both roles.
+    alsoOfficer: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.role === "OFFICER") {
@@ -23,8 +25,13 @@ const schema = z
       if (v.phone && !PHONE_RE.test(v.phone)) {
         ctx.addIssue({ code: "custom", path: ["phone"], message: "Số điện thoại gồm 9–15 chữ số." });
       }
-    } else if (!v.phone || !PHONE_RE.test(v.phone)) {
-      ctx.addIssue({ code: "custom", path: ["phone"], message: "Số điện thoại gồm 9–15 chữ số." });
+    } else {
+      if (!v.phone || !PHONE_RE.test(v.phone)) {
+        ctx.addIssue({ code: "custom", path: ["phone"], message: "Số điện thoại gồm 9–15 chữ số." });
+      }
+      if (v.alsoOfficer && v.staffCode && !/^[A-Za-z0-9._-]{3,30}$/.test(v.staffCode)) {
+        ctx.addIssue({ code: "custom", path: ["staffCode"], message: "Mã cán bộ gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." });
+      }
     }
   });
 
@@ -63,7 +70,8 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
   // Staff codes are stored in upper case so "cb001" and "CB001" are the same account. An officer
   // without a phone number gets the code as a placeholder until they enter their own.
-  const staffCode = data.role === "OFFICER" ? data.staffCode!.toUpperCase() : null;
+  const isOfficer = data.role === "OFFICER" || !!data.alsoOfficer;
+  const staffCode = isOfficer && data.staffCode ? data.staffCode.toUpperCase() : null;
   const phone = data.role === "OFFICER" ? data.phone || staffCode! : data.phone!;
 
   // Phone numbers and staff codes both work as logins, so neither may collide with the other.
@@ -80,7 +88,7 @@ export async function POST(req: NextRequest) {
       name: data.name,
       phone,
       staffCode,
-      isOfficer: data.role === "OFFICER",
+      isOfficer,
       passwordHash,
       role: data.role,
       mustChangePassword: true,
