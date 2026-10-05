@@ -211,7 +211,7 @@ body::before {
 .wave-cell {
   border-radius: 22%;
   background: var(--tone);
-  box-shadow: 0 2px 8px rgba(190, 22, 81, 0.22);
+  box-shadow: 0 2px 8px rgba(238, 143, 176, 0.35);
   opacity: 0;
   animation: cell-appear 8.5s ease-in-out infinite backwards;
 }

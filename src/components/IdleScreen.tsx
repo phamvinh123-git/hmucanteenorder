@@ -44,7 +44,7 @@ function WaveField({ grid }: { grid: WaveGrid }) {
             key={i}
             className="wave-cell"
             style={{
-              ["--tone" as string]: (row + col) % 2 ? "#ffffff" : "#be1651",
+              ["--tone" as string]: (row + col) % 2 ? "#ffffff" : "#ee8fb0",
               animationDelay: `${delay.toFixed(2)}s`,
             }}
           />
@@ -138,9 +138,9 @@ export default function IdleScreen() {
           alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
           width={160}
           height={160}
-          className="mx-auto mb-6 h-36 w-36 rounded-full bg-white object-cover shadow-[0_8px_30px_rgba(190,22,81,0.45)] ring-[6px] ring-white animate-logo-float sm:h-44 sm:w-44"
+          className="mx-auto mb-6 h-36 w-36 rounded-full bg-white object-cover shadow-[0_12px_32px_rgba(110,10,50,0.5)] ring-[6px] ring-white animate-logo-float sm:h-44 sm:w-44"
         />
-        <div className="[filter:drop-shadow(0_0_2px_#fff)_drop-shadow(0_0_6px_#fff)_drop-shadow(0_0_14px_#fff)]">
+        <div className="[filter:drop-shadow(0_0_2px_#fff)_drop-shadow(0_0_8px_#fff)_drop-shadow(0_4px_6px_rgba(110,10,50,0.35))]">
           <AnimatedTitle
             title="HMU THC Canteen"
             subtitle="Hệ thống đặt ăn tại Canteen"
