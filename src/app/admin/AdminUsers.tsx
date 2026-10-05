@@ -89,7 +89,8 @@ export default function AdminUsers() {
   const q = foldText(search);
   const visible = users.filter(
     (u) =>
-      (roleFilter === "ALL" || u.role === roleFilter) &&
+      // The "Cán bộ" filter also lists managers/sales/admins who are officers too (one login, two roles).
+      (roleFilter === "ALL" || u.role === roleFilter || (roleFilter === "OFFICER" && u.isOfficer)) &&
       (!q ||
         foldText(u.name).includes(q) ||
         u.phone.includes(search.trim()) ||
