@@ -1,6 +1,11 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import { Be_Vietnam_Pro } from "next/font/google";
 import PrintButton from "./PrintButton";
+
+// Be Vietnam Pro is drawn for Vietnamese: every tone mark sits correctly, in every weight used here (and in the
+// PDF printed from this page). The default fonts synthesize bold and misplace stacked diacritics.
+const guideFont = Be_Vietnam_Pro({ subsets: ["vietnamese", "latin"], weight: ["400", "500", "600", "700", "800"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Hướng dẫn đặt cơm trưa cho cán bộ",
@@ -54,7 +59,7 @@ function Key({ children }: { children: React.ReactNode }) {
 
 export default function GuidePage() {
   return (
-    <main className="mx-auto max-w-3xl space-y-5 px-4 py-8 [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:py-0">
+    <main className={`${guideFont.className} mx-auto max-w-3xl space-y-5 px-4 py-8 [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:py-0`}>
       {/* Vietnamese paper: A4 with even margins when printed or saved as PDF. */}
       <style>{`@page { size: A4; margin: 12mm; }`}</style>
       <header className="text-center">
