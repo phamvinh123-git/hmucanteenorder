@@ -6,14 +6,14 @@ import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
 /** How long without any input before the idle screen takes over. */
-const IDLE_MS = 3 * 60 * 1000;
+const IDLE_MS = 45 * 1000;
 
 // Anything that counts as someone being at the screen.
 const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "scroll"] as const;
 
 /**
  * Full-screen idle screen: the login screen's logo and title, centred, without the form. It appears after
- * three minutes without input and goes away on the next touch, click, key press or mouse movement.
+ * 45 seconds without input and goes away on the next touch, click, key press or mouse movement.
  */
 export default function IdleScreen() {
   const [idle, setIdle] = useState(false);
@@ -47,7 +47,7 @@ export default function IdleScreen() {
         idleRef.current = true;
         setIdle(true);
       }
-    }, 5000);
+    }, 1000);
 
     return () => {
       for (const name of ACTIVITY_EVENTS) window.removeEventListener(name, onActivity);
