@@ -175,7 +175,16 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
       <PageHeader
         title="Đặt cơm trưa cho cán bộ"
         subtitle={`Đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
-      />
+      >
+        <a
+          href="/huong-dan"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/30"
+        >
+          Hướng dẫn sử dụng
+        </a>
+      </PageHeader>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
         <h2 className="mb-3 text-base font-bold text-slate-800">Lịch đăng ký cơm theo tuần</h2>
