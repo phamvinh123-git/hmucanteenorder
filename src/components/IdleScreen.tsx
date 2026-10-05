@@ -5,31 +5,53 @@ import { useEffect, useRef, useState } from "react";
 import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
-// One tile of the background: a white field with a red band across the middle, both edges of the band
-// swaying like a sine wave (one full wave per tile height, so the tile repeats seamlessly in both directions).
-// The tile is 200 wide: 50 of white, a 100-wide red band, 50 of white.
-const WAVE_AMPLITUDE = 14;
+const WAVE_GAP = 4;
+// How long the wave takes to run from the left edge to the right edge, and how far a cell's start is nudged
+// up or down by its row so that the front is wavy instead of a straight line.
+const WAVE_TRAVEL_S = 5;
+const WAVE_RIPPLE_S = 0.5;
 
-function bandsTile() {
-  const left: string[] = [];
-  const right: string[] = [];
-  for (let y = 0; y <= 100; y += 2) {
-    const dx = WAVE_AMPLITUDE * Math.sin((y / 100) * Math.PI * 2);
-    left.push(`${(50 + dx).toFixed(1)} ${y}`);
-    right.unshift(`${(150 + dx).toFixed(1)} ${y}`);
-  }
-  const svg =
-    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'>" +
-    "<rect width='200' height='100' fill='#ffffff'/>" +
-    `<polygon points='${[...left, ...right].join(" ")}' fill='#be1651'/></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+type WaveGrid = { cell: number; cols: number; rows: number };
+
+/** How many cells it takes to cover the window (cell size follows the smaller side, within limits). */
+function measureWaveGrid(): WaveGrid {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cell = Math.round(Math.min(110, Math.max(40, Math.min(w, h) * 0.075)));
+  return { cell, cols: Math.ceil(w / (cell + WAVE_GAP)) + 1, rows: Math.ceil(h / (cell + WAVE_GAP)) + 1 };
 }
 
-const BANDS = bandsTile();
-
-/** Red and white bands with wavy edges rolling across the whole screen from left to right. */
-function Sweep() {
-  return <div aria-hidden className="sweep" style={{ backgroundImage: BANDS }} />;
+/** Hidden red and white cells that appear column by column from left to right, alternating in both directions. */
+function WaveField({ grid }: { grid: WaveGrid }) {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${grid.cols}, ${grid.cell}px)`,
+        gridAutoRows: `${grid.cell}px`,
+        gap: WAVE_GAP,
+        padding: WAVE_GAP,
+      }}
+    >
+      {Array.from({ length: grid.cols * grid.rows }, (_, i) => {
+        const row = Math.floor(i / grid.cols);
+        const col = i % grid.cols;
+        const delay = (col / grid.cols) * WAVE_TRAVEL_S + (Math.sin(row * 0.7) + 1) * 0.5 * WAVE_RIPPLE_S;
+        return (
+          <div
+            key={i}
+            className="wave-cell"
+            style={{
+              ["--tone" as string]: (row + col) % 2 ? "#ffffff" : "#be1651",
+              animationDelay: `${delay.toFixed(2)}s`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 /** How long without any input before the idle screen takes over. */
@@ -44,6 +66,7 @@ const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touc
  */
 export default function IdleScreen() {
   const [idle, setIdle] = useState(false);
+  const [grid, setGrid] = useState<WaveGrid | null>(null);
   const lastActivity = useRef(0);
   const idleRef = useRef(false);
 
@@ -83,6 +106,15 @@ export default function IdleScreen() {
     };
   }, []);
 
+  // The grid is measured when the idle screen opens and again whenever the window is resized.
+  useEffect(() => {
+    if (!idle) return;
+    const update = () => setGrid(measureWaveGrid());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [idle]);
+
   if (!idle) return null;
 
   return (
@@ -90,9 +122,9 @@ export default function IdleScreen() {
       role="dialog"
       aria-label="Màn hình chờ"
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden px-4 text-center print:hidden"
-      style={{ background: "linear-gradient(to bottom, #ffffff, #fdf2f6)" }}
+      style={{ background: "linear-gradient(to bottom, #fbe4ed, #f6d3e1)" }}
     >
-      <Sweep />
+      {grid && <WaveField grid={grid} />}
       <div className="relative rounded-[2rem] bg-white/90 px-8 py-8 shadow-2xl ring-1 ring-red-100 backdrop-blur-sm sm:px-14 sm:py-10">
         <Image
           src="/logo.webp"

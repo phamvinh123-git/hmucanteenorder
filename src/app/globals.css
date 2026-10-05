@@ -204,32 +204,43 @@ body::before {
   animation: title-sweep 4s linear infinite;
 }
 
-/* Idle screen: red and white bands with wavy edges, flowing across the whole screen from left to right.
-   The bands are one tiled image (see IdleScreen.tsx). Moving the tile by exactly one tile size per loop makes the
-   motion seamless: sideways it carries the bands to the right, downwards it makes the wavy edges ripple. */
-.sweep {
-  --tw: max(40vw, 280px);
-  --th: 55vh;
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-repeat: repeat;
-  background-size: var(--tw) var(--th);
-  animation: sweep-flow 7s linear infinite;
+/* Idle screen: a grid of hidden cells that appear one column after another from left to right, alternating
+   red and white up, down, left and right. Each cell pops in when the wave reaches it (its animation-delay is set
+   from its column and a small row offset, so the front is wavy), stays for a while, then disappears in the same
+   left-to-right order before the next wave starts. */
+.wave-cell {
+  border-radius: 22%;
+  background: var(--tone);
+  box-shadow: 0 2px 8px rgba(190, 22, 81, 0.22);
+  opacity: 0;
+  animation: cell-appear 14s ease-in-out infinite backwards;
 }
 
-@keyframes sweep-flow {
-  from {
-    background-position: 0 0;
+@keyframes cell-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
   }
-  to {
-    background-position: var(--tw) var(--th);
+  4% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  7%,
+  62% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  68%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sweep {
+  .wave-cell {
     animation: none;
+    opacity: 1;
   }
   .animate-logo-float,
   .animate-logo-glow,
