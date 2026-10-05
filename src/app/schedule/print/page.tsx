@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/guard";
 import { prisma } from "@/lib/db";
 import { Fragment } from "react";
 import { compareVietnameseNames } from "@/lib/text";
+import { dinerWhere, parseGroup } from "@/lib/groups";
 import PrintButton from "./PrintButton";
 import { isPremiumPrice } from "@/lib/pricing";
 
@@ -32,7 +33,7 @@ export default async function SchedulePrintPage({
   const { date: dateParam, mealType: mealTypeParam, group: groupParam } = await searchParams;
   // group=OFFICER: staff only; group=ALL: students and staff together; otherwise students only.
   // Officers (cán bộ) sign on the printout instead of being ticked off as picked up.
-  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "ALL" ? "ALL" : "STUDENT";
+  const group = parseGroup(groupParam, "STUDENT");
   const mealType = mealTypeParam === "DINNER" ? "DINNER" : "LUNCH";
   const date = dateParam ? new Date(dateParam) : new Date();
   const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -44,14 +45,14 @@ export default async function SchedulePrintPage({
       date: { gte: dayStart, lt: dayEnd },
       mealType,
       status: { in: ["SCHEDULED", "COMPLETED"] },
-      student: { role: group === "OFFICER" ? "OFFICER" : group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : "STUDENT" },
+      student: dinerWhere(group),
     },
     select: {
       id: true,
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { name: true, phone: true, staffCode: true, role: true, orderCode: true } },
+      student: { select: { name: true, phone: true, staffCode: true, isOfficer: true, orderCode: true } },
     },
   });
 
@@ -65,7 +66,7 @@ export default async function SchedulePrintPage({
       // Officers are listed by staff code, students by phone number.
       phone: s.student.staffCode ?? s.student.phone,
       orderCode: s.student.orderCode,
-      isOfficer: s.student.role === "OFFICER",
+      isOfficer: s.student.isOfficer,
     }))
     .sort(sortByOrderCode);
 

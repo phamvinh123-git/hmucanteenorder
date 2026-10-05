@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { saveOfficerWeek } from "@/lib/meal-logic";
 import { parseLocalDate } from "@/lib/officer-rules";
 import { logActivity } from "@/lib/log";
@@ -14,7 +15,8 @@ const schema = z.object({
 // (lunch only, Mon-Fri, deadline = end of the Friday before the week) are enforced in saveOfficerWeek.
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || session.role !== "OFFICER") {
+  const officer = session ? await prisma.user.findUnique({ where: { id: session.userId }, select: { isOfficer: true, active: true } }) : null;
+  if (!session || !officer?.isOfficer || !officer.active) {
     return NextResponse.json({ error: "Chỉ tài khoản cán bộ mới đăng ký cơm theo tuần." }, { status: 403 });
   }
 

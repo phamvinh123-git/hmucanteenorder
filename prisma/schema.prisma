@@ -52,6 +52,9 @@ model User {
   /// edited by the officer. It is a second way to log in; `phone` stays the officer's own, editable
   /// number (set equal to the code as a placeholder until they enter one).
   staffCode         String?  @unique
+  /// True for every OFFICER, and also for a manager/sales/admin who is an officer too (same login, both
+  /// roles). Drives the officer lunch ordering page and the officer groups in lists, reports and stats.
+  isOfficer         Boolean  @default(false)
   createdAt         DateTime @default(now())
 
   registrations     MealRegistration[] @relation("StudentRegistrations")

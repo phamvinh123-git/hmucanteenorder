@@ -11,6 +11,7 @@ type UserRow = {
   name: string;
   phone: string;
   staffCode: string | null;
+  isOfficer: boolean;
   role: Role;
   active: boolean;
   mustChangePassword: boolean;
@@ -219,6 +220,11 @@ export default function AdminUsers() {
                 </p>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">{ROLE_LABEL[u.role]}</span>
+              {u.isOfficer && u.role !== "OFFICER" && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit" title="Tài khoản này cũng đặt cơm trưa như cán bộ">
+                  + Cán bộ
+                </span>
+              )}
               {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit">Đã khóa</span>}
               {u.mustChangePassword && u.role === "STUDENT" && (
                 <span
@@ -266,6 +272,23 @@ export default function AdminUsers() {
                     className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                   >
                     Reset mật khẩu
+                  </button>
+                )}
+                {(u.role === "ADMIN" || u.role === "MANAGER" || u.role === "SALES") && (
+                  <button
+                    onClick={() => patchUser(u.id, { isOfficer: !u.isOfficer })}
+                    title={
+                      u.isOfficer
+                        ? "Bỏ quyền đặt cơm trưa như cán bộ của tài khoản này"
+                        : "Cho tài khoản này đặt cơm trưa như cán bộ (vẫn dùng chung một đăng nhập)"
+                    }
+                    className={`text-xs px-3 py-1.5 rounded-lg border ${
+                      u.isOfficer
+                        ? "border-red-300 bg-red-50 text-red-700"
+                        : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                    }`}
+                  >
+                    {u.isOfficer ? "Bỏ cán bộ" : "Đặt làm cán bộ"}
                   </button>
                 )}
                 <select

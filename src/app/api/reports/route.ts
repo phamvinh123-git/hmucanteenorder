@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { syncCompletedSessions } from "@/lib/meal-logic";
 import { compareVietnameseNames } from "@/lib/text";
+import { dinerWhere, parseGroup } from "@/lib/groups";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -13,8 +14,7 @@ export async function GET(req: NextRequest) {
 
   const range = req.nextUrl.searchParams.get("range") ?? "week";
   // Students and officers (cán bộ) can be reported together (ALL), or each on its own.
-  const groupParam = req.nextUrl.searchParams.get("group");
-  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "STUDENT" ? "STUDENT" : "ALL";
+  const group = parseGroup(req.nextUrl.searchParams.get("group"));
   const dateParam = req.nextUrl.searchParams.get("date");
   const refDate = dateParam ? new Date(dateParam) : new Date();
 
@@ -101,13 +101,13 @@ export async function GET(req: NextRequest) {
   const sessions = await prisma.mealSession.findMany({
     where: {
       date: { gte: start, lte: end },
-      student: { role: group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : group },
+      student: dinerWhere(group),
     },
     select: {
       studentId: true,
       status: true,
       pickedUp: true,
-      student: { select: { name: true, role: true, staffCode: true, orderCode: true, major: true, className: true } },
+      student: { select: { name: true, isOfficer: true, staffCode: true, orderCode: true, major: true, className: true } },
     },
   });
 
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
       row = {
         studentId: s.studentId,
         name: s.student.name,
-        role: s.student.role === "OFFICER" ? "OFFICER" : "STUDENT",
+        role: s.student.isOfficer ? "OFFICER" : "STUDENT",
         orderCode: s.student.orderCode,
         staffCode: s.student.staffCode,
         major: s.student.major,
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
     if (s.status !== "CANCELLED") row.booked += 1;
     // Students are ticked off as "picked up"; officers sign a paper list instead, so for them a meal
     // counts as eaten once it has gone by (status COMPLETED) without being cancelled.
-    if (s.student.role === "OFFICER" ? s.status === "COMPLETED" : s.pickedUp) row.eaten += 1;
+    if (s.student.isOfficer ? s.status === "COMPLETED" : s.pickedUp) row.eaten += 1;
   }
 
   const rows = Array.from(byStudent.values())

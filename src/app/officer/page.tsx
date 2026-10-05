@@ -5,7 +5,7 @@ import AppShell from "@/components/AppShell";
 import OfficerDashboard from "./OfficerDashboard";
 
 export default async function OfficerPage() {
-  const user = await requireUser({ roles: ["OFFICER"] });
+  const user = await requireUser({ roles: ["OFFICER"], allowOfficer: true });
 
   await syncCompletedSessions(user.id);
 

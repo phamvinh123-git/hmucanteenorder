@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession, isDiner } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { cancelOfficerSession, cancelSessionAndExtend } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
@@ -17,7 +17,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Không tìm thấy buổi ăn." }, { status: 404 });
   }
 
-  const isOwner = target.studentId === session.userId && isDiner(session.role);
+  // Anyone may cancel their own meal: a student, an officer, or a manager who is also an officer.
+  const isOwner = target.studentId === session.userId;
   const isAdmin = session.role === "ADMIN";
   if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: "Không có quyền hủy buổi ăn này." }, { status: 403 });
@@ -25,9 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     // Officers order week by week, so cancelling a day just drops it: no make-up slot is appended.
-    const owner = await prisma.user.findUnique({ where: { id: target.studentId }, select: { role: true } });
-    if (owner?.role === "OFFICER") {
-      await cancelOfficerSession(id, { bypassDeadline: isAdmin });
+    const owner = await prisma.user.findUnique({ where: { id: target.studentId }, select: { isOfficer: true } });
+    if (owner?.isOfficer) {
+      await cancelOfficerSession(id, { bypassDeadline: isAdmin && !isOwner });
       await logActivity(
         session.userId,
         "CANCEL_SESSION",
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       );
       return NextResponse.json({ ok: true });
     }
-    const result = await cancelSessionAndExtend(id, { bypassDeadline: isAdmin });
+    const result = await cancelSessionAndExtend(id, { bypassDeadline: isAdmin && !isOwner });
     await logActivity(
       session.userId,
       "CANCEL_SESSION",

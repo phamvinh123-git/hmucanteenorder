@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessSalesTools, getSession, isDiner } from "@/lib/auth";
+import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { restoreOfficerSession, restoreSession } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
@@ -17,15 +17,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Không tìm thấy buổi ăn." }, { status: 404 });
   }
 
-  const isOwner = target.studentId === session.userId && isDiner(session.role);
-  const isStaff = canAccessSalesTools(session.role);
+  const isOwner = target.studentId === session.userId;
+  // Staff acting on someone else's meal skip the cutoff; restoring one's own meal never does.
+  const isStaff = canAccessSalesTools(session.role) && !isOwner;
   if (!isOwner && !isStaff) {
     return NextResponse.json({ error: "Không có quyền khôi phục buổi ăn này." }, { status: 403 });
   }
 
   try {
-    const owner = await prisma.user.findUnique({ where: { id: target.studentId }, select: { role: true } });
-    if (owner?.role === "OFFICER") {
+    const owner = await prisma.user.findUnique({ where: { id: target.studentId }, select: { isOfficer: true } });
+    if (owner?.isOfficer) {
       await restoreOfficerSession(id, { bypassDeadline: isStaff });
       await logActivity(
         session.userId,

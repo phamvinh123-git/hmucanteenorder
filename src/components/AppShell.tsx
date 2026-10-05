@@ -3,6 +3,8 @@ import Image from "next/image";
 import LogoutButton from "./LogoutButton";
 import IdleScreen from "./IdleScreen";
 import { Role } from "@prisma/client";
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "STUDENT", href: "/student", label: "Đặt suất ăn" },
@@ -31,7 +33,7 @@ const ROLE_LABEL: Record<Role, string> = {
   OFFICER: "Cán bộ",
 };
 
-export default function AppShell({
+export default async function AppShell({
   role,
   name,
   children,
@@ -41,6 +43,16 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const items = NAV_ITEMS.filter((i) => i.role === role);
+
+  // A manager, salesperson or admin who is also an officer (cán bộ) keeps their own menu and gets the
+  // lunch-ordering page as one more entry.
+  const session = await getSession();
+  const officerToo =
+    role !== "OFFICER" &&
+    role !== "STUDENT" &&
+    !!session &&
+    !!(await prisma.user.findUnique({ where: { id: session.userId }, select: { isOfficer: true } }))?.isOfficer;
+  if (officerToo) items.push({ role, href: "/officer", label: "Đặt cơm trưa" });
 
   return (
     <div className="min-h-screen">

@@ -3,7 +3,12 @@ import { prisma } from "@/lib/db";
 import { getSession, homePathForRole } from "@/lib/auth";
 import { Role } from "@prisma/client";
 
-export async function requireUser(options?: { roles?: Role[]; allowPendingPasswordChange?: boolean }) {
+export async function requireUser(options?: {
+  roles?: Role[];
+  allowPendingPasswordChange?: boolean;
+  /** Also let through anyone flagged as an officer, whatever their role (a manager who is also a cán bộ). */
+  allowOfficer?: boolean;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -14,7 +19,7 @@ export async function requireUser(options?: { roles?: Role[]; allowPendingPasswo
     redirect("/change-password");
   }
 
-  if (options?.roles && !options.roles.includes(user.role)) {
+  if (options?.roles && !options.roles.includes(user.role) && !(options.allowOfficer && user.isOfficer)) {
     redirect(homePathForRole(user.role));
   }
 

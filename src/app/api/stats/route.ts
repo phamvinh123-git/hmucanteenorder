@@ -11,6 +11,7 @@ import {
 } from "date-fns";
 import { prisma } from "@/lib/db";
 import { canAccessStats, getSession } from "@/lib/auth";
+import { dinerWhere, parseGroup } from "@/lib/groups";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -55,16 +56,15 @@ export async function GET(req: NextRequest) {
   }
 
   // Students and officers (cán bộ) can be counted together (ALL), or each on its own.
-  const groupParam = req.nextUrl.searchParams.get("group");
-  const group = groupParam === "OFFICER" ? "OFFICER" : groupParam === "STUDENT" ? "STUDENT" : "ALL";
+  const group = parseGroup(req.nextUrl.searchParams.get("group"));
 
   const sessions = await prisma.mealSession.findMany({
     where: {
       date: { gte: start, lte: end },
       status: { in: ["SCHEDULED", "COMPLETED"] },
-      student: { role: group === "ALL" ? { in: ["STUDENT", "OFFICER"] } : group },
+      student: dinerWhere(group),
     },
-    select: { date: true, mealType: true, price: true, status: true, student: { select: { role: true } } },
+    select: { date: true, mealType: true, price: true, status: true, student: { select: { isOfficer: true } } },
   });
 
   const days = eachDayOfInterval({ start, end });
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     if (s.mealType === "LUNCH") bucket.lunch += 1;
     else bucket.dinner += 1;
     // Officers' meal prices are not shown anywhere, so they add nothing to the revenue figure.
-    if (s.student.role === "OFFICER") officerMeals += 1;
+    if (s.student.isOfficer) officerMeals += 1;
     else bucket.revenue += s.price;
   }
 

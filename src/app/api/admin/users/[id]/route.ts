@@ -7,6 +7,8 @@ import { logActivity } from "@/lib/log";
 const schema = z.object({
   active: z.boolean().optional(),
   role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER"]).optional(),
+  // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
+  isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
 });
 
@@ -29,7 +31,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const updateData: Record<string, unknown> = {};
   if (typeof data.active === "boolean") updateData.active = data.active;
-  if (data.role) updateData.role = data.role;
+  if (data.role) {
+    updateData.role = data.role;
+    // OFFICER accounts are officers by definition; a student never is. Other roles keep their flag.
+    if (data.role === "OFFICER") updateData.isOfficer = true;
+    else if (data.role === "STUDENT") updateData.isOfficer = false;
+  }
+  if (typeof data.isOfficer === "boolean" && data.role !== "OFFICER" && data.role !== "STUDENT") {
+    updateData.isOfficer = data.isOfficer;
+  }
   if (data.resetPassword) {
     updateData.passwordHash = await hashPassword(DEFAULT_STUDENT_PASSWORD);
     updateData.mustChangePassword = true;
