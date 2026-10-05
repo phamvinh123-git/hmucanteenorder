@@ -106,7 +106,7 @@ export default function AdminUsers() {
     setEditError(null);
     try {
       const body: Record<string, string> = { phone: editPhone.trim() };
-      if (u.isOfficer || u.role === "OFFICER") body.staffCode = editCode.trim();
+      if (u.role !== "STUDENT") body.staffCode = editCode.trim();
       const res = await fetch(`/api/admin/users/${u.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -379,9 +379,9 @@ export default function AdminUsers() {
                         className="mt-1 block w-44 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                       />
                     </label>
-                    {(u.isOfficer || u.role === "OFFICER") && (
+                    {u.role !== "STUDENT" && (
                       <label className="text-xs font-medium text-slate-600">
-                        Mã cán bộ
+                        Mã cán bộ{u.isOfficer || u.role === "OFFICER" ? "" : " (nhập để đặt làm cán bộ)"}
                         <input
                           value={editCode}
                           onChange={(e) => setEditCode(e.target.value)}

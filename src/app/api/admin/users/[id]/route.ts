@@ -41,20 +41,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const target = await prisma.user.findUnique({ where: { id } });
     if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
 
-    const isOfficerAccount = target.isOfficer || target.role === "OFFICER";
+    let becomesOfficer = false;
     let nextCode = target.staffCode;
     let nextPhone = target.phone;
     // An officer with no phone of their own has the staff code in the phone column as a placeholder.
     const hadPlaceholder = !!target.staffCode && target.phone === target.staffCode;
 
-    if (data.staffCode !== undefined) {
-      if (!isOfficerAccount) {
-        return NextResponse.json({ error: "Chỉ tài khoản cán bộ mới có mã cán bộ." }, { status: 400 });
+    // An empty code means "leave the code alone". Giving a code to a manager / sales / admin account
+    // also makes them an officer (one login, both roles), so no separate toggle is needed first.
+    if (data.staffCode !== undefined && data.staffCode !== "") {
+      if (target.role === "STUDENT") {
+        return NextResponse.json({ error: "Sinh viên không có mã cán bộ." }, { status: 400 });
       }
       if (!CODE_RE.test(data.staffCode)) {
         return NextResponse.json({ error: "Mã cán bộ gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." }, { status: 400 });
       }
       nextCode = data.staffCode.toUpperCase();
+      becomesOfficer = !target.isOfficer && target.role !== "OFFICER";
       if (hadPlaceholder && data.phone === undefined) nextPhone = nextCode;
     }
 
@@ -80,6 +83,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (nextPhone !== target.phone) updateData.phone = nextPhone;
     if (nextCode !== target.staffCode) updateData.staffCode = nextCode;
+    if (becomesOfficer) updateData.isOfficer = true;
     if (Object.keys(updateData).length > 0) {
       await logActivity(
         session.userId,
