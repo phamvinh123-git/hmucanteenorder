@@ -5,37 +5,31 @@ import { useEffect, useRef, useState } from "react";
 import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
-// One vertical period of a wavy edge, as an image: the colour fills everything to the left of an S-shaped
-// curve. Tiled downwards it gives the leading edge of a swell.
-const edgeImage = (colour: string) =>
-  `url("data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='M0 0H58C86 10 86 40 58 50C30 60 30 90 58 100H0Z' fill='${colour}'/></svg>`,
-  )}")`;
+// One tile of the background: a white field with a red band across the middle, both edges of the band
+// swaying like a sine wave (one full wave per tile height, so the tile repeats seamlessly in both directions).
+// The tile is 200 wide: 50 of white, a 100-wide red band, 50 of white.
+const WAVE_AMPLITUDE = 14;
 
-type Swell = { main: string; foam: string; className: string };
+function bandsTile() {
+  const left: string[] = [];
+  const right: string[] = [];
+  for (let y = 0; y <= 100; y += 2) {
+    const dx = WAVE_AMPLITUDE * Math.sin((y / 100) * Math.PI * 2);
+    left.push(`${(50 + dx).toFixed(1)} ${y}`);
+    right.unshift(`${(150 + dx).toFixed(1)} ${y}`);
+  }
+  const svg =
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'>" +
+    "<rect width='200' height='100' fill='#ffffff'/>" +
+    `<polygon points='${[...left, ...right].join(" ")}' fill='#be1651'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 
-// Red sweeps over white, then white sweeps over red, forever. "foam" is the paler edge running just ahead.
-const SWELLS: Swell[] = [
-  { main: "#be1651", foam: "#f4a6c1", className: "sweep-under" },
-  { main: "#ffffff", foam: "#fce7ef", className: "sweep-over" },
-];
+const BANDS = bandsTile();
 
-/** Waves of red and white rolling across the whole screen from left to right, one after the other. */
+/** Red and white bands with wavy edges rolling across the whole screen from left to right. */
 function Sweep() {
-  return (
-    <div aria-hidden className="sweep">
-      {SWELLS.map((w) => (
-        <div key={w.main} className={`sweep-layer ${w.className}`}>
-          <div className="sweep-solid" style={{ background: w.main }} />
-          <div
-            className="sweep-edge"
-            style={{ left: "calc(100% + 5vw)", backgroundImage: edgeImage(w.foam), animationDelay: "-1.5s" }}
-          />
-          <div className="sweep-edge" style={{ left: "100%", backgroundImage: edgeImage(w.main) }} />
-        </div>
-      ))}
-    </div>
-  );
+  return <div aria-hidden className="sweep" style={{ backgroundImage: BANDS }} />;
 }
 
 /** How long without any input before the idle screen takes over. */

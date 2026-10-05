@@ -204,93 +204,32 @@ body::before {
   animation: title-sweep 4s linear infinite;
 }
 
-/* Idle screen: waves of colour that roll across the whole screen from left to right, one after the other.
-   A layer is a solid block with a wavy leading edge. Two layers (red, then white) take turns: the one on top
-   sweeps across and covers the screen, then slips underneath the other while it is fully hidden, and the other
-   one sweeps across on top. The wavy edge is a tile that keeps flowing downwards (edge-flow), and a paler "foam"
-   edge runs a little ahead of it, so the front looks like a swell instead of a straight wipe. */
+/* Idle screen: red and white bands with wavy edges, flowing across the whole screen from left to right.
+   The bands are one tiled image (see IdleScreen.tsx). Moving the tile by exactly one tile size per loop makes the
+   motion seamless: sideways it carries the bands to the right, downwards it makes the wavy edges ripple. */
 .sweep {
+  --tw: max(40vw, 280px);
+  --th: 55vh;
   position: absolute;
   inset: 0;
-  overflow: hidden;
   pointer-events: none;
+  background-repeat: repeat;
+  background-size: var(--tw) var(--th);
+  animation: sweep-flow 7s linear infinite;
 }
 
-.sweep-layer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  will-change: transform;
-}
-
-.sweep-solid {
-  position: absolute;
-  inset: 0;
-}
-
-.sweep-edge {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 22vw;
-  background-repeat: repeat-y;
-  background-size: 100% 50vh;
-  animation: edge-flow 3s linear infinite;
-}
-
-@keyframes edge-flow {
+@keyframes sweep-flow {
+  from {
+    background-position: 0 0;
+  }
   to {
-    background-position-y: 50vh;
+    background-position: var(--tw) var(--th);
   }
-}
-
-/* The layer that is on top while it sweeps in, then slips underneath once the screen is covered. */
-@keyframes sweep-over {
-  0% {
-    transform: translateX(-132vw);
-    z-index: 2;
-  }
-  50% {
-    transform: translateX(0);
-    z-index: 2;
-  }
-  50.01%,
-  100% {
-    transform: translateX(0);
-    z-index: 0;
-  }
-}
-
-/* The layer that waits underneath, jumps to the left edge while hidden, then sweeps in on top. */
-@keyframes sweep-under {
-  0%,
-  50% {
-    transform: translateX(0);
-    z-index: 1;
-  }
-  50.01% {
-    transform: translateX(-132vw);
-    z-index: 3;
-  }
-  100% {
-    transform: translateX(0);
-    z-index: 3;
-  }
-}
-
-.sweep-over {
-  animation: sweep-over 12s ease-in-out -6s infinite;
-}
-
-.sweep-under {
-  animation: sweep-under 12s ease-in-out -6s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .sweep {
-    display: none;
+    animation: none;
   }
   .animate-logo-float,
   .animate-logo-glow,
