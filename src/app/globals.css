@@ -204,46 +204,93 @@ body::before {
   animation: title-sweep 4s linear infinite;
 }
 
-/* Idle screen: a field of red and white cells over the whole screen. Every column starts a little later than the
-   one before it (and every row a touch later still), so crests travel across the screen from left to right: each
-   cell rises and shrinks as a crest passes (cell-wave) while swapping between red and white (cell-tone), which
-   makes the checkerboard roll like a swell. --c is the column, --r the row, --p the checkerboard phase (0 or 1:
-   the white cells swap half a cycle later). */
-@keyframes cell-wave {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-26%) scale(0.84);
+/* Idle screen: waves of colour that roll across the whole screen from left to right, one after the other.
+   A layer is a solid block with a wavy leading edge. Two layers (red, then white) take turns: the one on top
+   sweeps across and covers the screen, then slips underneath the other while it is fully hidden, and the other
+   one sweeps across on top. The wavy edge is a tile that keeps flowing downwards (edge-flow), and a paler "foam"
+   edge runs a little ahead of it, so the front looks like a swell instead of a straight wipe. */
+.sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sweep-layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.sweep-solid {
+  position: absolute;
+  inset: 0;
+}
+
+.sweep-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22vw;
+  background-repeat: repeat-y;
+  background-size: 100% 50vh;
+  animation: edge-flow 3s linear infinite;
+}
+
+@keyframes edge-flow {
+  to {
+    background-position-y: 50vh;
   }
 }
 
-@keyframes cell-tone {
-  0%,
-  100% {
-    background-color: #be1651;
+/* The layer that is on top while it sweeps in, then slips underneath once the screen is covered. */
+@keyframes sweep-over {
+  0% {
+    transform: translateX(-132vw);
+    z-index: 2;
   }
   50% {
-    background-color: #ffffff;
+    transform: translateX(0);
+    z-index: 2;
+  }
+  50.01%,
+  100% {
+    transform: translateX(0);
+    z-index: 0;
   }
 }
 
-.wave-cell {
-  border-radius: 24%;
-  background-color: var(--tone, #be1651);
-  box-shadow: inset 0 0 0 1px rgba(190, 22, 81, 0.2);
-  animation:
-    cell-wave 2.6s ease-in-out infinite,
-    cell-tone 2.6s ease-in-out infinite;
-  animation-delay:
-    calc(var(--c) * 0.09s + var(--r) * 0.035s - 6s),
-    calc(var(--c) * 0.09s + var(--r) * 0.035s + var(--p) * 1.3s - 6s);
+/* The layer that waits underneath, jumps to the left edge while hidden, then sweeps in on top. */
+@keyframes sweep-under {
+  0%,
+  50% {
+    transform: translateX(0);
+    z-index: 1;
+  }
+  50.01% {
+    transform: translateX(-132vw);
+    z-index: 3;
+  }
+  100% {
+    transform: translateX(0);
+    z-index: 3;
+  }
+}
+
+.sweep-over {
+  animation: sweep-over 12s ease-in-out -6s infinite;
+}
+
+.sweep-under {
+  animation: sweep-under 12s ease-in-out -6s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wave-cell {
-    animation: none;
+  .sweep {
+    display: none;
   }
   .animate-logo-float,
   .animate-logo-glow,

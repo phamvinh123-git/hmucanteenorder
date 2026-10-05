@@ -5,49 +5,35 @@ import { useEffect, useRef, useState } from "react";
 import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
-const WAVE_GAP = 4;
+// One vertical period of a wavy edge, as an image: the colour fills everything to the left of an S-shaped
+// curve. Tiled downwards it gives the leading edge of a swell.
+const edgeImage = (colour: string) =>
+  `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='M0 0H58C86 10 86 40 58 50C30 60 30 90 58 100H0Z' fill='${colour}'/></svg>`,
+  )}")`;
 
-type WaveGrid = { cell: number; cols: number; rows: number };
+type Swell = { main: string; foam: string; className: string };
 
-/** How many cells it takes to cover the window (cell size follows the smaller side, within limits). */
-function measureWaveGrid(): WaveGrid {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const cell = Math.round(Math.min(110, Math.max(40, Math.min(w, h) * 0.075)));
-  return { cell, cols: Math.ceil(w / (cell + WAVE_GAP)) + 1, rows: Math.ceil(h / (cell + WAVE_GAP)) + 1 };
-}
+// Red sweeps over white, then white sweeps over red, forever. "foam" is the paler edge running just ahead.
+const SWELLS: Swell[] = [
+  { main: "#be1651", foam: "#f4a6c1", className: "sweep-under" },
+  { main: "#ffffff", foam: "#fce7ef", className: "sweep-over" },
+];
 
-/** Red and white cells filling the whole screen, rolling like a swell from left to right. */
-function WaveField({ grid }: { grid: WaveGrid }) {
+/** Waves of red and white rolling across the whole screen from left to right, one after the other. */
+function Sweep() {
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 overflow-hidden"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${grid.cols}, ${grid.cell}px)`,
-        gridAutoRows: `${grid.cell}px`,
-        gap: WAVE_GAP,
-        padding: WAVE_GAP,
-      }}
-    >
-      {Array.from({ length: grid.cols * grid.rows }, (_, i) => {
-        const row = Math.floor(i / grid.cols);
-        const col = i % grid.cols;
-        const phase = (row + col) % 2;
-        return (
+    <div aria-hidden className="sweep">
+      {SWELLS.map((w) => (
+        <div key={w.main} className={`sweep-layer ${w.className}`}>
+          <div className="sweep-solid" style={{ background: w.main }} />
           <div
-            key={i}
-            className="wave-cell"
-            style={{
-              ["--c" as string]: col,
-              ["--r" as string]: row,
-              ["--p" as string]: phase,
-              ["--tone" as string]: phase ? "#ffffff" : "#be1651",
-            }}
+            className="sweep-edge"
+            style={{ left: "calc(100% + 5vw)", backgroundImage: edgeImage(w.foam), animationDelay: "-1.5s" }}
           />
-        );
-      })}
+          <div className="sweep-edge" style={{ left: "100%", backgroundImage: edgeImage(w.main) }} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -64,7 +50,6 @@ const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touc
  */
 export default function IdleScreen() {
   const [idle, setIdle] = useState(false);
-  const [grid, setGrid] = useState<WaveGrid | null>(null);
   const lastActivity = useRef(0);
   const idleRef = useRef(false);
 
@@ -104,15 +89,6 @@ export default function IdleScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!idle) return;
-    const update = () => setGrid(measureWaveGrid());
-    // Size the cell field to the window as soon as the screen shows.
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [idle]);
-
   if (!idle) return null;
 
   return (
@@ -122,7 +98,7 @@ export default function IdleScreen() {
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden px-4 text-center print:hidden"
       style={{ background: "linear-gradient(to bottom, #ffffff, #fdf2f6)" }}
     >
-      {grid && <WaveField grid={grid} />}
+      <Sweep />
       <div className="relative rounded-[2rem] bg-white/90 px-8 py-8 shadow-2xl ring-1 ring-red-100 backdrop-blur-sm sm:px-14 sm:py-10">
         <Image
           src="/logo.webp"
