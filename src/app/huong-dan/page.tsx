@@ -54,7 +54,9 @@ function Key({ children }: { children: React.ReactNode }) {
 
 export default function GuidePage() {
   return (
-    <main className="mx-auto max-w-3xl space-y-5 px-4 py-8 print:py-0">
+    <main className="mx-auto max-w-3xl space-y-5 px-4 py-8 [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:py-0">
+      {/* Vietnamese paper: A4 with even margins when printed or saved as PDF. */}
+      <style>{`@page { size: A4; margin: 12mm; }`}</style>
       <header className="text-center">
         <Image
           src="/logo.webp"
