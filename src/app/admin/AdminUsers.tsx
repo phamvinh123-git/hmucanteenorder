@@ -86,6 +86,44 @@ export default function AdminUsers() {
     load();
   }
 
+  // Correcting a wrong phone number or staff code (shown under the row when "Sửa đăng nhập" is pressed).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPhone, setEditPhone] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+
+  function startEdit(u: UserRow) {
+    setEditingId(u.id);
+    // An officer without a phone of their own has the code as a placeholder: show the phone blank.
+    setEditPhone(u.staffCode && u.phone === u.staffCode ? "" : u.phone);
+    setEditCode(u.staffCode ?? "");
+    setEditError(null);
+  }
+
+  async function saveEdit(u: UserRow) {
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const body: Record<string, string> = { phone: editPhone.trim() };
+      if (u.isOfficer || u.role === "OFFICER") body.staffCode = editCode.trim();
+      const res = await fetch(`/api/admin/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error ?? "Không thể lưu.");
+        return;
+      }
+      setEditingId(null);
+      load();
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   const q = foldText(search);
   const visible = users.filter(
     (u) =>
@@ -224,7 +262,7 @@ export default function AdminUsers() {
           {visible.map((u, i) => (
             <div
               key={u.id}
-              className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 animate-rise-in hover:bg-red-50/40 transition-colors"
+              className="p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 animate-rise-in hover:bg-red-50/40 transition-colors"
               style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
             >
               <div className="sm:w-56">
@@ -305,6 +343,13 @@ export default function AdminUsers() {
                     {u.isOfficer ? "Bỏ cán bộ" : "Đặt làm cán bộ"}
                   </button>
                 )}
+                <button
+                  onClick={() => (editingId === u.id ? setEditingId(null) : startEdit(u))}
+                  title="Sửa số điện thoại hoặc mã cán bộ nếu nhập sai"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                >
+                  {editingId === u.id ? "Đóng" : "Sửa đăng nhập"}
+                </button>
                 <select
                   value={u.role}
                   onChange={(e) => patchUser(u.id, { role: e.target.value })}
@@ -317,6 +362,44 @@ export default function AdminUsers() {
 <option value="OFFICER">Cán bộ</option>
                 </select>
               </div>
+              {editingId === u.id && (
+                <div className="basis-full rounded-xl bg-red-50/60 p-3 animate-pop-in">
+                  <p className="mb-2 text-xs text-slate-500">
+                    Sửa thông tin dùng để đăng nhập của <b>{u.name}</b>. Số điện thoại và mã cán bộ đều đăng nhập được, nên
+                    không được trùng với tài khoản khác.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="text-xs font-medium text-slate-600">
+                      Số điện thoại
+                      <input
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value.replace(/[^0-9]/g, ""))}
+                        inputMode="numeric"
+                        placeholder={u.isOfficer || u.role === "OFFICER" ? "Để trống nếu chưa có" : ""}
+                        className="mt-1 block w-44 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                      />
+                    </label>
+                    {(u.isOfficer || u.role === "OFFICER") && (
+                      <label className="text-xs font-medium text-slate-600">
+                        Mã cán bộ
+                        <input
+                          value={editCode}
+                          onChange={(e) => setEditCode(e.target.value)}
+                          className="mt-1 block w-40 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm uppercase outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                        />
+                      </label>
+                    )}
+                    <button
+                      onClick={() => saveEdit(u)}
+                      disabled={editBusy}
+                      className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {editBusy ? "Đang lưu..." : "Lưu"}
+                    </button>
+                    {editError && <span className="text-xs text-red-600">{editError}</span>}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

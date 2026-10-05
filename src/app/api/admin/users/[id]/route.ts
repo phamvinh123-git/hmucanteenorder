@@ -10,7 +10,13 @@ const schema = z.object({
   // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
   isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
+  // Correcting a wrong phone number or staff code (an empty phone gives an officer back the placeholder).
+  phone: z.string().trim().max(20).optional(),
+  staffCode: z.string().trim().max(40).optional(),
 });
+
+const PHONE_RE = /^[0-9]{9,15}$/;
+const CODE_RE = /^[A-Za-z0-9._-]{3,30}$/;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -30,6 +36,59 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updateData: Record<string, unknown> = {};
+
+  if (data.phone !== undefined || data.staffCode !== undefined) {
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
+
+    const isOfficerAccount = target.isOfficer || target.role === "OFFICER";
+    let nextCode = target.staffCode;
+    let nextPhone = target.phone;
+    // An officer with no phone of their own has the staff code in the phone column as a placeholder.
+    const hadPlaceholder = !!target.staffCode && target.phone === target.staffCode;
+
+    if (data.staffCode !== undefined) {
+      if (!isOfficerAccount) {
+        return NextResponse.json({ error: "Chỉ tài khoản cán bộ mới có mã cán bộ." }, { status: 400 });
+      }
+      if (!CODE_RE.test(data.staffCode)) {
+        return NextResponse.json({ error: "Mã cán bộ gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." }, { status: 400 });
+      }
+      nextCode = data.staffCode.toUpperCase();
+      if (hadPlaceholder && data.phone === undefined) nextPhone = nextCode;
+    }
+
+    if (data.phone !== undefined) {
+      if (data.phone === "") {
+        if (!nextCode) return NextResponse.json({ error: "Tài khoản này cần có số điện thoại." }, { status: 400 });
+        nextPhone = nextCode;
+      } else if (!PHONE_RE.test(data.phone)) {
+        return NextResponse.json({ error: "Số điện thoại gồm 9–15 chữ số." }, { status: 400 });
+      } else {
+        nextPhone = data.phone;
+      }
+    }
+
+    // Both columns are logins, so neither value may match anyone else's phone or staff code.
+    const ids = Array.from(new Set([nextPhone, nextCode].filter((v): v is string => !!v)));
+    const clash = await prisma.user.findFirst({
+      where: { id: { not: id }, OR: [{ phone: { in: ids } }, { staffCode: { in: ids } }] },
+    });
+    if (clash) {
+      return NextResponse.json({ error: `Số điện thoại hoặc mã này đã thuộc về "${clash.name}".` }, { status: 409 });
+    }
+
+    if (nextPhone !== target.phone) updateData.phone = nextPhone;
+    if (nextCode !== target.staffCode) updateData.staffCode = nextCode;
+    if (Object.keys(updateData).length > 0) {
+      await logActivity(
+        session.userId,
+        "UPDATE_USER",
+        `Sửa thông tin đăng nhập của ${target.name}: SĐT ${target.phone} → ${nextPhone}, mã cán bộ ${target.staffCode ?? "(không)"} → ${nextCode ?? "(không)"}`,
+      );
+    }
+  }
+
   if (typeof data.active === "boolean") updateData.active = data.active;
   if (data.role) {
     updateData.role = data.role;
@@ -46,7 +105,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const user = await prisma.user.update({ where: { id }, data: updateData });
-  await logActivity(session.userId, "UPDATE_USER", `Cập nhật tài khoản ${user.name} (${user.phone}): ${JSON.stringify(data)}`);
+  if (data.phone === undefined && data.staffCode === undefined) {
+    await logActivity(session.userId, "UPDATE_USER", `Cập nhật tài khoản ${user.name} (${user.phone}): ${JSON.stringify(data)}`);
+  }
 
   return NextResponse.json({ ok: true });
 }
