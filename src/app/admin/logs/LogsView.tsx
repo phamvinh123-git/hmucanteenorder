@@ -17,6 +17,7 @@ const ACTION_LABEL: Record<string, string> = {
   REMOVE_SESSION: "Xóa buổi ăn",
   FIX_STUDENT_SCHEDULE: "Sửa lịch ăn của sinh viên",
   IMPORT_OFFICERS: "Nhập danh sách cán bộ",
+  DELETE_TEST_OFFICER: "Xóa tài khoản cán bộ thử",
   OFFICER_SAVE_WEEK: "Cán bộ đăng ký cơm tuần",
   CANCEL_SESSION: "Hủy buổi ăn",
   RESTORE_SESSION: "Khôi phục buổi ăn",
