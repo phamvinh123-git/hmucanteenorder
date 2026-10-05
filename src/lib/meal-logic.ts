@@ -10,7 +10,15 @@ import {
   nextSlot,
 } from "@/lib/session-rules";
 import { localDateKey } from "@/lib/client-session-rules";
-import { OFFICER_MEAL_PRICE, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
+import {
+  ALL_DAY_LUNCH_DATES,
+  OFFICER_MEAL_PRICE,
+  officerCanCancel,
+  officerCanRestore,
+  officerWeekDays,
+  openWeekMondays,
+  registrationDeadline,
+} from "@/lib/officer-rules";
 
 export {
   LUNCH_CUTOFF_HOUR,
@@ -73,7 +81,10 @@ export async function syncCompletedSessions(studentId?: string) {
       status: "SCHEDULED",
       OR: [
         { date: { lt: today } },
-        ...(hour >= LUNCH_DONE_HOUR ? [{ date: today, mealType: "LUNCH" as const }] : []),
+        // (Not on a launch day when lunch stays open for registering and cancelling until midnight.)
+        ...(hour >= LUNCH_DONE_HOUR && !ALL_DAY_LUNCH_DATES.includes(localDateKey(today))
+          ? [{ date: today, mealType: "LUNCH" as const }]
+          : []),
         ...(hour >= DINNER_DONE_HOUR ? [{ date: today, mealType: "DINNER" as const }] : []),
       ],
       ...(studentId ? { studentId } : {}),
@@ -477,7 +488,7 @@ export async function cancelOfficerSession(sessionId: string, opts: { bypassDead
   if (opts.bypassDeadline) {
     if (session.status !== "SCHEDULED") throw new Error("Buổi ăn này không còn ở trạng thái có thể hủy.");
   } else {
-    const check = canCancelSession(session);
+    const check = officerCanCancel(session);
     if (!check.ok) throw new Error(check.reason ?? "Không thể hủy buổi ăn này.");
   }
   return prisma.mealSession.update({
@@ -492,7 +503,7 @@ export async function restoreOfficerSession(sessionId: string, opts: { bypassDea
   if (opts.bypassDeadline) {
     if (session.status !== "CANCELLED") throw new Error("Buổi ăn này không ở trạng thái đã hủy.");
   } else {
-    const check = canRestoreSession(session);
+    const check = officerCanRestore(session);
     if (!check.ok) throw new Error(check.reason ?? "Không thể khôi phục buổi ăn này.");
   }
   return prisma.mealSession.update({

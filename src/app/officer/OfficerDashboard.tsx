@@ -2,14 +2,16 @@
 
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import { canBookSlot, cancelCutoff, localDateKey } from "@/lib/client-session-rules";
 import {
-  canBookSlot,
-  cancelCutoff,
-  canCancelSession,
-  canRestoreSession,
-  localDateKey,
-} from "@/lib/client-session-rules";
-import { addDaysLocal, mondayOf, officerWeekDays, openWeekMondays, registrationDeadline } from "@/lib/officer-rules";
+  addDaysLocal,
+  mondayOf,
+  officerCanCancel,
+  officerCanRestore,
+  officerWeekDays,
+  openWeekMondays,
+  registrationDeadline,
+} from "@/lib/officer-rules";
 
 type SessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
@@ -322,7 +324,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {upcoming.map((s) => {
             const d = new Date(s.date);
-            const check = canCancelSession({ date: d, mealType: "LUNCH", status: s.status });
+            const check = officerCanCancel({ date: d, mealType: "LUNCH", status: s.status });
             return (
               <div key={s.id} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex h-14 w-14 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-red-50 text-red-700">
@@ -375,7 +377,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
             {history.map((s) => {
               const d = new Date(s.date);
               const restore =
-                s.status === "CANCELLED" ? canRestoreSession({ date: d, mealType: "LUNCH", status: s.status }) : null;
+                s.status === "CANCELLED" ? officerCanRestore({ date: d, mealType: "LUNCH", status: s.status }) : null;
               return (
                 <div key={s.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
                   <span className="w-44 capitalize">

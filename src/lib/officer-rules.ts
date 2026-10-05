@@ -5,10 +5,43 @@
 //  - A week must be ordered in the week before it: the deadline is the end of the Friday before.
 //  - Cancelling a single day follows the same lunch cutoff as students (see session-rules.ts).
 
-import { localDateKey } from "@/lib/client-session-rules";
+import {
+  canCancelSession,
+  canRestoreSession,
+  localDateKey,
+  type MealType,
+  type SessionStatus,
+} from "@/lib/client-session-rules";
 
 /** Price recorded for one officer lunch. */
 export const OFFICER_MEAL_PRICE = 30000;
+
+/**
+ * One-off launch exception: on these days an officer's lunch can be registered, cancelled and restored all
+ * day long (no 9:00 cutoff), and is not marked finished at 14:00 — the feature started mid-day. Remove the
+ * date once it has passed.
+ */
+export const ALL_DAY_LUNCH_DATES = ["2026-10-05"];
+
+/** Is `date` one of the launch days, and is it that day right now? */
+function isAllDayLunch(date: Date, now: Date) {
+  const key = localDateKey(date);
+  return ALL_DAY_LUNCH_DATES.includes(key) && key === localDateKey(now);
+}
+
+type Cancellable = { date: Date; mealType: MealType; status: SessionStatus };
+
+/** Same cutoff as students (lunch before 9:00 the same day), except on the launch day, which lasts all day. */
+export function officerCanCancel(session: Cancellable, now: Date = new Date()) {
+  if (session.status === "SCHEDULED" && isAllDayLunch(session.date, now)) return { ok: true as const };
+  return canCancelSession(session, now);
+}
+
+/** Undoing a cancellation follows the same window as cancelling. */
+export function officerCanRestore(session: Cancellable, now: Date = new Date()) {
+  if (session.status === "CANCELLED" && isAllDayLunch(session.date, now)) return { ok: true as const };
+  return canRestoreSession(session, now);
+}
 
 /** Number of selectable days per week (Monday to Friday). */
 export const OFFICER_DAYS_PER_WEEK = 5;
