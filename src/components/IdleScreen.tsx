@@ -125,20 +125,29 @@ export default function IdleScreen() {
       style={{ background: "linear-gradient(to bottom, #fbe4ed, #f6d3e1)" }}
     >
       {grid && <WaveField grid={grid} />}
-      <div className="relative rounded-[2rem] bg-white/90 px-8 py-8 shadow-2xl ring-1 ring-red-100 backdrop-blur-sm sm:px-14 sm:py-10">
+      {/* No panel: the cells run right through behind the logo and title. A soft white glow and halos keep them readable. */}
+      <div
+        className="relative px-8 py-8 sm:px-14 sm:py-10"
+        style={{
+          background:
+            "radial-gradient(ellipse closest-side, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.55) 60%, rgba(255,255,255,0) 100%)",
+        }}
+      >
         <Image
           src="/logo.webp"
           alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
           width={160}
           height={160}
-          className="mx-auto mb-6 h-36 w-36 rounded-full bg-white object-cover animate-logo-float sm:h-44 sm:w-44"
+          className="mx-auto mb-6 h-36 w-36 rounded-full bg-white object-cover shadow-[0_8px_30px_rgba(190,22,81,0.45)] ring-[6px] ring-white animate-logo-float sm:h-44 sm:w-44"
         />
-        <AnimatedTitle
-          title="HMU THC Canteen"
-          subtitle="Hệ thống đặt ăn tại Canteen"
-          fontClassName={titleFont.className}
-          large
-        />
+        <div className="[filter:drop-shadow(0_0_2px_#fff)_drop-shadow(0_0_6px_#fff)_drop-shadow(0_0_14px_#fff)]">
+          <AnimatedTitle
+            title="HMU THC Canteen"
+            subtitle="Hệ thống đặt ăn tại Canteen"
+            fontClassName={titleFont.className}
+            large
+          />
+        </div>
       </div>
     </div>
   );
