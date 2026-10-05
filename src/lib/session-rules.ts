@@ -123,11 +123,24 @@ export function canCancelSession(
   return withinCutoffWindow(session.date, session.mealType, now, "Buổi ăn đã qua, không thể hủy.");
 }
 
+/**
+ * One-off launch exception: the officer ("cán bộ") lunch ordering started on these days, so lunch can still be
+ * booked all day long instead of only before the usual cutoff. Remove the date once it has passed.
+ */
+const ALL_DAY_LUNCH_BOOKING_DATES = ["2026-10-05"];
+
 /** Booking a slot follows the same cutoff as cancelling one: not in the past, and before 8:00 / 14:00 on the day itself. */
 export function canBookSlot(
   slot: { date: Date; mealType: MealType },
   now: Date = new Date(),
 ): { ok: boolean; reason?: string } {
+  if (
+    slot.mealType === "LUNCH" &&
+    ALL_DAY_LUNCH_BOOKING_DATES.includes(localDateKey(slot.date)) &&
+    localDateKey(slot.date) === localDateKey(now)
+  ) {
+    return { ok: true };
+  }
   return withinCutoffWindow(slot.date, slot.mealType, now, "Không thể chọn ngày đã qua.");
 }
 
