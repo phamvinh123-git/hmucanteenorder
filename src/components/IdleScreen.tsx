@@ -5,35 +5,46 @@ import { useEffect, useRef, useState } from "react";
 import { titleFont } from "@/app/title-font";
 import AnimatedTitle from "./AnimatedTitle";
 
-// Cells per row: more than any screen needs (the extra ones are clipped), because the number that fit
-// depends on the screen. Two rows per band.
-const WAVE_COLS = 48;
-const WAVE_ROWS = 2;
+const WAVE_GAP = 4;
 
-/** A strip of red and white cells along one edge whose colours and height ripple from left to right. */
-function WaveBand({ position }: { position: "top" | "bottom" }) {
+type WaveGrid = { cell: number; cols: number; rows: number };
+
+/** How many cells it takes to cover the window (cell size follows the smaller side, within limits). */
+function measureWaveGrid(): WaveGrid {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cell = Math.round(Math.min(110, Math.max(40, Math.min(w, h) * 0.075)));
+  return { cell, cols: Math.ceil(w / (cell + WAVE_GAP)) + 1, rows: Math.ceil(h / (cell + WAVE_GAP)) + 1 };
+}
+
+/** Red and white cells filling the whole screen, rolling like a swell from left to right. */
+function WaveField({ grid }: { grid: WaveGrid }) {
   return (
     <div
       aria-hidden
-      className={`pointer-events-none absolute inset-x-0 ${position === "top" ? "top-0" : "bottom-0"} overflow-hidden`}
+      className="pointer-events-none absolute inset-0 overflow-hidden"
       style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${WAVE_COLS}, var(--wave-cell))`,
-        gap: "4px",
-        padding: "4px 0 4px 4px",
-        // Cell size follows the smaller side of the screen, within sensible limits.
-        ["--wave-cell" as string]: "clamp(30px, 7vmin, 90px)",
+        gridTemplateColumns: `repeat(${grid.cols}, ${grid.cell}px)`,
+        gridAutoRows: `${grid.cell}px`,
+        gap: WAVE_GAP,
+        padding: WAVE_GAP,
       }}
     >
-      {Array.from({ length: WAVE_ROWS * WAVE_COLS }, (_, i) => {
-        const row = Math.floor(i / WAVE_COLS);
-        const col = i % WAVE_COLS;
+      {Array.from({ length: grid.cols * grid.rows }, (_, i) => {
+        const row = Math.floor(i / grid.cols);
+        const col = i % grid.cols;
         const phase = (row + col) % 2;
         return (
           <div
             key={i}
             className="wave-cell"
-            style={{ ["--c" as string]: col, ["--p" as string]: phase, ["--tone" as string]: phase ? "#ffffff" : "#be1651" }}
+            style={{
+              ["--c" as string]: col,
+              ["--r" as string]: row,
+              ["--p" as string]: phase,
+              ["--tone" as string]: phase ? "#ffffff" : "#be1651",
+            }}
           />
         );
       })}
@@ -53,6 +64,7 @@ const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touc
  */
 export default function IdleScreen() {
   const [idle, setIdle] = useState(false);
+  const [grid, setGrid] = useState<WaveGrid | null>(null);
   const lastActivity = useRef(0);
   const idleRef = useRef(false);
 
@@ -92,6 +104,15 @@ export default function IdleScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!idle) return;
+    const update = () => setGrid(measureWaveGrid());
+    // Size the cell field to the window as soon as the screen shows.
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [idle]);
+
   if (!idle) return null;
 
   return (
@@ -101,15 +122,8 @@ export default function IdleScreen() {
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden px-4 text-center print:hidden"
       style={{ background: "linear-gradient(to bottom, #ffffff, #fdf2f6)" }}
     >
-      {/* The same faint school-logo watermark the rest of the site has behind its pages. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        style={{ background: 'url("/logo.webp") center / min(75vmin, 640px) no-repeat' }}
-      />
-      <WaveBand position="top" />
-      <WaveBand position="bottom" />
-      <div className="relative">
+      {grid && <WaveField grid={grid} />}
+      <div className="relative rounded-[2rem] bg-white/90 px-8 py-8 shadow-2xl ring-1 ring-red-100 backdrop-blur-sm sm:px-14 sm:py-10">
         <Image
           src="/logo.webp"
           alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
