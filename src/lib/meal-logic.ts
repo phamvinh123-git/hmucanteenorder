@@ -291,16 +291,13 @@ export async function backfillMissingOrderCodes() {
 
 /**
  * Data-entry fix: staff forgot to register a meal the student already ate (e.g. picked "start
- * from dinner" although lunch that day was already served). Records that meal as eaten today
+ * from dinner" although lunch that day was already served). Either lunch or dinner can be recorded
+ * whatever the registration's package (lunch only, dinner only or both). Records that meal as eaten today
  * (or an earlier date), and — since the student only paid for `totalSessions` meals — gives up
  * the registration's last still-scheduled slot so the total actually served doesn't grow.
  */
 export async function recordMissedSession(params: { registrationId: string; date: Date; mealType: MealType }) {
   const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
-
-  if (registration.mealPattern !== "BOTH" && registration.mealPattern !== params.mealType) {
-    throw new Error(registration.mealPattern === "LUNCH" ? "Gói này chỉ có bữa trưa." : "Gói này chỉ có bữa tối.");
-  }
 
   const day = startOfDay(params.date);
   if (day.getTime() > startOfDay(new Date()).getTime()) {

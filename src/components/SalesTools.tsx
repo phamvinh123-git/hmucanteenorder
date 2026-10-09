@@ -1168,7 +1168,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             <p className="text-xs text-slate-500">
                               Dùng khi nhân viên quên đăng ký 1 buổi mà sinh viên đã ăn rồi (ví dụ chọn nhầm &quot;Bắt
                               đầu từ tối&quot; dù bạn ấy đã ăn trưa). Hệ thống ghi nhận buổi này là đã ăn, và tự bớt 1
-                              buổi ở cuối lịch để tổng số buổi không đổi so với gói đã mua.
+                              buổi ở cuối lịch để tổng số buổi không đổi so với gói đã mua. Ghi nhận được cả bữa trưa lẫn bữa tối, không phụ thuộc gói sinh viên đã đăng ký.
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               {detail.registrations.length > 1 && (
