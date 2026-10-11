@@ -68,6 +68,8 @@ const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
   { monday: "2026-10-05", until: "2026-10-06" },
   // The week of 12/10 stays open until 9:00 that Monday; the week after (19/10) follows the usual Friday deadline.
   { monday: "2026-10-12", until: "2026-10-12", untilTime: "09:00" },
+  // The week of 19/10 is already open (it opened on 10/10 under the old rule) and keeps the usual Friday deadline.
+  { monday: "2026-10-19", until: "2026-10-16" },
 ];
 
 /** The Friday before `weekMonday`, at 23:59:59.999 — the last moment that week can be ordered. */
