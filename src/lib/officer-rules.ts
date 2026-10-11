@@ -60,18 +60,24 @@ export function mondayOf(d: Date) {
 }
 
 /**
- * One-off launch exception: the officer feature started mid-week, so these weeks can still be ordered
- * after the usual Friday deadline — up to the end of `until` (inclusive). Individual days must still be
+ * One-off exceptions: these weeks can still be ordered after the usual Friday deadline — up to the end of
+ * `until` (inclusive), or up to `untilTime` ("HH:MM") on that day when given. Individual days must still be
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
-const LAUNCH_WEEKS = [{ monday: "2026-10-05", until: "2026-10-06" }];
+const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
+  { monday: "2026-10-05", until: "2026-10-06" },
+  // The week of 12/10 stays open until 9:00 that Monday; the week after (19/10) follows the usual Friday deadline.
+  { monday: "2026-10-12", until: "2026-10-12", untilTime: "09:00" },
+];
 
 /** The Friday before `weekMonday`, at 23:59:59.999 — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
   const launch = LAUNCH_WEEKS.find((w) => w.monday === localDateKey(weekMonday));
   if (launch) {
     const end = parseLocalDate(launch.until) ?? weekMonday;
-    end.setHours(23, 59, 59, 999);
+    const time = launch.untilTime ? /^(\d{1,2}):(\d{2})$/.exec(launch.untilTime) : null;
+    if (time) end.setHours(Number(time[1]), Number(time[2]), 0, 0);
+    else end.setHours(23, 59, 59, 999);
     return end;
   }
   const x = addDaysLocal(weekMonday, -3);
