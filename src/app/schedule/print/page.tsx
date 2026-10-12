@@ -52,7 +52,7 @@ export default async function SchedulePrintPage({
       note: true,
       price: true,
       pickedUp: true,
-      student: { select: { name: true, phone: true, staffCode: true, isOfficer: true, orderCode: true } },
+      student: { select: { name: true, phone: true, staffCode: true, isOfficer: true, department: true, orderCode: true } },
     },
   });
 
@@ -65,6 +65,7 @@ export default async function SchedulePrintPage({
       name: s.student.name,
       // Officers are listed by staff code, students by phone number.
       phone: s.student.staffCode ?? s.student.phone,
+      department: s.student.department,
       orderCode: s.student.orderCode,
       isOfficer: s.student.isOfficer,
     }))
@@ -132,6 +133,7 @@ export default async function SchedulePrintPage({
               <p className="text-[12px] font-semibold leading-tight">{r.name}</p>
               <p className="text-[10px] leading-tight">
                 {r.phone}
+                {r.isOfficer && r.department && <> &middot; {r.department}</>}
                 {!r.isOfficer && <> &middot; {currency.format(r.price)}</>}
               </p>
               {r.note && <p className="text-[10px] italic leading-tight">{r.note}</p>}

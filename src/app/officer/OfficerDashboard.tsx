@@ -29,7 +29,13 @@ const weekdayLong = new Intl.DateTimeFormat("vi-VN", { weekday: "long" });
 
 const keyOf = (iso: string) => localDateKey(new Date(iso));
 
-export default function OfficerDashboard({ sessions: initialSessions }: { sessions: OfficerSession[] }) {
+export default function OfficerDashboard({
+  sessions: initialSessions,
+  autoRegister = false,
+}: {
+  sessions: OfficerSession[];
+  autoRegister?: boolean;
+}) {
   const [sessions, setSessions] = useState(initialSessions);
 
   // Every week that can be ordered right now (normally one; two during the launch week), and which days are ticked.
@@ -186,6 +192,13 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
           Hướng dẫn sử dụng
         </a>
       </PageHeader>
+
+      {autoRegister && (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          Cơm trưa thứ 2 đến thứ 6 của bạn được <b>đăng ký tự động</b> mỗi tuần. Ngày nào không ăn, bạn bỏ chọn và bấm Lưu đăng ký
+          (hoặc bấm Hủy cơm) trước hạn; hệ thống sẽ không tự thêm lại ngày đã bỏ.
+        </p>
+      )}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-rise-in">
         <h2 className="mb-3 text-base font-bold text-slate-800">Lịch đăng ký cơm theo tuần</h2>

@@ -49,6 +49,8 @@ export async function GET() {
       staffCode: true,
       role: true,
       isOfficer: true,
+      department: true,
+      autoRegister: true,
       active: true,
       mustChangePassword: true,
       createdAt: true,

@@ -13,6 +13,9 @@ const schema = z.object({
   // Correcting a wrong phone number or staff code (an empty phone gives an officer back the placeholder).
   phone: z.string().trim().max(20).optional(),
   staffCode: z.string().trim().max(40).optional(),
+  // Department of an officer (empty clears it) and whether their lunches are registered automatically each week.
+  department: z.string().trim().max(100).optional(),
+  autoRegister: z.boolean().optional(),
 });
 
 const PHONE_RE = /^[0-9]{9,15}$/;
@@ -90,6 +93,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         "UPDATE_USER",
         `Sửa thông tin đăng nhập của ${target.name}: SĐT ${target.phone} → ${nextPhone}, mã cán bộ ${target.staffCode ?? "(không)"} → ${nextCode ?? "(không)"}`,
       );
+    }
+  }
+
+  if (data.department !== undefined || data.autoRegister !== undefined) {
+    const target = await prisma.user.findUnique({ where: { id }, select: { name: true, isOfficer: true, role: true, department: true } });
+    if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
+    if (!(target.isOfficer || target.role === "OFFICER" || data.isOfficer || data.role === "OFFICER")) {
+      return NextResponse.json({ error: "Chỉ tài khoản cán bộ mới có phòng ban và tự động đăng ký." }, { status: 400 });
+    }
+    if (data.department !== undefined) {
+      updateData.department = data.department === "" ? null : data.department;
+      await logActivity(session.userId, "UPDATE_USER", `Đặt phòng ban của ${target.name}: ${target.department ?? "(trống)"} → ${data.department || "(trống)"}`);
+    }
+    if (data.autoRegister !== undefined) {
+      updateData.autoRegister = data.autoRegister;
+      // Switching it on starts from scratch: the weeks open now are filled in the next time anyone loads a list.
+      if (data.autoRegister) updateData.autoRegisteredWeek = null;
+      await logActivity(session.userId, "UPDATE_USER", `${data.autoRegister ? "Bật" : "Tắt"} tự động đăng ký cơm trưa cho ${target.name}`);
     }
   }
 

@@ -12,6 +12,8 @@ type UserRow = {
   phone: string;
   staffCode: string | null;
   isOfficer: boolean;
+  department: string | null;
+  autoRegister: boolean;
   role: Role;
   active: boolean;
   mustChangePassword: boolean;
@@ -33,6 +35,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
   const [search, setSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("ALL");
 
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +93,7 @@ export default function AdminUsers() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPhone, setEditPhone] = useState("");
   const [editCode, setEditCode] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
 
@@ -98,6 +102,7 @@ export default function AdminUsers() {
     // An officer without a phone of their own has the code as a placeholder: show the phone blank.
     setEditPhone(u.staffCode && u.phone === u.staffCode ? "" : u.phone);
     setEditCode(u.staffCode ?? "");
+    setEditDepartment(u.department ?? "");
     setEditError(null);
   }
 
@@ -107,6 +112,8 @@ export default function AdminUsers() {
     try {
       const body: Record<string, string> = { phone: editPhone.trim() };
       if (u.role !== "STUDENT") body.staffCode = editCode.trim();
+      // Anyone who is an officer already can have a department.
+      if (u.isOfficer || u.role === "OFFICER") body.department = editDepartment.trim();
       const res = await fetch(`/api/admin/users/${u.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -124,13 +131,18 @@ export default function AdminUsers() {
     }
   }
 
+  const departments = Array.from(new Set(users.map((u) => u.department).filter((d): d is string => !!d))).sort((a, b) =>
+    a.localeCompare(b, "vi"),
+  );
   const q = foldText(search);
   const visible = users.filter(
     (u) =>
       // The "Cán bộ" filter also lists managers/sales/admins who are officers too (one login, two roles).
       (roleFilter === "ALL" || u.role === roleFilter || (roleFilter === "OFFICER" && u.isOfficer)) &&
+      (departmentFilter === "ALL" || u.department === departmentFilter) &&
       (!q ||
         foldText(u.name).includes(q) ||
+        foldText(u.department ?? "").includes(q) ||
         u.phone.includes(search.trim()) ||
         (u.staffCode ?? "").toLowerCase().includes(search.trim().toLowerCase())),
   );
@@ -235,7 +247,7 @@ export default function AdminUsers() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc số điện thoại..."
+            placeholder="Tìm theo tên, số điện thoại hoặc phòng ban..."
             className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100 sm:w-64"
           />
           <select
@@ -250,6 +262,20 @@ export default function AdminUsers() {
             <option value="STUDENT">Sinh viên</option>
 <option value="OFFICER">Cán bộ</option>
           </select>
+          {departments.length > 0 && (
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
+            >
+              <option value="ALL">Tất cả phòng ban</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          )}
           </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
@@ -270,11 +296,17 @@ export default function AdminUsers() {
                 <p className="text-xs text-slate-400">
                   {u.staffCode ? `Mã CB: ${u.staffCode}${u.phone !== u.staffCode ? ` · ${u.phone}` : ""}` : u.phone}
                 </p>
+                {u.department && <p className="text-xs text-slate-500">{u.department}</p>}
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">{ROLE_LABEL[u.role]}</span>
               {u.isOfficer && u.role !== "OFFICER" && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit" title="Tài khoản này cũng đặt cơm trưa như cán bộ">
                   + Cán bộ
+                </span>
+              )}
+              {u.isOfficer && u.autoRegister && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 w-fit" title="Cơm trưa thứ 2 đến thứ 6 được đăng ký tự động mỗi tuần">
+                  Tự động đăng ký
                 </span>
               )}
               {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit">Đã khóa</span>}
@@ -343,6 +375,23 @@ export default function AdminUsers() {
                     {u.isOfficer ? "Bỏ cán bộ" : "Đặt làm cán bộ"}
                   </button>
                 )}
+                {u.isOfficer && (
+                  <button
+                    onClick={() => patchUser(u.id, { autoRegister: !u.autoRegister })}
+                    title={
+                      u.autoRegister
+                        ? "Tắt tự động đăng ký cơm trưa mỗi tuần cho cán bộ này"
+                        : "Tự động đăng ký cơm trưa thứ 2 đến thứ 6 mỗi tuần cho cán bộ này (vẫn bỏ được từng ngày)"
+                    }
+                    className={`text-xs px-3 py-1.5 rounded-lg border ${
+                      u.autoRegister
+                        ? "border-sky-300 bg-sky-50 text-sky-700"
+                        : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                    }`}
+                  >
+                    {u.autoRegister ? "Tắt tự động ĐK" : "Bật tự động ĐK"}
+                  </button>
+                )}
                 <button
                   onClick={() => (editingId === u.id ? setEditingId(null) : startEdit(u))}
                   title="Sửa số điện thoại hoặc mã cán bộ nếu nhập sai"
@@ -389,6 +438,18 @@ export default function AdminUsers() {
                         />
                       </label>
                     )}
+                    {(u.isOfficer || u.role === "OFFICER") && (
+                      <label className="text-xs font-medium text-slate-600">
+                        Phòng ban
+                        <input
+                          value={editDepartment}
+                          onChange={(e) => setEditDepartment(e.target.value)}
+                          list="department-options"
+                          placeholder="Ví dụ: Phòng TCHCQT"
+                          className="mt-1 block w-56 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                        />
+                      </label>
+                    )}
                     <button
                       onClick={() => saveEdit(u)}
                       disabled={editBusy}
@@ -402,6 +463,11 @@ export default function AdminUsers() {
               )}
             </div>
           ))}
+          <datalist id="department-options">
+            {departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
         </div>
       </section>
     </div>

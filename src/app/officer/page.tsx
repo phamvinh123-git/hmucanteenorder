@@ -17,6 +17,7 @@ export default async function OfficerPage() {
   return (
     <AppShell role={user.role} name={user.name}>
       <OfficerDashboard
+        autoRegister={user.autoRegister}
         sessions={sessions.map((s) => ({
           id: s.id,
           date: s.date.toISOString(),

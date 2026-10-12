@@ -1,5 +1,6 @@
 import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
+import { logActivity } from "@/lib/log";
 import { MealPattern, MealType } from "@prisma/client";
 import {
   canBookSlot,
@@ -74,6 +75,7 @@ const DINNER_DONE_HOUR = 20;
  * lunch after 14:00 and today's dinner after 20:00. Call before reading session data.
  */
 export async function syncCompletedSessions(studentId?: string) {
+  await syncOfficerAutoRegistrations();
   const now = new Date();
   const today = startOfDay(now);
   const hour = now.getHours();
@@ -478,6 +480,68 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
 
     return { added: createDays.length, removed: removeIds.length, revived: reviveIds.length, total, sessions };
   });
+}
+
+let lastAutoRegistrationRun = 0;
+
+/**
+ * Automatic registration: every active officer with `autoRegister` gets lunch Monday to Friday in each week
+ * that is open for ordering, the first time that week is seen. It happens once per officer and week (the
+ * Monday of the last week done is kept in `autoRegisteredWeek`), so a day the officer later drops is not put
+ * back. Days that are already past or past their cutoff, and days already registered or cancelled, are left
+ * alone. Runs from `syncCompletedSessions`, at most once a minute per server process; failures are logged
+ * and never break the caller.
+ */
+export async function syncOfficerAutoRegistrations() {
+  const nowMs = Date.now();
+  if (nowMs - lastAutoRegistrationRun < 60_000) return;
+  lastAutoRegistrationRun = nowMs;
+
+  try {
+    const officers = await prisma.user.findMany({
+      where: { autoRegister: true, isOfficer: true, active: true },
+      select: { id: true, name: true },
+    });
+    if (officers.length === 0) return;
+
+    const now = new Date();
+    for (const monday of openWeekMondays(now)) {
+      for (const officer of officers) {
+        // Claim the week first, so two requests at the same time cannot both fill it in.
+        const claim = await prisma.user.updateMany({
+          where: { id: officer.id, OR: [{ autoRegisteredWeek: null }, { autoRegisteredWeek: { lt: monday } }] },
+          data: { autoRegisteredWeek: monday },
+        });
+        if (claim.count === 0) continue;
+
+        try {
+          const existing = await prisma.mealSession.findMany({
+            where: { studentId: officer.id, mealType: "LUNCH", date: { gte: monday, lt: addDays(monday, 7) } },
+            select: { date: true, status: true },
+          });
+          const known = new Set(existing.map((e) => localDateKey(e.date)));
+          // Keep what is already registered, and add every weekday that has nothing yet and can still be booked.
+          const days = officerWeekDays(monday).filter((d) => {
+            const key = localDateKey(d);
+            if (known.has(key)) return existing.some((e) => localDateKey(e.date) === key && e.status === "SCHEDULED");
+            return officerCanBook({ date: d, mealType: "LUNCH" }, now).ok;
+          });
+          const result = await saveOfficerWeek({ officerId: officer.id, weekMonday: monday, days });
+          await logActivity(
+            officer.id,
+            "OFFICER_AUTO_REGISTER",
+            `Tự động đăng ký cơm trưa tuần ${localDateKey(monday)} cho ${officer.name}: ${result.total} ngày (thêm ${result.added})`,
+          );
+        } catch (err) {
+          console.error("Auto-registration failed for", officer.id, localDateKey(monday), err);
+          // Give the week back so the next run tries again (days already registered are left as they are).
+          await prisma.user.updateMany({ where: { id: officer.id, autoRegisteredWeek: monday }, data: { autoRegisteredWeek: null } });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Auto-registration run failed", err);
+  }
 }
 
 /** Cancel one officer lunch. No make-up slot is added: officers order week by week, not by package. */

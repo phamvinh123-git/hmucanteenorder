@@ -55,6 +55,12 @@ model User {
   /// True for every OFFICER, and also for a manager/sales/admin who is an officer too (same login, both
   /// roles). Drives the officer lunch ordering page and the officer groups in lists, reports and stats.
   isOfficer         Boolean  @default(false)
+  /// Department ("phòng ban") of an officer, as written in the staff list (e.g. "Phòng TCHCQT").
+  department        String?
+  /// When true, the officer's lunches Monday to Friday are registered automatically for every week as it
+  /// opens (they can still drop days). `autoRegisteredWeek` is the Monday of the last week done this way.
+  autoRegister      Boolean  @default(false)
+  autoRegisteredWeek DateTime?
   createdAt         DateTime @default(now())
 
   registrations     MealRegistration[] @relation("StudentRegistrations")
