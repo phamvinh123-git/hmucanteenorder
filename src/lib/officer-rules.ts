@@ -2,7 +2,7 @@
 // officer page and the API.
 //
 //  - Lunch only, Monday to Friday.
-//  - A week must be ordered in the week before it: the deadline is the end of the Friday before.
+//  - A week must be ordered in the week before it: the deadline is 15:00 on the Sunday before.
 //  - Cancelling a single day follows the same lunch cutoff as students (see session-rules.ts).
 
 import {
@@ -59,20 +59,17 @@ export function mondayOf(d: Date) {
   return x;
 }
 
+/** Hour (local time) on the Sunday before a week at which ordering that week closes. */
+export const REGISTRATION_DEADLINE_HOUR = 15;
+
 /**
- * One-off exceptions: these weeks can still be ordered after the usual Friday deadline — up to the end of
+ * One-off exceptions: these weeks can still be ordered after the usual deadline — up to the end of
  * `until` (inclusive), or up to `untilTime` ("HH:MM") on that day when given. Individual days must still be
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
-const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
-  { monday: "2026-10-05", until: "2026-10-06" },
-  // The week of 12/10 stays open until 9:00 that Monday; the week after (19/10) follows the usual Friday deadline.
-  { monday: "2026-10-12", until: "2026-10-12", untilTime: "09:00" },
-  // The week of 19/10 is already open (it opened on 10/10 under the old rule) and keeps the usual Friday deadline.
-  { monday: "2026-10-19", until: "2026-10-16" },
-];
+const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [];
 
-/** The Friday before `weekMonday`, at 23:59:59.999 — the last moment that week can be ordered. */
+/** The Sunday before `weekMonday` at 15:00 — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
   const launch = LAUNCH_WEEKS.find((w) => w.monday === localDateKey(weekMonday));
   if (launch) {
@@ -82,8 +79,8 @@ export function registrationDeadline(weekMonday: Date) {
     else end.setHours(23, 59, 59, 999);
     return end;
   }
-  const x = addDaysLocal(weekMonday, -3);
-  x.setHours(23, 59, 59, 999);
+  const x = addDaysLocal(weekMonday, -1);
+  x.setHours(REGISTRATION_DEADLINE_HOUR, 0, 0, 0);
   return x;
 }
 

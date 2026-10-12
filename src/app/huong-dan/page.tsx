@@ -95,7 +95,7 @@ export default function GuidePage() {
             Chỉ đặt <b>cơm trưa</b>, các ngày <b>thứ 2 đến thứ 6</b>.
           </li>
           <li>
-            Phải đăng ký <b>trước hết ngày thứ 6 của tuần trước đó</b>.
+            Phải đăng ký <b>trước 15h Chủ nhật của tuần trước đó</b>.
           </li>
           <li>
             Muốn hủy một ngày: hủy <b>trước 9h00 sáng của chính ngày đó</b>.
@@ -158,11 +158,11 @@ export default function GuidePage() {
 
       <Step n={3} title="Hạn đăng ký">
         <p>
-          Hệ thống chỉ mở <b>một tuần</b> để đăng ký tại mỗi thời điểm, và <b>hạn chót là hết ngày thứ 6</b> của tuần trước đó.
+          Hệ thống chỉ mở <b>một tuần</b> để đăng ký tại mỗi thời điểm, và <b>hạn chót là 15h Chủ nhật</b> của tuần trước đó.
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            Ví dụ: muốn ăn tuần <b>19–23/10</b> thì phải đăng ký xong trước hết ngày <b>thứ 6, 16/10</b>.
+            Ví dụ: muốn ăn tuần <b>19–23/10</b> thì phải đăng ký xong trước <b>15h Chủ nhật, 18/10</b>.
           </li>
           <li>
             Sang <b>thứ 7</b>, hệ thống mở tuần kế tiếp để đăng ký.

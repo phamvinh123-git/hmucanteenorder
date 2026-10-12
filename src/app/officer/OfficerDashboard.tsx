@@ -174,7 +174,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
     <div className="space-y-6">
       <PageHeader
         title="Đặt cơm trưa cho cán bộ"
-        subtitle={`Đăng ký trước hết thứ 6 của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
+        subtitle={`Đăng ký trước 15h Chủ nhật của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
       >
         <a
           href="/huong-dan"
@@ -231,7 +231,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
         <p className="mb-3 text-xs text-slate-500">
           {openWeek ? (
             <>
-              Hạn đăng ký: hết{" "}
+              Hạn đăng ký: <b>{openWeek.deadline.getHours()}h00</b>{" "}
               <b>
                 {weekdayLong.format(openWeek.deadline)} {fullDate.format(openWeek.deadline)}
               </b>
