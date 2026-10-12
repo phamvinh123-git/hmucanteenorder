@@ -76,6 +76,8 @@ const DINNER_DONE_HOUR = 20;
  */
 export async function syncCompletedSessions(studentId?: string) {
   await syncOfficerAutoRegistrations();
+  // In the background: the first run after a long gap can touch many students and must not hold this request up.
+  void syncStudentAudit();
   const now = new Date();
   const today = startOfDay(now);
   const hour = now.getHours();
@@ -323,16 +325,12 @@ export type RegistrationBalance = {
   scheduled: number;
   /** Cancelled meals (each normally has a make-up meal in `scheduled`). */
   cancelled: number;
-  /** Of those, meals staff took out for good (wrongly recorded or duplicated). */
+  /** Of those, meals staff took out for good (wrongly recorded or duplicated): bought, but not owed. */
   removed: number;
   /**
-   * Cancelled meals that have no make-up meal (skipped or dropped by the student, imported as cancelled, or
-   * removed by staff). The student chose not to eat them, so they are not owed.
-   */
-  skipped: number;
-  /**
-   * total - completed - scheduled - skipped: what the student is still owed (positive) or has too many of
-   * (negative). Normally 0: a cancelled meal is replaced by its make-up meal, a skipped one is not owed.
+   * total - removed - completed - scheduled: the meals still owed (positive) or in excess (negative).
+   * A cancelled meal is owed a make-up, so each one is matched by a make-up meal inside `scheduled` or
+   * `completed`; a meal that was simply not eaten counts as `completed` and is not made up. Normally 0.
    */
   missing: number;
 };
@@ -340,7 +338,7 @@ export type RegistrationBalance = {
 /** How the meals of each given registration add up against what was bought. */
 export async function registrationBalances(registrations: { id: string; totalSessions: number }[]) {
   const ids = registrations.map((r) => r.id);
-  const [counts, removedCounts, skippedCounts] = await Promise.all([
+  const [counts, removedCounts] = await Promise.all([
     prisma.mealSession.groupBy({
       by: ["registrationId", "status"],
       where: { registrationId: { in: ids } },
@@ -351,20 +349,6 @@ export async function registrationBalances(registrations: { id: string; totalSes
       where: { registrationId: { in: ids }, status: "CANCELLED", note: { startsWith: REMOVED_NOTE } },
       _count: { _all: true },
     }),
-    // The meal that "Ghi nhận buổi bị bỏ sót" gives up in exchange for the one it records is a swap, not a skip.
-    prisma.mealSession.groupBy({
-      by: ["registrationId"],
-      where: {
-        registrationId: { in: ids },
-        status: "CANCELLED",
-        compensatedBy: { is: null },
-        OR: [
-          { note: null },
-          { NOT: [{ note: { startsWith: SWAPPED_NOTE } }, { note: { startsWith: TRIMMED_NOTE } }] },
-        ],
-      },
-      _count: { _all: true },
-    }),
   ]);
   const result = new Map<string, RegistrationBalance>();
   for (const r of registrations) {
@@ -373,42 +357,150 @@ export async function registrationBalances(registrations: { id: string; totalSes
     const completed = of("COMPLETED");
     const scheduled = of("SCHEDULED");
     const removed = removedCounts.find((c) => c.registrationId === r.id)?._count._all ?? 0;
-    const skipped = skippedCounts.find((c) => c.registrationId === r.id)?._count._all ?? 0;
     result.set(r.id, {
       total: r.totalSessions,
       completed,
       scheduled,
       cancelled: of("CANCELLED"),
       removed,
-      skipped,
-      missing: r.totalSessions - skipped - completed - scheduled,
+      missing: r.totalSessions - removed - completed - scheduled,
     });
   }
   return result;
 }
 
+const dayLabel = (d: Date) => localDateKey(d).split("-").reverse().join("/");
+
 /**
- * Gives a registration back the meals it is short of (cancelled days that never got a make-up meal, e.g.
- * from an import): adds one meal per missing one after the registration's last slot, on days the student
- * does not already have a meal and that can still be booked. Never removes anything. Returns how many were added.
+ * Brings one registration back in line with the package: the student must end up with exactly the meals they
+ * bought (minus any staff removed on purpose).
+ *  - Short (e.g. a cancelled meal never got its make-up): adds the missing meals after the registration's last
+ *    slot, following the meal pattern, on days the student has no meal and that can still be booked. Each new
+ *    meal is attached to a cancelled meal that was still owed one (oldest first), so restoring that cancelled
+ *    meal later takes its make-up away again.
+ *  - Too many: takes the surplus off the end of the schedule (only meals not eaten yet).
+ * A meal that was simply not eaten is already counted as eaten, so it is never made up.
  */
-export async function rebalanceRegistration(registrationId: string) {
+export async function reconcileRegistration(registrationId: string) {
   const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: registrationId } });
   const balance = (await registrationBalances([registration])).get(registration.id)!;
-  if (balance.missing <= 0) return { added: 0, slots: [] as { date: Date; mealType: MealType }[] };
+  const none = { added: 0, trimmed: 0, slots: [] as { date: Date; mealType: MealType }[] };
+  if (balance.missing === 0) return none;
 
-  const slots = await appendMeals(registration, balance.missing, "Bù buổi còn thiếu so với gói đã mua (đối chiếu số buổi)");
-  return { added: slots.length, slots };
+  if (balance.missing > 0) {
+    // Cancelled meals still without a make-up (not removed, swapped or trimmed on purpose), oldest first.
+    const owed = await prisma.mealSession.findMany({
+      where: {
+        registrationId,
+        status: "CANCELLED",
+        compensatedBy: { is: null },
+        OR: [
+          { note: null },
+          {
+            NOT: [
+              { note: { startsWith: REMOVED_NOTE } },
+              { note: { startsWith: SWAPPED_NOTE } },
+              { note: { startsWith: TRIMMED_NOTE } },
+            ],
+          },
+        ],
+      },
+      select: { id: true, date: true },
+    });
+    owed.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const items = Array.from({ length: balance.missing }, (_, i) => {
+      const original = owed[i];
+      return original
+        ? { note: `Bù cho buổi đã hủy ngày ${dayLabel(original.date)} (hệ thống tự bù)`, compensationForId: original.id }
+        : { note: "Bù buổi còn thiếu so với gói đã mua (hệ thống tự bù)" };
+    });
+    const slots = await appendMeals(registration, items);
+    return { added: slots.length, trimmed: 0, slots };
+  }
+
+  // Surplus: drop the last meals that have not been eaten yet.
+  const upcoming = await prisma.mealSession.findMany({
+    where: { registrationId, status: "SCHEDULED", pickedUp: false },
+    select: { id: true, date: true, mealType: true },
+  });
+  const drop = [...upcoming].sort(compareSlots).slice(-Math.min(-balance.missing, upcoming.length));
+  if (drop.length === 0) return none;
+  await prisma.mealSession.updateMany({
+    where: { id: { in: drop.map((d) => d.id) } },
+    data: { status: "CANCELLED", cancelledAt: new Date(), note: `${TRIMMED_NOTE} tự động (nhiều hơn số buổi đã mua)` },
+  });
+  return { ...none, trimmed: drop.length };
 }
 
 /**
- * Adds `count` scheduled meals after the registration's last slot (or after yesterday's dinner when that is
+ * Audits every student registration and reconciles the ones that do not add up (see reconcileRegistration).
+ * Returns what changed. Nothing is written to the activity log when everything already adds up.
+ */
+export function auditStudentRegistrations() {
+  // One audit at a time: a second caller (a request and the "run now" button) joins the one already running.
+  auditInFlight ??= runStudentAudit().finally(() => {
+    auditInFlight = null;
+  });
+  return auditInFlight;
+}
+
+let auditInFlight: ReturnType<typeof runStudentAudit> | null = null;
+
+async function runStudentAudit() {
+  const registrations = await prisma.mealRegistration.findMany({
+    where: { student: { role: "STUDENT", active: true } },
+    select: { id: true, totalSessions: true, studentId: true },
+  });
+  const balances = await registrationBalances(registrations);
+  const off = registrations.filter((r) => (balances.get(r.id)?.missing ?? 0) !== 0);
+
+  let added = 0;
+  let trimmed = 0;
+  let touched = 0;
+  let failed = 0;
+  for (const r of off) {
+    try {
+      const result = await reconcileRegistration(r.id);
+      if (result.added > 0 || result.trimmed > 0) touched += 1;
+      added += result.added;
+      trimmed += result.trimmed;
+    } catch (err) {
+      failed += 1;
+      console.error("Audit failed for registration", r.id, err);
+    }
+  }
+
+  if (touched > 0 || failed > 0) {
+    await logActivity(
+      null,
+      "AUTO_AUDIT",
+      `Truy soát số buổi ăn: ${off.length} đợt đăng ký lệch, đã bù thêm ${added} buổi, bớt ${trimmed} buổi${failed ? `, ${failed} đợt không xử lý được` : ""}`,
+    );
+  }
+  return { checked: registrations.length, off: off.length, added, trimmed, failed };
+}
+
+let lastAuditRun = 0;
+
+/** Runs the audit in the background of normal use: at most once every 5 minutes per server process, never throws. */
+export async function syncStudentAudit() {
+  const nowMs = Date.now();
+  if (nowMs - lastAuditRun < 5 * 60_000) return;
+  lastAuditRun = nowMs;
+  try {
+    await auditStudentRegistrations();
+  } catch (err) {
+    console.error("Student audit failed", err);
+  }
+}
+
+/**
+ * Adds one scheduled meal per item after the registration's last slot (or after yesterday's dinner when that is
  * later, so nothing lands in the past), on days the student has no meal yet and that can still be booked.
  */
 async function appendMeals(
   registration: { id: string; studentId: string; mealPattern: MealPattern; pricePerMeal: number },
-  count: number,
-  note: string,
+  items: { note: string; compensationForId?: string }[],
 ) {
   const [regSlots, studentSlots] = await Promise.all([
     prisma.mealSession.findMany({ where: { registrationId: registration.id }, select: { date: true, mealType: true } }),
@@ -420,21 +512,22 @@ async function appendMeals(
 
   const slots: { date: Date; mealType: MealType }[] = [];
   let cursor = last;
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < items.length; i++) {
     cursor = nextFreeSlot(cursor, registration.mealPattern, occupied, true);
     occupied.add(slotKey(cursor));
     slots.push(cursor);
   }
 
   await prisma.mealSession.createMany({
-    data: slots.map((slot) => ({
+    data: slots.map((slot, i) => ({
       registrationId: registration.id,
       studentId: registration.studentId,
       date: slot.date,
       mealType: slot.mealType,
       status: "SCHEDULED" as const,
       price: registration.pricePerMeal,
-      note,
+      note: items[i].note,
+      compensationForId: items[i].compensationForId,
     })),
   });
   return slots;
@@ -504,7 +597,7 @@ export async function updateRegistrationPackage(params: {
 
   if (delta > 0) {
     const updated = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: registration.id } });
-    await appendMeals(updated, delta, "Thêm theo chỉnh sửa gói");
+    await appendMeals(updated, Array.from({ length: delta }, () => ({ note: "Thêm theo chỉnh sửa gói" })));
     summary.push(`thêm ${delta} buổi`);
   }
   if (params.note !== undefined && params.note !== registration.note) summary.push("ghi chú");

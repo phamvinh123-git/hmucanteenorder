@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canAccessAdmin, getSession } from "@/lib/auth";
-import { rebalanceRegistration } from "@/lib/meal-logic";
+import { reconcileRegistration } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
 
@@ -19,7 +19,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    const result = await rebalanceRegistration(id);
+    const result = await reconcileRegistration(id);
+    if (result.trimmed > 0) {
+      await logActivity(
+        session.userId,
+        "REBALANCE_REGISTRATION",
+        `Bớt ${result.trimmed} buổi dư của ${registration.student.name} (${registration.student.phone}), đợt từ ${localDateKey(registration.startDate)}`,
+      );
+    }
     if (result.added > 0) {
       await logActivity(
         session.userId,
@@ -29,7 +36,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           .join(", ")}`,
       );
     }
-    return NextResponse.json({ ok: true, added: result.added });
+    return NextResponse.json({ ok: true, added: result.added, trimmed: result.trimmed });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Không thể bù buổi.";
     return NextResponse.json({ error: message }, { status: 400 });

@@ -49,7 +49,6 @@ type StudentDetail = {
       scheduled: number;
       cancelled: number;
       removed: number;
-      skipped: number;
       missing: number;
     } | null;
   }[];
@@ -390,9 +389,11 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
       const data = await res.json();
       setShowRebalanceAll(false);
       setRebalanceAllMessage(
-        res.ok || data.added != null
-          ? `Đã bù ${data.added} buổi cho ${data.registrations} đợt đăng ký${data.failed ? `, ${data.failed} đợt không bù được` : ""}.`
-          : (data.error ?? "Không thể bù buổi."),
+        data.checked != null
+          ? data.off === 0
+            ? `Đã kiểm tra ${data.checked} đợt đăng ký: tất cả đều khớp số buổi.`
+            : `Đã kiểm tra ${data.checked} đợt đăng ký: ${data.off} đợt lệch, đã bù thêm ${data.added} buổi, bớt ${data.trimmed} buổi${data.failed ? `, ${data.failed} đợt không xử lý được` : ""}.`
+          : (data.error ?? "Không thể truy soát."),
       );
       loadStudents();
     } finally {
@@ -941,13 +942,13 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
             Lệch buổi ({students.filter((x) => x.missing !== 0).length})
           </button>
           )}
-          {isAdmin && students.some((x) => x.missing > 0) && (
+          {isAdmin && (
             <button
               onClick={() => setShowRebalanceAll(true)}
               className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-              title="Thêm các buổi còn thiếu vào cuối lịch của tất cả sinh viên đang bị thiếu"
+              title="Kiểm tra ngay số buổi của tất cả sinh viên và tự bù hoặc bớt cho khớp gói (hệ thống cũng tự làm việc này mỗi vài phút)"
             >
-              Bù buổi thiếu cho tất cả
+              Truy soát số buổi ngay
             </button>
           )}
           {priceOptions.length > 1 && (
@@ -989,9 +990,9 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
         {isAdmin && showRebalanceAll && (
           <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm animate-pop-in">
             <p className="text-slate-700">
-              Thêm <b>{students.reduce((sum, x) => sum + Math.max(x.missing, 0), 0)} buổi</b> còn thiếu cho{" "}
-              <b>{students.filter((x) => x.missing > 0).length} sinh viên</b>, xếp vào các ngày trống sau buổi cuối của mỗi đợt.
-              Không xóa buổi nào. Bạn chắc chắn chứ?
+              Kiểm tra số buổi của tất cả sinh viên: buổi đã hủy mà chưa được bù thì bù thêm vào cuối lịch (đúng quy định, vào
+              ngày trống), buổi nhiều hơn gói thì bớt ở cuối lịch. Buổi sinh viên không đến ăn không được bù. Hệ thống tự làm việc
+              này mỗi vài phút; bấm để chạy ngay.
             </p>
             <div className="mt-2 flex gap-2">
               <button
@@ -999,7 +1000,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                 disabled={rebalanceAllBusy}
                 className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {rebalanceAllBusy ? "Đang bù..." : "Xác nhận bù"}
+                {rebalanceAllBusy ? "Đang truy soát..." : "Chạy truy soát"}
               </button>
               <button
                 onClick={() => setShowRebalanceAll(false)}
@@ -1309,7 +1310,6 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                             {r.balance && (
                               <span className="block text-xs text-slate-500">
                                 Đã ăn {r.balance.completed} · còn {r.balance.scheduled} · đã hủy {r.balance.cancelled - r.balance.removed}
-                                {r.balance.skipped - r.balance.removed > 0 ? ` (${r.balance.skipped - r.balance.removed} không có suất bù)` : ""}
                                 {r.balance.removed > 0 ? ` · đã xóa ${r.balance.removed}` : ""}
                                 {r.balance.missing === 0 && <span className="text-green-600"> · khớp với gói</span>}
                                 {r.balance.missing > 0 && (
@@ -1322,16 +1322,20 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                                 )}
                               </span>
                             )}
-                            {r.balance && r.balance.missing > 0 &&
+                            {r.balance && r.balance.missing !== 0 &&
                               (rebalanceConfirmId === r.id ? (
                                 <span className="mt-1 flex flex-wrap items-center gap-2 text-xs animate-pop-in">
-                                  <span className="text-slate-600">Thêm {r.balance.missing} buổi vào cuối lịch?</span>
+                                  <span className="text-slate-600">
+                                    {r.balance.missing > 0
+                                      ? `Bù thêm ${r.balance.missing} buổi vào cuối lịch?`
+                                      : `Bớt ${-r.balance.missing} buổi chưa ăn ở cuối lịch?`}
+                                  </span>
                                   <button
                                     onClick={() => rebalanceRegistration(s.id, r.id)}
                                     disabled={rebalancingId === r.id}
                                     className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                                   >
-                                    {rebalancingId === r.id ? "Đang bù..." : "Xác nhận bù"}
+                                    {rebalancingId === r.id ? "Đang xử lý..." : "Xác nhận"}
                                   </button>
                                   <button
                                     onClick={() => setRebalanceConfirmId(null)}
@@ -1348,7 +1352,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                                   }}
                                   className="mt-1 block text-xs text-red-600 hover:underline"
                                 >
-                                  + Bù {r.balance.missing} buổi còn thiếu
+                                  {r.balance.missing > 0 ? `+ Bù ${r.balance.missing} buổi còn thiếu` : `− Bớt ${-r.balance.missing} buổi dư`}
                                 </button>
                               ))}
                           </li>
