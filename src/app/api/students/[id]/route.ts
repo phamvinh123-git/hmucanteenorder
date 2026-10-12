@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessSalesTools, canAccessStats, getSession } from "@/lib/auth";
-import { registrationBalances, syncCompletedSessions } from "@/lib/meal-logic";
+import { REMOVED_NOTE, registrationBalances, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
 
@@ -32,7 +32,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
   }
 
-  const balances = await registrationBalances(student.registrations);
+  // The balance of each package (bought vs eaten, remaining, cancelled) is for the admin only.
+  const balances = session.role === "ADMIN" ? await registrationBalances(student.registrations) : new Map();
 
   return NextResponse.json({
     id: student.id,
@@ -50,7 +51,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       pickedUp: s.pickedUp,
       note: s.note,
       // A cancelled session can only be restored if something still points back to it as its make-up slot.
-      hasCompensation: s.compensatedBy != null,
+      // ...or if staff removed it (undoing that is a restore too).
+      hasCompensation: s.compensatedBy != null || (s.status === "CANCELLED" && !!s.note?.startsWith(REMOVED_NOTE)),
     })),
   });
 }

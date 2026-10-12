@@ -116,7 +116,7 @@ const emptyForm = {
   note: "",
 };
 
-export default function SalesTools({ canResetAll = false }: { canResetAll?: boolean }) {
+export default function SalesTools({ canResetAll = false, isAdmin = false }: { canResetAll?: boolean; isAdmin?: boolean }) {
   const [showResetAll, setShowResetAll] = useState(false);
   const [resettingAll, setResettingAll] = useState(false);
   const [resetAllError, setResetAllError] = useState<string | null>(null);
@@ -152,6 +152,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [search, setSearch] = useState("");
   const [lowMealOnly, setLowMealOnly] = useState(false);
   const [mismatchOnly, setMismatchOnly] = useState(false);
+  // Admin: editing a meal package (number of meals, price, note).
+  const [editPkgId, setEditPkgId] = useState<string | null>(null);
+  const [pkgTotal, setPkgTotal] = useState("");
+  const [pkgPrice, setPkgPrice] = useState("");
+  const [pkgNote, setPkgNote] = useState("");
+  const [pkgPriceEaten, setPkgPriceEaten] = useState(false);
+  const [pkgBusy, setPkgBusy] = useState(false);
+  const [pkgError, setPkgError] = useState<string | null>(null);
   // Giving back meals a student is short of: one registration (confirm first) or everyone at once.
   const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
   const [rebalancingId, setRebalancingId] = useState<string | null>(null);
@@ -305,6 +313,54 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : s)),
     );
+  }
+
+  function startEditPackage(r: StudentDetail["registrations"][number]) {
+    setEditPkgId(r.id);
+    setPkgTotal(String(r.totalSessions));
+    setPkgPrice(String(r.pricePerMeal));
+    setPkgNote(r.note ?? "");
+    setPkgPriceEaten(false);
+    setPkgError(null);
+  }
+
+  async function savePackage(studentId: string, r: StudentDetail["registrations"][number]) {
+    const total = Number(pkgTotal);
+    const price = Number(pkgPrice);
+    if (!Number.isInteger(total) || total < 1) return setPkgError("Số buổi phải là số nguyên từ 1 trở lên.");
+    if (!Number.isInteger(price) || price < 0) return setPkgError("Giá mỗi suất không hợp lệ.");
+    setPkgBusy(true);
+    setPkgError(null);
+    try {
+      const res = await fetch(`/api/registrations/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          totalSessions: total,
+          pricePerMeal: price,
+          note: pkgNote.trim() === "" ? null : pkgNote.trim(),
+          priceForEaten: pkgPriceEaten,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPkgError(data.error ?? "Không thể sửa gói ăn.");
+        return;
+      }
+      setEditPkgId(null);
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) {
+        const d: StudentDetail = await res2.json();
+        setDetail(d);
+        const remaining = d.sessions.filter((x) => x.status === "SCHEDULED").length;
+        setStudents((prev) =>
+          prev.map((x) => (x.id === studentId ? { ...x, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : x)),
+        );
+      }
+    } finally {
+      setPkgBusy(false);
+    }
   }
 
   async function rebalanceRegistration(studentId: string, registrationId: string) {
@@ -872,6 +928,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           >
             ⚠ Cần gia hạn
           </button>
+          {isAdmin && (
           <button
             onClick={() => setMismatchOnly((v) => !v)}
             className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
@@ -883,7 +940,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           >
             Lệch buổi ({students.filter((x) => x.missing !== 0).length})
           </button>
-          {canResetAll && students.some((x) => x.missing > 0) && (
+          )}
+          {isAdmin && students.some((x) => x.missing > 0) && (
             <button
               onClick={() => setShowRebalanceAll(true)}
               className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
@@ -928,7 +986,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         {rebalanceAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{rebalanceAllMessage}</p>
         )}
-        {showRebalanceAll && (
+        {isAdmin && showRebalanceAll && (
           <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm animate-pop-in">
             <p className="text-slate-700">
               Thêm <b>{students.reduce((sum, x) => sum + Math.max(x.missing, 0), 0)} buổi</b> còn thiếu cho{" "}
@@ -1123,7 +1181,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 </div>
                 <div className={`text-sm font-medium whitespace-nowrap xl:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
                   Còn {s.remaining} buổi
-                  {s.missing !== 0 && (
+                  {isAdmin && s.missing !== 0 && (
                     <span
                       className={`block text-xs font-semibold ${s.missing > 0 ? "text-red-600" : "text-amber-600"}`}
                       title="So với số buổi đã mua trừ buổi đã ăn và buổi đã xóa. Mở Chi tiết để xem và bù."
@@ -1178,6 +1236,76 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             {r.totalSessions} buổi ({PATTERN_LABEL[r.mealPattern]}), {currency.format(r.pricePerMeal)}/suất,
                             bắt đầu {fmtDate(r.startDate)}
                             {r.note ? ` — ${r.note}` : ""}
+                            {isAdmin &&
+                              (editPkgId === r.id ? (
+                                <span className="mt-1 block rounded-lg bg-white p-2 animate-pop-in">
+                                  <span className="flex flex-wrap items-end gap-2">
+                                    <label className="text-xs font-medium text-slate-600">
+                                      Số buổi
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={200}
+                                        value={pkgTotal}
+                                        onChange={(e) => setPkgTotal(e.target.value)}
+                                        className="mt-1 block w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      />
+                                    </label>
+                                    <label className="text-xs font-medium text-slate-600">
+                                      Giá mỗi suất (đ)
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1000}
+                                        value={pkgPrice}
+                                        onChange={(e) => setPkgPrice(e.target.value)}
+                                        className="mt-1 block w-28 rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      />
+                                    </label>
+                                    <label className="min-w-40 flex-1 text-xs font-medium text-slate-600">
+                                      Ghi chú
+                                      <input
+                                        value={pkgNote}
+                                        onChange={(e) => setPkgNote(e.target.value)}
+                                        className="mt-1 block w-full rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      />
+                                    </label>
+                                  </span>
+                                  <span className="mt-1 block text-xs text-slate-500">
+                                    Tăng số buổi: thêm buổi vào cuối lịch. Giảm số buổi: bỏ bớt các buổi cuối chưa ăn (khôi phục lại được).
+                                    Giá mới áp dụng cho các buổi sắp tới.
+                                  </span>
+                                  <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+                                    <input
+                                      type="checkbox"
+                                      checked={pkgPriceEaten}
+                                      onChange={(e) => setPkgPriceEaten(e.target.checked)}
+                                      className="accent-red-600"
+                                    />
+                                    Áp dụng giá mới cả cho các buổi đã ăn (đổi cả doanh thu đã tính)
+                                  </label>
+                                  <span className="mt-2 flex flex-wrap items-center gap-2">
+                                    <button
+                                      onClick={() => savePackage(s.id, r)}
+                                      disabled={pkgBusy}
+                                      className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                      {pkgBusy ? "Đang lưu..." : "Lưu gói"}
+                                    </button>
+                                    <button
+                                      onClick={() => setEditPkgId(null)}
+                                      className="rounded-lg border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50"
+                                    >
+                                      Thôi
+                                    </button>
+                                    {pkgError && <span className="text-xs text-red-600">{pkgError}</span>}
+                                  </span>
+                                </span>
+                              ) : (
+                                <button onClick={() => startEditPackage(r)} className="ml-2 text-xs text-red-600 hover:underline">
+                                  Sửa gói
+                                </button>
+                              ))}
                             {r.balance && (
                               <span className="block text-xs text-slate-500">
                                 Đã ăn {r.balance.completed} · còn {r.balance.scheduled} · đã hủy {r.balance.cancelled - r.balance.removed}

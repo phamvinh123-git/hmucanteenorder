@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessStats, getSession } from "@/lib/auth";
+import { canAccessAdmin, getSession } from "@/lib/auth";
 import { rebalanceRegistration, registrationBalances, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 
-// Manager/admin: gives every student registration the meals it is short of (see rebalanceRegistration).
+// Admin-only: gives every student registration the meals it is short of (see rebalanceRegistration).
 export async function POST() {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessAdmin(session.role)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

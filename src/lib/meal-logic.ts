@@ -97,7 +97,9 @@ export async function syncCompletedSessions(studentId?: string) {
 }
 
 /** Start of the note on a meal staff took out for good: it has no make-up and is not owed back. */
-const REMOVED_NOTE = "Xóa thủ công";
+export const REMOVED_NOTE = "Xóa thủ công";
+/** Start of the note on a scheduled meal taken off the end of a registration when an admin shrinks the package. */
+const TRIMMED_NOTE = "Giảm gói";
 /** Start of the note on the last meal given up when a missed meal is recorded (see recordMissedSession). */
 const SWAPPED_NOTE = "Tự động bớt buổi cuối";
 
@@ -180,11 +182,20 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
  * would have allowed cancelling it, and only if that compensating slot
  * hasn't itself been touched (cancelled, completed, or picked up) since.
  */
-export async function restoreSession(sessionId: string, opts: { bypassDeadline?: boolean } = {}) {
+export async function restoreSession(
+  sessionId: string,
+  opts: { bypassDeadline?: boolean; allowUnremove?: boolean } = {},
+) {
   const session = await prisma.mealSession.findUniqueOrThrow({
     where: { id: sessionId },
     include: { compensatedBy: true },
   });
+
+  // A meal staff took out (or a package trim dropped) has no make-up to give back: undoing it just puts it back.
+  if (session.status === "CANCELLED" && !session.compensatedBy && isStaffRemoval(session.note)) {
+    if (!opts.allowUnremove) throw new Error("Chỉ Quản lý hoặc Admin mới khôi phục được buổi đã xóa.");
+    return unremoveSession(session);
+  }
 
   if (opts.bypassDeadline) {
     if (session.status !== "CANCELLED") {
@@ -198,7 +209,10 @@ export async function restoreSession(sessionId: string, opts: { bypassDeadline?:
   }
 
   const compensation = session.compensatedBy;
-  if (!compensation || compensation.status !== "SCHEDULED" || compensation.pickedUp) {
+  if (compensation && compensation.status === "CANCELLED" && isStaffRemoval(compensation.note)) {
+    // The make-up meal was taken out by staff: restoring the original simply drops that leftover row.
+    if (!opts.allowUnremove) throw new Error("Chỉ Quản lý hoặc Admin mới khôi phục được buổi bù đã xóa.");
+  } else if (!compensation || compensation.status !== "SCHEDULED" || compensation.pickedUp) {
     throw new Error("Suất bù cho lần hủy này đã được dùng, không thể khôi phục.");
   }
 
@@ -211,6 +225,26 @@ export async function restoreSession(sessionId: string, opts: { bypassDeadline?:
   ]);
 
   return { restored, removedCompensationId: compensation.id };
+}
+
+/** Is this note the one left by a staff removal or a package trim? */
+function isStaffRemoval(note: string | null) {
+  return !!note && (note.startsWith(REMOVED_NOTE) || note.startsWith(TRIMMED_NOTE));
+}
+
+/** Puts back a meal that staff removed (or that a package trim dropped), as it was before. */
+async function unremoveSession(session: { id: string; studentId: string; date: Date; mealType: MealType; note: string | null; pickedUp: boolean }) {
+  const clash = await prisma.mealSession.findFirst({
+    where: { studentId: session.studentId, date: session.date, mealType: session.mealType, status: { not: "CANCELLED" }, id: { not: session.id } },
+  });
+  if (clash) throw new Error("Sinh viên đã có một buổi ăn khác vào đúng ngày và bữa này, không khôi phục được.");
+  // A removed meal that had been eaten goes back to "finished"; an unused one goes back to "scheduled".
+  const wasEaten = session.pickedUp || !!session.note?.includes("buổi đã ăn");
+  const restored = await prisma.mealSession.update({
+    where: { id: session.id },
+    data: { status: wasEaten ? "COMPLETED" : "SCHEDULED", cancelledAt: null, note: null },
+  });
+  return { restored, removedCompensationId: undefined as string | undefined };
 }
 
 /**
@@ -324,7 +358,10 @@ export async function registrationBalances(registrations: { id: string; totalSes
         registrationId: { in: ids },
         status: "CANCELLED",
         compensatedBy: { is: null },
-        OR: [{ note: null }, { NOT: { note: { startsWith: SWAPPED_NOTE } } }],
+        OR: [
+          { note: null },
+          { NOT: [{ note: { startsWith: SWAPPED_NOTE } }, { note: { startsWith: TRIMMED_NOTE } }] },
+        ],
       },
       _count: { _all: true },
     }),
@@ -360,18 +397,30 @@ export async function rebalanceRegistration(registrationId: string) {
   const balance = (await registrationBalances([registration])).get(registration.id)!;
   if (balance.missing <= 0) return { added: 0, slots: [] as { date: Date; mealType: MealType }[] };
 
+  const slots = await appendMeals(registration, balance.missing, "Bù buổi còn thiếu so với gói đã mua (đối chiếu số buổi)");
+  return { added: slots.length, slots };
+}
+
+/**
+ * Adds `count` scheduled meals after the registration's last slot (or after yesterday's dinner when that is
+ * later, so nothing lands in the past), on days the student has no meal yet and that can still be booked.
+ */
+async function appendMeals(
+  registration: { id: string; studentId: string; mealPattern: MealPattern; pricePerMeal: number },
+  count: number,
+  note: string,
+) {
   const [regSlots, studentSlots] = await Promise.all([
-    prisma.mealSession.findMany({ where: { registrationId }, select: { date: true, mealType: true } }),
+    prisma.mealSession.findMany({ where: { registrationId: registration.id }, select: { date: true, mealType: true } }),
     prisma.mealSession.findMany({ where: { studentId: registration.studentId }, select: { date: true, mealType: true } }),
   ]);
   const occupied = new Set(studentSlots.map(slotKey));
-  // Start after the last slot, or after yesterday's dinner when that is later (never put a meal in the past).
   const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
   const last = [...regSlots, yesterday].sort(compareSlots).at(-1)!;
 
   const slots: { date: Date; mealType: MealType }[] = [];
   let cursor = last;
-  for (let i = 0; i < balance.missing; i++) {
+  for (let i = 0; i < count; i++) {
     cursor = nextFreeSlot(cursor, registration.mealPattern, occupied, true);
     occupied.add(slotKey(cursor));
     slots.push(cursor);
@@ -379,16 +428,87 @@ export async function rebalanceRegistration(registrationId: string) {
 
   await prisma.mealSession.createMany({
     data: slots.map((slot) => ({
-      registrationId,
+      registrationId: registration.id,
       studentId: registration.studentId,
       date: slot.date,
       mealType: slot.mealType,
       status: "SCHEDULED" as const,
       price: registration.pricePerMeal,
-      note: "Bù buổi còn thiếu so với gói đã mua (đối chiếu số buổi)",
+      note,
     })),
   });
-  return { added: slots.length, slots };
+  return slots;
+}
+
+/**
+ * Admin: edits a meal package. A new total adds meals at the end of the schedule, or takes the extra ones off
+ * the end (only meals not eaten yet); a new price applies to the meals still to come, and to the eaten ones too
+ * when `priceForEaten` is set. Cancelled meals keep their old price.
+ */
+export async function updateRegistrationPackage(params: {
+  registrationId: string;
+  totalSessions?: number;
+  pricePerMeal?: number;
+  note?: string | null;
+  priceForEaten?: boolean;
+}) {
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
+  const summary: string[] = [];
+
+  const total = params.totalSessions ?? registration.totalSessions;
+  const delta = total - registration.totalSessions;
+  let trimmedIds: string[] = [];
+  if (delta < 0) {
+    const upcoming = await prisma.mealSession.findMany({
+      where: { registrationId: registration.id, status: "SCHEDULED", pickedUp: false },
+      select: { id: true, date: true, mealType: true },
+    });
+    if (upcoming.length < -delta) {
+      throw new Error(`Chỉ còn ${upcoming.length} buổi chưa ăn nên không giảm được ${-delta} buổi.`);
+    }
+    trimmedIds = [...upcoming].sort(compareSlots).slice(delta).map((u) => u.id);
+  }
+
+  const price = params.pricePerMeal ?? registration.pricePerMeal;
+  await prisma.$transaction([
+    prisma.mealRegistration.update({
+      where: { id: registration.id },
+      data: {
+        totalSessions: total,
+        pricePerMeal: price,
+        ...(params.note !== undefined ? { note: params.note } : {}),
+      },
+    }),
+    ...(trimmedIds.length > 0
+      ? [
+          prisma.mealSession.updateMany({
+            where: { id: { in: trimmedIds } },
+            data: { status: "CANCELLED", cancelledAt: new Date(), note: `${TRIMMED_NOTE} theo chỉnh sửa gói` },
+          }),
+        ]
+      : []),
+    ...(price !== registration.pricePerMeal
+      ? [
+          prisma.mealSession.updateMany({
+            where: {
+              registrationId: registration.id,
+              status: params.priceForEaten ? { not: "CANCELLED" } : "SCHEDULED",
+            },
+            data: { price },
+          }),
+        ]
+      : []),
+  ]);
+  if (delta < 0) summary.push(`giảm ${-delta} buổi`);
+  if (price !== registration.pricePerMeal) summary.push(`giá ${registration.pricePerMeal} → ${price}`);
+
+  if (delta > 0) {
+    const updated = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: registration.id } });
+    await appendMeals(updated, delta, "Thêm theo chỉnh sửa gói");
+    summary.push(`thêm ${delta} buổi`);
+  }
+  if (params.note !== undefined && params.note !== registration.note) summary.push("ghi chú");
+  return { summary, added: Math.max(delta, 0), removed: trimmedIds.length };
 }
 
 /** Next free order code: one past the highest currently assigned to any student. */

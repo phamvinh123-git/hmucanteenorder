@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessSalesTools, getSession } from "@/lib/auth";
+import { canAccessSalesTools, canAccessStats, getSession } from "@/lib/auth";
 import { restoreOfficerSession, restoreSession } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
@@ -36,13 +36,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: true });
     }
     // Staff acting on a student's behalf (e.g. the student missed the self-service cutoff) skip the deadline check.
-    const result = await restoreSession(id, { bypassDeadline: isStaff });
+    const result = await restoreSession(id, { bypassDeadline: isStaff, allowUnremove: isStaff && canAccessStats(session.role) });
     await logActivity(
       session.userId,
       "RESTORE_SESSION",
-      `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), xóa suất bù đã thêm trước đó${
-        isStaff ? " (nhân viên khôi phục hộ)" : ""
-      }`,
+      result.removedCompensationId
+        ? `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), xóa suất bù đã thêm trước đó${
+            isStaff ? " (nhân viên khôi phục hộ)" : ""
+          }`
+        : `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}) đã bị xóa trước đó`,
     );
     return NextResponse.json({ ok: true, restored: result.restored, removedCompensationId: result.removedCompensationId });
   } catch (err) {

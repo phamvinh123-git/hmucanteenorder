@@ -178,7 +178,9 @@ export async function GET(req: NextRequest) {
     where: { studentId: { in: students.map((s) => s.id) } },
     select: { id: true, studentId: true, totalSessions: true },
   });
-  const balances = await registrationBalances(allRegistrations);
+  // Only the admin sees how meals add up against the package, so only the admin pays for working it out.
+  const isAdmin = session.role === "ADMIN";
+  const balances = isAdmin ? await registrationBalances(allRegistrations) : new Map<string, { missing: number }>();
   const missingByStudent = new Map<string, number>();
   for (const r of allRegistrations) {
     missingByStudent.set(r.studentId, (missingByStudent.get(r.studentId) ?? 0) + (balances.get(r.id)?.missing ?? 0));
