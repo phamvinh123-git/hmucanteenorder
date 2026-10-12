@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import AppShell from "@/components/AppShell";
 import LogsView from "./LogsView";
 
-const LOG_LIMIT = 1000;
+const LOG_LIMIT = 5000;
 
 export default async function LogsPage() {
   const user = await requireUser({ roles: ["ADMIN"] });
