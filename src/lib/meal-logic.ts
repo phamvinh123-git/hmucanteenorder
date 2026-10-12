@@ -98,6 +98,8 @@ export async function syncCompletedSessions(studentId?: string) {
 
 /** Start of the note on a meal staff took out for good: it has no make-up and is not owed back. */
 const REMOVED_NOTE = "Xóa thủ công";
+/** Start of the note on the last meal given up when a missed meal is recorded (see recordMissedSession). */
+const SWAPPED_NOTE = "Tự động bớt buổi cuối";
 
 const slotKey = (slot: { date: Date; mealType: MealType }) => `${localDateKey(slot.date)}-${slot.mealType}`;
 
@@ -287,16 +289,24 @@ export type RegistrationBalance = {
   scheduled: number;
   /** Cancelled meals (each normally has a make-up meal in `scheduled`). */
   cancelled: number;
-  /** Meals staff took out for good (wrongly recorded or duplicated): bought, but not owed. */
+  /** Of those, meals staff took out for good (wrongly recorded or duplicated). */
   removed: number;
-  /** total - removed - completed - scheduled: positive when the student is owed meals, negative when they have extra. */
+  /**
+   * Cancelled meals that have no make-up meal (skipped or dropped by the student, imported as cancelled, or
+   * removed by staff). The student chose not to eat them, so they are not owed.
+   */
+  skipped: number;
+  /**
+   * total - completed - scheduled - skipped: what the student is still owed (positive) or has too many of
+   * (negative). Normally 0: a cancelled meal is replaced by its make-up meal, a skipped one is not owed.
+   */
   missing: number;
 };
 
 /** How the meals of each given registration add up against what was bought. */
 export async function registrationBalances(registrations: { id: string; totalSessions: number }[]) {
   const ids = registrations.map((r) => r.id);
-  const [counts, removedCounts] = await Promise.all([
+  const [counts, removedCounts, skippedCounts] = await Promise.all([
     prisma.mealSession.groupBy({
       by: ["registrationId", "status"],
       where: { registrationId: { in: ids } },
@@ -307,6 +317,17 @@ export async function registrationBalances(registrations: { id: string; totalSes
       where: { registrationId: { in: ids }, status: "CANCELLED", note: { startsWith: REMOVED_NOTE } },
       _count: { _all: true },
     }),
+    // The meal that "Ghi nhận buổi bị bỏ sót" gives up in exchange for the one it records is a swap, not a skip.
+    prisma.mealSession.groupBy({
+      by: ["registrationId"],
+      where: {
+        registrationId: { in: ids },
+        status: "CANCELLED",
+        compensatedBy: { is: null },
+        OR: [{ note: null }, { NOT: { note: { startsWith: SWAPPED_NOTE } } }],
+      },
+      _count: { _all: true },
+    }),
   ]);
   const result = new Map<string, RegistrationBalance>();
   for (const r of registrations) {
@@ -315,13 +336,15 @@ export async function registrationBalances(registrations: { id: string; totalSes
     const completed = of("COMPLETED");
     const scheduled = of("SCHEDULED");
     const removed = removedCounts.find((c) => c.registrationId === r.id)?._count._all ?? 0;
+    const skipped = skippedCounts.find((c) => c.registrationId === r.id)?._count._all ?? 0;
     result.set(r.id, {
       total: r.totalSessions,
       completed,
       scheduled,
       cancelled: of("CANCELLED"),
       removed,
-      missing: r.totalSessions - removed - completed - scheduled,
+      skipped,
+      missing: r.totalSessions - skipped - completed - scheduled,
     });
   }
   return result;
@@ -456,7 +479,7 @@ export async function recordMissedSession(params: { registrationId: string; date
             data: {
               status: "CANCELLED",
               cancelledAt: new Date(),
-              note: "Tự động bớt buổi cuối để bù cho buổi bị bỏ sót ở trên",
+              note: `${SWAPPED_NOTE} để bù cho buổi bị bỏ sót ở trên`,
             },
           }),
         ]

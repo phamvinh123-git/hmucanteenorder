@@ -43,7 +43,15 @@ type StudentDetail = {
     mealPattern: MealPattern;
     pricePerMeal: number;
     note: string | null;
-    balance: { total: number; completed: number; scheduled: number; cancelled: number; removed: number; missing: number } | null;
+    balance: {
+      total: number;
+      completed: number;
+      scheduled: number;
+      cancelled: number;
+      removed: number;
+      skipped: number;
+      missing: number;
+    } | null;
   }[];
   sessions: {
     id: string;
@@ -1173,6 +1181,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             {r.balance && (
                               <span className="block text-xs text-slate-500">
                                 Đã ăn {r.balance.completed} · còn {r.balance.scheduled} · đã hủy {r.balance.cancelled - r.balance.removed}
+                                {r.balance.skipped - r.balance.removed > 0 ? ` (${r.balance.skipped - r.balance.removed} không có suất bù)` : ""}
                                 {r.balance.removed > 0 ? ` · đã xóa ${r.balance.removed}` : ""}
                                 {r.balance.missing === 0 && <span className="text-green-600"> · khớp với gói</span>}
                                 {r.balance.missing > 0 && (
