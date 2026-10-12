@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessSalesTools, canAccessStats, getSession } from "@/lib/auth";
-import { syncCompletedSessions } from "@/lib/meal-logic";
+import { registrationBalances, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
 
@@ -32,6 +32,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
   }
 
+  const balances = await registrationBalances(student.registrations);
+
   return NextResponse.json({
     id: student.id,
     name: student.name,
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     orderCode: student.orderCode,
     major: student.major,
     className: student.className,
-    registrations: student.registrations,
+    registrations: student.registrations.map((r) => ({ ...r, balance: balances.get(r.id) ?? null })),
     sessions: student.sessions.map((s) => ({
       id: s.id,
       date: s.date,

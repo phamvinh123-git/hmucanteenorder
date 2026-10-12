@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessSalesTools, DEFAULT_STUDENT_PASSWORD, getSession, hashPassword } from "@/lib/auth";
-import { createRegistrationWithSessions, LOW_MEAL_THRESHOLD, nextOrderCode, syncCompletedSessions } from "@/lib/meal-logic";
+import {
+  createRegistrationWithSessions,
+  LOW_MEAL_THRESHOLD,
+  nextOrderCode,
+  registrationBalances,
+  syncCompletedSessions,
+} from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 import { generateSessionPlan } from "@/lib/session-rules";
 import { localDateKey } from "@/lib/client-session-rules";
@@ -167,6 +173,17 @@ export async function GET(req: NextRequest) {
 
   await syncCompletedSessions();
 
+  // Meals each student is owed (positive) or has too many of (negative) compared with what they bought.
+  const allRegistrations = await prisma.mealRegistration.findMany({
+    where: { studentId: { in: students.map((s) => s.id) } },
+    select: { id: true, studentId: true, totalSessions: true },
+  });
+  const balances = await registrationBalances(allRegistrations);
+  const missingByStudent = new Map<string, number>();
+  for (const r of allRegistrations) {
+    missingByStudent.set(r.studentId, (missingByStudent.get(r.studentId) ?? 0) + (balances.get(r.id)?.missing ?? 0));
+  }
+
   const withCounts = await Promise.all(
     students.map(async (s) => {
       const [remaining, last] = await Promise.all([
@@ -188,6 +205,7 @@ export async function GET(req: NextRequest) {
         active: s.active,
         latestRegistration: s.registrations[0] ?? null,
         remaining,
+        missing: missingByStudent.get(s.id) ?? 0,
         lastSessionDate: last?.date ?? null,
         lowMeal: remaining <= LOW_MEAL_THRESHOLD,
       };

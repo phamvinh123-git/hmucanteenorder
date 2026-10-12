@@ -19,6 +19,8 @@ const ACTION_LABEL: Record<string, string> = {
   IMPORT_OFFICERS: "Nhập danh sách cán bộ",
   DELETE_TEST_OFFICER: "Xóa tài khoản cán bộ thử",
   OFFICER_SAVE_WEEK: "Cán bộ đăng ký cơm tuần",
+  REBALANCE_REGISTRATION: "Bù buổi còn thiếu cho sinh viên",
+  REBALANCE_ALL: "Bù buổi còn thiếu cho tất cả sinh viên",
   OFFICER_AUTO_REGISTER: "Tự động đăng ký cơm cho cán bộ",
   SET_OFFICER_DEPARTMENTS: "Nhập phòng ban cán bộ",
   CANCEL_SESSION: "Hủy buổi ăn",

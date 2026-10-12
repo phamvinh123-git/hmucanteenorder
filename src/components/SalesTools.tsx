@@ -19,6 +19,8 @@ type StudentRow = {
   mustChangePassword: boolean;
   active: boolean;
   remaining: number;
+  /** Meals owed (positive) or in excess (negative) compared with what was bought. */
+  missing: number;
   lastSessionDate: string | null;
   lowMeal: boolean;
   latestRegistration: {
@@ -41,6 +43,7 @@ type StudentDetail = {
     mealPattern: MealPattern;
     pricePerMeal: number;
     note: string | null;
+    balance: { total: number; completed: number; scheduled: number; cancelled: number; removed: number; missing: number } | null;
   }[];
   sessions: {
     id: string;
@@ -140,6 +143,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState("");
   const [lowMealOnly, setLowMealOnly] = useState(false);
+  const [mismatchOnly, setMismatchOnly] = useState(false);
+  // Giving back meals a student is short of: one registration (confirm first) or everyone at once.
+  const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
+  const [rebalancingId, setRebalancingId] = useState<string | null>(null);
+  const [rebalanceError, setRebalanceError] = useState<string | null>(null);
+  const [showRebalanceAll, setShowRebalanceAll] = useState(false);
+  const [rebalanceAllBusy, setRebalanceAllBusy] = useState(false);
+  const [rebalanceAllMessage, setRebalanceAllMessage] = useState<string | null>(null);
   const [priceFilter, setPriceFilter] = useState<"ALL" | number>("ALL");
   const [loadingList, setLoadingList] = useState(true);
 
@@ -273,6 +284,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setRemoveError(null);
     setRestoreConfirmId(null);
     setRestoreError(null);
+    setRebalanceConfirmId(null);
+    setRebalanceError(null);
     const res = await fetch(`/api/students/${id}`);
     if (!res.ok) return;
     const data: StudentDetail = await res.json();
@@ -284,6 +297,43 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setStudents((prev) =>
       prev.map((s) => (s.id === id ? { ...s, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : s)),
     );
+  }
+
+  async function rebalanceRegistration(studentId: string, registrationId: string) {
+    setRebalancingId(registrationId);
+    setRebalanceError(null);
+    try {
+      const res = await fetch(`/api/registrations/${registrationId}/rebalance`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setRebalanceError(data.error ?? "Không thể bù buổi.");
+        return;
+      }
+      setRebalanceConfirmId(null);
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setRebalancingId(null);
+    }
+  }
+
+  async function rebalanceAll() {
+    setRebalanceAllBusy(true);
+    setRebalanceAllMessage(null);
+    try {
+      const res = await fetch("/api/students/rebalance-all", { method: "POST" });
+      const data = await res.json();
+      setShowRebalanceAll(false);
+      setRebalanceAllMessage(
+        res.ok || data.added != null
+          ? `Đã bù ${data.added} buổi cho ${data.registrations} đợt đăng ký${data.failed ? `, ${data.failed} đợt không bù được` : ""}.`
+          : (data.error ?? "Không thể bù buổi."),
+      );
+      loadStudents();
+    } finally {
+      setRebalanceAllBusy(false);
+    }
   }
 
   async function removeSession(studentId: string, sessionId: string) {
@@ -495,6 +545,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const visibleStudents = students.filter(
     (s) =>
       (!lowMealOnly || s.lowMeal) &&
+      (!mismatchOnly || s.missing !== 0) &&
       (priceFilter === "ALL" || s.latestRegistration?.pricePerMeal === priceFilter) &&
       (!q || foldText(s.name).includes(q) || s.phone.includes(search.trim())),
   );
@@ -813,6 +864,26 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           >
             ⚠ Cần gia hạn
           </button>
+          <button
+            onClick={() => setMismatchOnly((v) => !v)}
+            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+              mismatchOnly
+                ? "border-red-600 bg-red-600 text-white shadow-sm"
+                : "border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+            }`}
+            title="Chỉ hiện sinh viên có số buổi ăn không khớp với gói đã mua (thiếu hoặc dư)"
+          >
+            Lệch buổi ({students.filter((x) => x.missing !== 0).length})
+          </button>
+          {canResetAll && students.some((x) => x.missing > 0) && (
+            <button
+              onClick={() => setShowRebalanceAll(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+              title="Thêm các buổi còn thiếu vào cuối lịch của tất cả sinh viên đang bị thiếu"
+            >
+              Bù buổi thiếu cho tất cả
+            </button>
+          )}
           {priceOptions.length > 1 && (
             <>
               <span className="text-xs text-slate-300">|</span>
@@ -841,11 +912,38 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
               ))}
             </>
           )}
-          {(lowMealOnly || priceFilter !== "ALL") && (
+          {(lowMealOnly || mismatchOnly || priceFilter !== "ALL") && (
             <span className="text-xs text-slate-400">{visibleStudents.length} kết quả</span>
           )}
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
+        {rebalanceAllMessage && (
+          <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{rebalanceAllMessage}</p>
+        )}
+        {showRebalanceAll && (
+          <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm animate-pop-in">
+            <p className="text-slate-700">
+              Thêm <b>{students.reduce((sum, x) => sum + Math.max(x.missing, 0), 0)} buổi</b> còn thiếu cho{" "}
+              <b>{students.filter((x) => x.missing > 0).length} sinh viên</b>, xếp vào các ngày trống sau buổi cuối của mỗi đợt.
+              Không xóa buổi nào. Bạn chắc chắn chứ?
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={rebalanceAll}
+                disabled={rebalanceAllBusy}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {rebalanceAllBusy ? "Đang bù..." : "Xác nhận bù"}
+              </button>
+              <button
+                onClick={() => setShowRebalanceAll(false)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+              >
+                Thôi
+              </button>
+            </div>
+          </div>
+        )}
         {resetAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
         )}
@@ -1017,6 +1115,14 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 </div>
                 <div className={`text-sm font-medium whitespace-nowrap xl:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
                   Còn {s.remaining} buổi
+                  {s.missing !== 0 && (
+                    <span
+                      className={`block text-xs font-semibold ${s.missing > 0 ? "text-red-600" : "text-amber-600"}`}
+                      title="So với số buổi đã mua trừ buổi đã ăn và buổi đã xóa. Mở Chi tiết để xem và bù."
+                    >
+                      {s.missing > 0 ? `Thiếu ${s.missing} buổi` : `Dư ${-s.missing} buổi`}
+                    </span>
+                  )}
                 </div>
                 <div className="xl:text-center">
                   {s.mustChangePassword && (
@@ -1064,9 +1170,54 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             {r.totalSessions} buổi ({PATTERN_LABEL[r.mealPattern]}), {currency.format(r.pricePerMeal)}/suất,
                             bắt đầu {fmtDate(r.startDate)}
                             {r.note ? ` — ${r.note}` : ""}
+                            {r.balance && (
+                              <span className="block text-xs text-slate-500">
+                                Đã ăn {r.balance.completed} · còn {r.balance.scheduled} · đã hủy {r.balance.cancelled - r.balance.removed}
+                                {r.balance.removed > 0 ? ` · đã xóa ${r.balance.removed}` : ""}
+                                {r.balance.missing === 0 && <span className="text-green-600"> · khớp với gói</span>}
+                                {r.balance.missing > 0 && (
+                                  <span className="font-semibold text-red-600">
+                                    {" "}· thiếu {r.balance.missing} buổi so với gói
+                                  </span>
+                                )}
+                                {r.balance.missing < 0 && (
+                                  <span className="font-semibold text-amber-600"> · dư {-r.balance.missing} buổi so với gói</span>
+                                )}
+                              </span>
+                            )}
+                            {r.balance && r.balance.missing > 0 &&
+                              (rebalanceConfirmId === r.id ? (
+                                <span className="mt-1 flex flex-wrap items-center gap-2 text-xs animate-pop-in">
+                                  <span className="text-slate-600">Thêm {r.balance.missing} buổi vào cuối lịch?</span>
+                                  <button
+                                    onClick={() => rebalanceRegistration(s.id, r.id)}
+                                    disabled={rebalancingId === r.id}
+                                    className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {rebalancingId === r.id ? "Đang bù..." : "Xác nhận bù"}
+                                  </button>
+                                  <button
+                                    onClick={() => setRebalanceConfirmId(null)}
+                                    className="rounded-lg border border-slate-300 px-3 py-1 hover:bg-slate-50"
+                                  >
+                                    Thôi
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setRebalanceConfirmId(r.id);
+                                    setRebalanceError(null);
+                                  }}
+                                  className="mt-1 block text-xs text-red-600 hover:underline"
+                                >
+                                  + Bù {r.balance.missing} buổi còn thiếu
+                                </button>
+                              ))}
                           </li>
                         ))}
                       </ul>
+                      {rebalanceError && <p className="text-xs text-red-600">{rebalanceError}</p>}
                       <p className="font-medium text-slate-700 mt-2">Lịch buổi ăn</p>
                       <ul className="list-disc pl-5 max-h-40 overflow-y-auto">
                         {[...detail.sessions]
