@@ -159,13 +159,10 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   const [pkgPriceEaten, setPkgPriceEaten] = useState(false);
   const [pkgBusy, setPkgBusy] = useState(false);
   const [pkgError, setPkgError] = useState<string | null>(null);
-  // Giving back meals a student is short of: one registration (confirm first) or everyone at once.
+  // Giving back meals a student is short of (or taking off a surplus), one registration at a time with a confirmation.
   const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
   const [rebalancingId, setRebalancingId] = useState<string | null>(null);
   const [rebalanceError, setRebalanceError] = useState<string | null>(null);
-  const [showRebalanceAll, setShowRebalanceAll] = useState(false);
-  const [rebalanceAllBusy, setRebalanceAllBusy] = useState(false);
-  const [rebalanceAllMessage, setRebalanceAllMessage] = useState<string | null>(null);
   const [priceFilter, setPriceFilter] = useState<"ALL" | number>("ALL");
   const [loadingList, setLoadingList] = useState(true);
 
@@ -378,26 +375,6 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
       if (res2.ok) setDetail(await res2.json());
     } finally {
       setRebalancingId(null);
-    }
-  }
-
-  async function rebalanceAll() {
-    setRebalanceAllBusy(true);
-    setRebalanceAllMessage(null);
-    try {
-      const res = await fetch("/api/students/rebalance-all", { method: "POST" });
-      const data = await res.json();
-      setShowRebalanceAll(false);
-      setRebalanceAllMessage(
-        data.checked != null
-          ? data.off === 0
-            ? `Đã kiểm tra ${data.checked} đợt đăng ký: tất cả đều khớp số buổi.`
-            : `Đã kiểm tra ${data.checked} đợt đăng ký: ${data.off} đợt lệch, đã bù thêm ${data.added} buổi, bớt ${data.trimmed} buổi${data.failed ? `, ${data.failed} đợt không xử lý được` : ""}.`
-          : (data.error ?? "Không thể truy soát."),
-      );
-      loadStudents();
-    } finally {
-      setRebalanceAllBusy(false);
     }
   }
 
@@ -942,15 +919,6 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
             Lệch buổi ({students.filter((x) => x.missing !== 0).length})
           </button>
           )}
-          {isAdmin && (
-            <button
-              onClick={() => setShowRebalanceAll(true)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-              title="Kiểm tra ngay số buổi của tất cả sinh viên và tự bù hoặc bớt cho khớp gói (hệ thống cũng tự làm việc này mỗi vài phút)"
-            >
-              Truy soát số buổi ngay
-            </button>
-          )}
           {priceOptions.length > 1 && (
             <>
               <span className="text-xs text-slate-300">|</span>
@@ -984,33 +952,6 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
           )}
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
-        {rebalanceAllMessage && (
-          <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{rebalanceAllMessage}</p>
-        )}
-        {isAdmin && showRebalanceAll && (
-          <div className="mb-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm animate-pop-in">
-            <p className="text-slate-700">
-              Kiểm tra số buổi của tất cả sinh viên: buổi đã hủy mà chưa được bù thì bù thêm vào cuối lịch (đúng quy định, vào
-              ngày trống), buổi nhiều hơn gói thì bớt ở cuối lịch. Buổi sinh viên không đến ăn không được bù. Hệ thống tự làm việc
-              này mỗi vài phút; bấm để chạy ngay.
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={rebalanceAll}
-                disabled={rebalanceAllBusy}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {rebalanceAllBusy ? "Đang truy soát..." : "Chạy truy soát"}
-              </button>
-              <button
-                onClick={() => setShowRebalanceAll(false)}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
-              >
-                Thôi
-              </button>
-            </div>
-          </div>
-        )}
         {resetAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
         )}

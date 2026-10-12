@@ -23,6 +23,7 @@ const ACTION_LABEL: Record<string, string> = {
   REBALANCE_REGISTRATION: "Bù buổi còn thiếu cho sinh viên",
   REBALANCE_ALL: "Bù buổi còn thiếu cho tất cả sinh viên",
   AUTO_AUDIT: "Hệ thống tự truy soát số buổi ăn",
+  UNDO_AUTO_AUDIT: "Hoàn tác truy soát tự động",
   OFFICER_AUTO_REGISTER: "Tự động đăng ký cơm cho cán bộ",
   SET_OFFICER_DEPARTMENTS: "Nhập phòng ban cán bộ",
   CANCEL_SESSION: "Hủy buổi ăn",

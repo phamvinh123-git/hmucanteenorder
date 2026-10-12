@@ -76,8 +76,6 @@ const DINNER_DONE_HOUR = 20;
  */
 export async function syncCompletedSessions(studentId?: string) {
   await syncOfficerAutoRegistrations();
-  // In the background: the first run after a long gap can touch many students and must not hold this request up.
-  void syncStudentAudit();
   const now = new Date();
   const today = startOfDay(now);
   const hour = now.getHours();
@@ -372,8 +370,9 @@ export async function registrationBalances(registrations: { id: string; totalSes
 const dayLabel = (d: Date) => localDateKey(d).split("-").reverse().join("/");
 
 /**
- * Brings one registration back in line with the package: the student must end up with exactly the meals they
- * bought (minus any staff removed on purpose).
+ * Admin tool, only ever run by hand for one registration: brings it back in line with the package so the
+ * student ends up with exactly the meals they bought (minus any staff removed on purpose). Nothing runs it
+ * automatically.
  *  - Short (e.g. a cancelled meal never got its make-up): adds the missing meals after the registration's last
  *    slot, following the meal pattern, on days the student has no meal and that can still be booked. Each new
  *    meal is attached to a cancelled meal that was still owed one (oldest first), so restoring that cancelled
@@ -411,8 +410,8 @@ export async function reconcileRegistration(registrationId: string) {
     const items = Array.from({ length: balance.missing }, (_, i) => {
       const original = owed[i];
       return original
-        ? { note: `Bù cho buổi đã hủy ngày ${dayLabel(original.date)} (hệ thống tự bù)`, compensationForId: original.id }
-        : { note: "Bù buổi còn thiếu so với gói đã mua (hệ thống tự bù)" };
+        ? { note: `Bù cho buổi đã hủy ngày ${dayLabel(original.date)} (admin bù)`, compensationForId: original.id }
+        : { note: "Bù buổi còn thiếu so với gói đã mua (admin bù)" };
     });
     const slots = await appendMeals(registration, items);
     return { added: slots.length, trimmed: 0, slots };
@@ -427,71 +426,9 @@ export async function reconcileRegistration(registrationId: string) {
   if (drop.length === 0) return none;
   await prisma.mealSession.updateMany({
     where: { id: { in: drop.map((d) => d.id) } },
-    data: { status: "CANCELLED", cancelledAt: new Date(), note: `${TRIMMED_NOTE} tự động (nhiều hơn số buổi đã mua)` },
+    data: { status: "CANCELLED", cancelledAt: new Date(), note: `${TRIMMED_NOTE} (admin bớt buổi dư so với gói)` },
   });
   return { ...none, trimmed: drop.length };
-}
-
-/**
- * Audits every student registration and reconciles the ones that do not add up (see reconcileRegistration).
- * Returns what changed. Nothing is written to the activity log when everything already adds up.
- */
-export function auditStudentRegistrations() {
-  // One audit at a time: a second caller (a request and the "run now" button) joins the one already running.
-  auditInFlight ??= runStudentAudit().finally(() => {
-    auditInFlight = null;
-  });
-  return auditInFlight;
-}
-
-let auditInFlight: ReturnType<typeof runStudentAudit> | null = null;
-
-async function runStudentAudit() {
-  const registrations = await prisma.mealRegistration.findMany({
-    where: { student: { role: "STUDENT", active: true } },
-    select: { id: true, totalSessions: true, studentId: true },
-  });
-  const balances = await registrationBalances(registrations);
-  const off = registrations.filter((r) => (balances.get(r.id)?.missing ?? 0) !== 0);
-
-  let added = 0;
-  let trimmed = 0;
-  let touched = 0;
-  let failed = 0;
-  for (const r of off) {
-    try {
-      const result = await reconcileRegistration(r.id);
-      if (result.added > 0 || result.trimmed > 0) touched += 1;
-      added += result.added;
-      trimmed += result.trimmed;
-    } catch (err) {
-      failed += 1;
-      console.error("Audit failed for registration", r.id, err);
-    }
-  }
-
-  if (touched > 0 || failed > 0) {
-    await logActivity(
-      null,
-      "AUTO_AUDIT",
-      `Truy soát số buổi ăn: ${off.length} đợt đăng ký lệch, đã bù thêm ${added} buổi, bớt ${trimmed} buổi${failed ? `, ${failed} đợt không xử lý được` : ""}`,
-    );
-  }
-  return { checked: registrations.length, off: off.length, added, trimmed, failed };
-}
-
-let lastAuditRun = 0;
-
-/** Runs the audit in the background of normal use: at most once every 5 minutes per server process, never throws. */
-export async function syncStudentAudit() {
-  const nowMs = Date.now();
-  if (nowMs - lastAuditRun < 5 * 60_000) return;
-  lastAuditRun = nowMs;
-  try {
-    await auditStudentRegistrations();
-  } catch (err) {
-    console.error("Student audit failed", err);
-  }
 }
 
 /**
