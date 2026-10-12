@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import { canBookSlot, cancelCutoff, localDateKey } from "@/lib/client-session-rules";
+import { cancelCutoff, localDateKey } from "@/lib/client-session-rules";
 import {
   addDaysLocal,
   mondayOf,
+  officerCanBook,
   officerCanCancel,
   officerCanRestore,
   officerWeekDays,
@@ -83,7 +84,7 @@ export default function OfficerDashboard({ sessions: initialSessions }: { sessio
 
   // Days of a week that can still be added or dropped (a week already under way has locked days).
   const bookableKeys = (days: Date[]) =>
-    days.filter((d) => canBookSlot({ date: d, mealType: "LUNCH" }).ok).map(localDateKey);
+    days.filter((d) => officerCanBook({ date: d, mealType: "LUNCH" }).ok).map(localDateKey);
 
   const free = openWeek ? bookableKeys(viewDays) : [];
 

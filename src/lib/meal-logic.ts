@@ -16,6 +16,7 @@ import {
   officerCanCancel,
   officerCanRestore,
   officerWeekDays,
+  officerCanBook,
   openWeekMondays,
   registrationDeadline,
 } from "@/lib/officer-rules";
@@ -416,7 +417,7 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
     // Adding or dropping a day only works while that day is still bookable (matters for a week that is
     // already under way, such as the launch week); afterwards the normal cancel button with its cutoff applies.
     for (const date of [...dropped.map((s) => s.date), ...revived.map((s) => s.date), ...createDays]) {
-      const check = canBookSlot({ date: startOfDay(date), mealType: "LUNCH" }, now);
+      const check = officerCanBook({ date: startOfDay(date), mealType: "LUNCH" }, now);
       if (!check.ok) {
         throw new Error(
           `Ngày ${localDateKey(date).split("-").reverse().join("/")} đã quá giờ nên không thêm hoặc bỏ được nữa. ${check.reason ?? ""}`.trim(),

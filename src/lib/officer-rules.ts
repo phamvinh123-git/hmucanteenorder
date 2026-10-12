@@ -6,6 +6,7 @@
 //  - Cancelling a single day follows the same lunch cutoff as students (see session-rules.ts).
 
 import {
+  canBookSlot,
   canCancelSession,
   canRestoreSession,
   localDateKey,
@@ -21,7 +22,7 @@ export const OFFICER_MEAL_PRICE = 30000;
  * day long (no 9:00 cutoff), and is not marked finished at 14:00 — the feature started mid-day. Remove the
  * date once it has passed.
  */
-export const ALL_DAY_LUNCH_DATES = ["2026-10-05"];
+export const ALL_DAY_LUNCH_DATES = ["2026-10-05", "2026-10-12"];
 
 /** Is `date` one of the launch days, and is it that day right now? */
 function isAllDayLunch(date: Date, now: Date) {
@@ -30,6 +31,12 @@ function isAllDayLunch(date: Date, now: Date) {
 }
 
 type Cancellable = { date: Date; mealType: MealType; status: SessionStatus };
+
+/** Can this lunch still be added or dropped? Same cutoff as students, except on a launch day, which lasts all day. */
+export function officerCanBook(slot: { date: Date; mealType: MealType }, now: Date = new Date()) {
+  if (slot.mealType === "LUNCH" && isAllDayLunch(slot.date, now)) return { ok: true as const };
+  return canBookSlot(slot, now);
+}
 
 /** Same cutoff as students (lunch before 9:00 the same day), except on the launch day, which lasts all day. */
 export function officerCanCancel(session: Cancellable, now: Date = new Date()) {
@@ -67,7 +74,11 @@ export const REGISTRATION_DEADLINE_HOUR = 15;
  * `until` (inclusive), or up to `untilTime` ("HH:MM") on that day when given. Individual days must still be
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
-const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [];
+const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
+  // Trial week: the whole week of 12/10 (Mon-Fri) can be ordered so everyone gets used to it; the week of
+  // 19/10 is open at the same time under the normal rule.
+  { monday: "2026-10-12", until: "2026-10-16" },
+];
 
 /** The Sunday before `weekMonday` at 15:00 — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
