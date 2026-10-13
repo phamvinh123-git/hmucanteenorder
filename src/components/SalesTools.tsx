@@ -266,8 +266,8 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     loadStudents();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     runScan(true);
   }, []);
 
