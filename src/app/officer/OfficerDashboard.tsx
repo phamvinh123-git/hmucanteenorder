@@ -245,7 +245,7 @@ export default function OfficerDashboard({
         <p className="mb-3 text-xs text-slate-500">
           {openWeek ? (
             <>
-              Hạn đăng ký: <b>{openWeek.deadline.getHours()}h00</b>{" "}
+              Hạn đăng ký: {openWeek.deadline.getHours() === 23 ? "hết" : <b>{openWeek.deadline.getHours()}h{String(openWeek.deadline.getMinutes()).padStart(2, "0")}</b>}{" "}
               <b>
                 {weekdayLong.format(openWeek.deadline)} {fullDate.format(openWeek.deadline)}
               </b>

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function LogoutButton() {
+export default function LogoutButton({ className = "text-sm text-slate-500 hover:text-red-600" }: { className?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +22,7 @@ export default function LogoutButton() {
     <button
       onClick={onLogout}
       disabled={loading}
-      className="text-sm text-slate-500 hover:text-red-600 disabled:opacity-60"
+      className={`${className} disabled:opacity-60`}
     >
       Đăng xuất
     </button>

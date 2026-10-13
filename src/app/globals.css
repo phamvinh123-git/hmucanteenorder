@@ -31,7 +31,40 @@
 body {
   background: linear-gradient(to bottom, #ffffff, #fdf2f6) fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, "Segoe UI", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+::selection {
+  background: #f9cfdf;
+  color: #6b0f32;
+}
+
+/* Everything clickable shows it, and keyboard focus is always visible. */
+button:not(:disabled),
+[role="button"],
+summary,
+select {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid #d63c74;
+  outline-offset: 2px;
+}
+
+/* Sideways-scrolling rows (the phone menu) without a scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Slim scrollbars for the lists that scroll inside a page. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f4a6c1 transparent;
 }
 
 /* School logo as a faint watermark behind every page. Fixed and behind

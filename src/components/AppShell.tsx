@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import LogoutButton from "./LogoutButton";
+import NavLinks from "./NavLinks";
+import UserMenu from "./UserMenu";
 import IdleScreen from "./IdleScreen";
 import { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
@@ -57,47 +58,28 @@ export default async function AppShell({
   return (
     <div className="min-h-screen">
       <IdleScreen />
-      <header className="print:hidden bg-white border-b-2 border-red-600 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
+      <header className="print:hidden sticky top-0 z-30 border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur">
+        <div className="h-1 bg-gradient-to-r from-red-700 via-red-400 to-red-700" />
+        <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 py-2">
+          <Link href="/" className="flex flex-shrink-0 items-center gap-3">
             <Image
               src="/logo.webp"
               alt="Đại học Y Hà Nội - Phân hiệu Thanh Hóa"
               width={44}
               height={44}
-              className="h-11 w-11 flex-shrink-0 rounded-full object-cover bg-white animate-logo-glow logo-spin-hover"
+              className="h-10 w-10 flex-shrink-0 rounded-full object-cover bg-white animate-logo-glow logo-spin-hover"
             />
-            <div>
-              <p className="font-semibold text-slate-800 text-sm">Căng tin Phân hiệu ĐHYHN Thanh Hóa</p>
-              <nav className="flex flex-wrap gap-1 mt-1 -ml-2">
-                {items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md px-2 py-0.5 transition-colors"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 md:block md:border-0 md:pt-0 md:text-right">
-            <div>
-            <p className="text-sm font-medium text-slate-700">{name}</p>
-            <p className="text-xs text-slate-400 md:mb-1">{ROLE_LABEL[role]}</p>
-            </div>
-            <div className="flex items-center gap-3 justify-end">
-              <Link href="/profile" className="text-sm text-slate-500 hover:text-red-600 transition-colors">
-                Hồ sơ
-              </Link>
-              <Link href="/change-password" className="text-sm text-slate-500 hover:text-red-600 transition-colors">
-                Đổi mật khẩu
-              </Link>
-              <LogoutButton />
-            </div>
+            <span className="hidden leading-tight sm:block">
+              <span className="block text-sm font-bold text-red-700">Căng tin Phân hiệu</span>
+              <span className="block text-xs text-slate-500">ĐHYHN Thanh Hóa</span>
+            </span>
+          </Link>
+          <NavLinks items={items} className="ml-2 hidden flex-1 md:flex" />
+          <div className="ml-auto md:ml-0">
+            <UserMenu name={name} roleLabel={ROLE_LABEL[role]} />
           </div>
         </div>
+        <NavLinks items={items} className="no-scrollbar mx-auto max-w-6xl overflow-x-auto px-4 pb-2 md:hidden" />
       </header>
       <main className="max-w-6xl mx-auto px-4 py-6 animate-rise-in">
         {children}
