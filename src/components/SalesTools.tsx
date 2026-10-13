@@ -182,8 +182,6 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [pkgError, setPkgError] = useState<string | null>(null);
   // Two meals on the same day and meal: moving the extra one to a free day.
   const [movingId, setMovingId] = useState<string | null>(null);
-  // The meal row whose actions are open in the student's detail.
-  const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   // Giving back meals a student is short of (or taking off a surplus), one registration at a time with a confirmation.
   const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
@@ -372,7 +370,6 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setRestoreError(null);
     setRebalanceConfirmId(null);
     setRebalanceError(null);
-    setOpenRowId(null);
     setEditPkgId(null);
     const res = await fetch(`/api/students/${id}`);
     if (!res.ok) return;
@@ -1484,26 +1481,18 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                               )}
 
                               {canResetAll && editPkgId === r.id && (
-                                <div className="mt-3 space-y-3 rounded-lg bg-red-50/60 p-3 animate-pop-in">
-                                  <p className="text-xs font-semibold text-slate-700">Sửa gói ăn</p>
-                                  <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="mt-3 rounded-lg bg-red-50/60 p-3 animate-pop-in">
+                                  <div className="flex flex-wrap items-end gap-3">
                                     <label className="text-xs font-medium text-slate-600">
-                                      Số buổi của gói
+                                      Số buổi
                                       <input
                                         type="number"
                                         min={1}
                                         max={200}
                                         value={pkgTotal}
                                         onChange={(e) => setPkgTotal(e.target.value)}
-                                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                        className="mt-1 block w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                                       />
-                                      <span className="mt-1 block font-normal text-slate-500">
-                                        {Number(pkgTotal) > r.totalSessions
-                                          ? `Sẽ thêm ${Number(pkgTotal) - r.totalSessions} buổi vào chỗ trống sau buổi cuối.`
-                                          : Number(pkgTotal) < r.totalSessions && Number(pkgTotal) >= 1
-                                            ? `Sẽ bỏ ${r.totalSessions - Number(pkgTotal)} buổi cuối chưa ăn (khôi phục lại được).`
-                                            : "Không đổi."}
-                                      </span>
                                     </label>
                                     <label className="text-xs font-medium text-slate-600">
                                       Giá mỗi suất (đ)
@@ -1513,43 +1502,23 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                         step={1000}
                                         value={pkgPrice}
                                         onChange={(e) => setPkgPrice(e.target.value)}
-                                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                        className="mt-1 block w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                                       />
-                                      <span className="mt-1 block font-normal text-slate-500">
-                                        {Number(pkgPrice) !== r.pricePerMeal
-                                          ? "Giá mới áp dụng cho các buổi sắp tới."
-                                          : "Không đổi."}
-                                      </span>
                                     </label>
-                                  </div>
-                                  {Number(pkgPrice) !== r.pricePerMeal && (
-                                    <label className="flex items-start gap-2 text-xs text-slate-600">
+                                    <label className="min-w-40 flex-1 text-xs font-medium text-slate-600">
+                                      Ghi chú
                                       <input
-                                        type="checkbox"
-                                        checked={pkgPriceEaten}
-                                        onChange={(e) => setPkgPriceEaten(e.target.checked)}
-                                        className="mt-0.5 accent-red-600"
+                                        value={pkgNote}
+                                        onChange={(e) => setPkgNote(e.target.value)}
+                                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                                       />
-                                      <span>
-                                        Áp dụng giá mới cả cho các buổi <b>đã ăn</b> (doanh thu đã tính cũng đổi theo)
-                                      </span>
                                     </label>
-                                  )}
-                                  <label className="block text-xs font-medium text-slate-600">
-                                    Ghi chú
-                                    <input
-                                      value={pkgNote}
-                                      onChange={(e) => setPkgNote(e.target.value)}
-                                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                                    />
-                                  </label>
-                                  <div className="flex flex-wrap items-center gap-2">
                                     <button
                                       onClick={() => savePackage(s.id, r)}
                                       disabled={pkgBusy}
                                       className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                                     >
-                                      {pkgBusy ? "Đang lưu..." : "Lưu thay đổi"}
+                                      {pkgBusy ? "Đang lưu..." : "Lưu"}
                                     </button>
                                     <button
                                       onClick={() => setEditPkgId(null)}
@@ -1557,8 +1526,27 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     >
                                       Hủy
                                     </button>
-                                    {pkgError && <span className="text-xs text-red-600">{pkgError}</span>}
                                   </div>
+                                  <p className="mt-2 text-xs text-slate-500">
+                                    {Number(pkgTotal) > r.totalSessions
+                                      ? `Thêm ${Number(pkgTotal) - r.totalSessions} buổi vào chỗ trống sau buổi cuối. `
+                                      : Number(pkgTotal) < r.totalSessions && Number(pkgTotal) >= 1
+                                        ? `Bỏ ${r.totalSessions - Number(pkgTotal)} buổi cuối chưa ăn (khôi phục lại được). `
+                                        : ""}
+                                    {Number(pkgPrice) !== r.pricePerMeal ? "Giá mới áp dụng cho các buổi sắp tới. " : ""}
+                                    {Number(pkgPrice) !== r.pricePerMeal && (
+                                      <label className="inline-flex items-center gap-1 text-slate-600">
+                                        <input
+                                          type="checkbox"
+                                          checked={pkgPriceEaten}
+                                          onChange={(e) => setPkgPriceEaten(e.target.checked)}
+                                          className="accent-red-600"
+                                        />
+                                        áp dụng cả cho buổi đã ăn
+                                      </label>
+                                    )}
+                                  </p>
+                                  {pkgError && <p className="mt-1 text-xs text-red-600">{pkgError}</p>}
                                 </div>
                               )}
                             </div>
@@ -1569,7 +1557,11 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
 
                       {/* ---- 3. Every meal, with what can be done to it */}
                       <div>
-                        <p className="mb-1 font-semibold text-slate-700">Lịch buổi ăn</p>
+                        <p className="font-semibold text-slate-700">Lịch buổi ăn</p>
+                        <p className="mb-1 text-xs text-slate-500">
+                          <b>Xóa</b>: bỏ hẳn buổi, không bù · <b>Khôi phục</b>: trả buổi đã hủy về lịch · <b>Dời</b>: chuyển buổi trùng sang
+                          ngày trống.
+                        </p>
                         <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
                           {[...detail.sessions]
                             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -1586,7 +1578,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     : { text: "Sắp tới", cls: "bg-red-50 text-red-700" };
                               const canRemove = canResetAll && !cancelled;
                               const canRestore = cancelled && sx.hasCompensation;
-                              const hasActions = canRemove || canRestore || (dup && canResetAll && !sx.pickedUp);
+                              const canMove = dup && canResetAll && !sx.pickedUp;
                               return (
                                 <li key={sx.id} className="px-3 py-2">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1599,100 +1591,83 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     <span className={`rounded-full px-2 py-0.5 text-xs ${badge.cls}`}>{badge.text}</span>
                                     {dup && <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">Trùng buổi</span>}
                                     {sx.note && <span className="min-w-0 flex-1 truncate text-xs text-slate-400">{sx.note}</span>}
-                                    {hasActions && (
-                                      <button
-                                        onClick={() => {
-                                          setOpenRowId(openRowId === sx.id ? null : sx.id);
-                                          setRemoveConfirmId(null);
-                                          setRestoreConfirmId(null);
-                                        }}
-                                        className="ml-auto rounded-lg border border-slate-300 px-2.5 py-0.5 text-xs text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                                      >
-                                        {openRowId === sx.id ? "Đóng" : "Sửa"}
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {openRowId === sx.id && (
-                                    <div className="mt-2 space-y-2 rounded-lg bg-red-50/60 p-3 text-xs animate-pop-in">
-                                      {dup && canResetAll && !sx.pickedUp && (
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                          <p className="text-slate-600">
-                                            <b>Dời sang ngày trống</b> — chuyển buổi này sang ngày trống gần nhất, bạn ấy vẫn đủ số buổi đã mua.
-                                          </p>
+                                    <span className="ml-auto flex flex-wrap items-center gap-1.5 text-xs">
+                                      {canMove && (
+                                        <button
+                                          onClick={() => moveDuplicate(s.id, sx.id)}
+                                          disabled={movingId === sx.id}
+                                          title="Chuyển buổi trùng này sang ngày trống gần nhất, bạn ấy vẫn đủ số buổi đã mua"
+                                          className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                        >
+                                          {movingId === sx.id ? "Đang dời..." : "Dời sang ngày trống"}
+                                        </button>
+                                      )}
+                                      {canRemove &&
+                                        (removeConfirmId === sx.id ? (
+                                          <>
+                                            <span className="text-red-700">
+                                              {sx.status === "COMPLETED" || sx.pickedUp ? "Xóa buổi ĐÃ ĂN này?" : "Xóa buổi này?"}
+                                            </span>
+                                            <button
+                                              onClick={() => removeSession(s.id, sx.id)}
+                                              disabled={removingId === sx.id}
+                                              className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                            >
+                                              {removingId === sx.id ? "Đang xóa..." : "Xóa"}
+                                            </button>
+                                            <button
+                                              onClick={() => setRemoveConfirmId(null)}
+                                              className="rounded-lg border border-slate-300 px-2.5 py-1 hover:bg-slate-50"
+                                            >
+                                              Thôi
+                                            </button>
+                                          </>
+                                        ) : (
                                           <button
-                                            onClick={() => moveDuplicate(s.id, sx.id)}
-                                            disabled={movingId === sx.id}
-                                            className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                            onClick={() => setRemoveConfirmId(sx.id)}
+                                            title={
+                                              sx.status === "COMPLETED" || sx.pickedUp
+                                                ? "Bỏ hẳn buổi đã ăn này, không bù (dùng khi ghi nhận nhầm hoặc trùng)"
+                                                : "Bỏ hẳn buổi này, không bù (dùng khi đăng ký dư)"
+                                            }
+                                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                                           >
-                                            {movingId === sx.id ? "Đang dời..." : "Dời"}
+                                            Xóa
                                           </button>
-                                        </div>
-                                      )}
-                                      {canRemove && (
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                          <p className="text-slate-600">
-                                            <b>Xóa buổi này</b> — bỏ hẳn, không bù.
-                                            {sx.status === "COMPLETED" || sx.pickedUp
-                                              ? " Đây là buổi đã ăn: chỉ xóa khi ghi nhận nhầm hoặc trùng lặp."
-                                              : " Dùng khi buổi bị đăng ký dư."}
-                                          </p>
-                                          {removeConfirmId === sx.id ? (
-                                            <span className="flex items-center gap-2">
-                                              <button
-                                                onClick={() => removeSession(s.id, sx.id)}
-                                                disabled={removingId === sx.id}
-                                                className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                                              >
-                                                {removingId === sx.id ? "Đang xóa..." : "Xác nhận xóa"}
-                                              </button>
-                                              <button onClick={() => setRemoveConfirmId(null)} className="text-slate-500 hover:underline">
-                                                Thôi
-                                              </button>
-                                            </span>
-                                          ) : (
+                                        ))}
+                                      {canRestore &&
+                                        (restoreConfirmId === sx.id ? (
+                                          <>
+                                            <span className="text-red-700">Khôi phục buổi này?</span>
                                             <button
-                                              onClick={() => setRemoveConfirmId(sx.id)}
-                                              className="rounded-lg border border-red-300 bg-white px-3 py-1 font-medium text-red-700 hover:bg-red-50"
+                                              onClick={() => staffRestoreSession(s.id, sx.id)}
+                                              disabled={restoringId === sx.id}
+                                              className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                                             >
-                                              Xóa buổi
+                                              {restoringId === sx.id ? "Đang khôi phục..." : "Khôi phục"}
                                             </button>
-                                          )}
-                                        </div>
-                                      )}
-                                      {canRestore && (
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                          <p className="text-slate-600">
-                                            <b>Khôi phục buổi này</b> —{" "}
-                                            {removed
-                                              ? "đưa buổi đã xóa trở lại lịch."
-                                              : "trả buổi về lịch và bỏ suất bù tương ứng (bỏ qua giờ chốt)."}
-                                          </p>
-                                          {restoreConfirmId === sx.id ? (
-                                            <span className="flex items-center gap-2">
-                                              <button
-                                                onClick={() => staffRestoreSession(s.id, sx.id)}
-                                                disabled={restoringId === sx.id}
-                                                className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                                              >
-                                                {restoringId === sx.id ? "Đang khôi phục..." : "Xác nhận khôi phục"}
-                                              </button>
-                                              <button onClick={() => setRestoreConfirmId(null)} className="text-slate-500 hover:underline">
-                                                Thôi
-                                              </button>
-                                            </span>
-                                          ) : (
                                             <button
-                                              onClick={() => setRestoreConfirmId(sx.id)}
-                                              className="rounded-lg border border-red-300 bg-white px-3 py-1 font-medium text-red-700 hover:bg-red-50"
+                                              onClick={() => setRestoreConfirmId(null)}
+                                              className="rounded-lg border border-slate-300 px-2.5 py-1 hover:bg-slate-50"
                                             >
-                                              Khôi phục
+                                              Thôi
                                             </button>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                          </>
+                                        ) : (
+                                          <button
+                                            onClick={() => setRestoreConfirmId(sx.id)}
+                                            title={
+                                              removed
+                                                ? "Đưa buổi đã xóa trở lại lịch"
+                                                : "Trả buổi về lịch và bỏ suất bù tương ứng (bỏ qua giờ chốt)"
+                                            }
+                                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                          >
+                                            Khôi phục
+                                          </button>
+                                        ))}
+                                    </span>
+                                  </div>
                                 </li>
                               );
                             })}
