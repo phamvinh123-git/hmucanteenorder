@@ -1430,7 +1430,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     <div className="bg-red-500" style={{ width: `${(b.scheduled / base) * 100}%` }} />
                                   </div>
                                   <p className="mt-1 text-xs text-slate-500">
-                                    Đã ăn {b.completed} · sắp tới {b.scheduled} · đã hủy {b.cancelled - b.removed}
+                                    Đã dùng {b.completed} (gồm cả buổi chưa lấy) · sắp tới {b.scheduled} · đã hủy {b.cancelled - b.removed}
                                     {b.removed > 0 ? ` · đã xóa ${b.removed}` : ""}
                                   </p>
                                   {b.missing === 0 && <p className="mt-1 text-xs text-green-600">✓ Số buổi khớp với gói đã mua.</p>}
