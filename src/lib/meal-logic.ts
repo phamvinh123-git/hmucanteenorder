@@ -141,18 +141,21 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
     }
   }
 
-  const [allSlots, studentSlots] = await Promise.all([
-    prisma.mealSession.findMany({
-      where: { registrationId: session.registrationId },
-      select: { date: true, mealType: true },
-    }),
-    prisma.mealSession.findMany({ where: { studentId: session.studentId }, select: { date: true, mealType: true } }),
-  ]);
+  const studentSlots = await prisma.mealSession.findMany({
+    where: { studentId: session.studentId },
+    select: { date: true, mealType: true },
+  });
 
-  const lastSlot = [...allSlots].sort(compareSlots).at(-1)!;
-  // After the registration's last slot, skipping any slot the student already has (a renewal registered
-  // meanwhile may already use those days) so two meals never land on the same day and meal.
-  const appended = nextFreeSlot(lastSlot, session.registration.mealPattern, new Set(studentSlots.map(slotKey)));
+  // The make-up meal goes into the first empty slot after the cancelled one (following the package's meal
+  // pattern) that can still be booked: a gap in the student's schedule when there is one, otherwise the day
+  // right after everything they already have. Slots the student holds in any package — or cancelled — are
+  // skipped, so two meals never land on the same day and meal, even with packages running side by side.
+  const appended = nextFreeSlot(
+    { date: session.date, mealType: session.mealType },
+    session.registration.mealPattern,
+    new Set(studentSlots.map(slotKey)),
+    true,
+  );
 
   const [cancelled, newSession] = await prisma.$transaction([
     prisma.mealSession.update({
