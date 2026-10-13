@@ -159,6 +159,9 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   const [pkgPriceEaten, setPkgPriceEaten] = useState(false);
   const [pkgBusy, setPkgBusy] = useState(false);
   const [pkgError, setPkgError] = useState<string | null>(null);
+  // Two meals on the same day and meal: moving the extra one to a free day.
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   // Giving back meals a student is short of (or taking off a surplus), one registration at a time with a confirmation.
   const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
   const [rebalancingId, setRebalancingId] = useState<string | null>(null);
@@ -356,6 +359,24 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
       }
     } finally {
       setPkgBusy(false);
+    }
+  }
+
+  async function moveDuplicate(studentId: string, sessionId: string) {
+    setMovingId(sessionId);
+    setMoveError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/move-duplicate`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMoveError(data.error ?? "Không thể dời buổi ăn.");
+        return;
+      }
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setMovingId(null);
     }
   }
 
@@ -591,6 +612,18 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
       (priceFilter === "ALL" || s.latestRegistration?.pricePerMeal === priceFilter) &&
       (!q || foldText(s.name).includes(q) || s.phone.includes(search.trim())),
   );
+
+  // Slots (day + meal) of the open student that hold more than one live meal: a double booking to fix.
+  const slotId = (x: { date: string; mealType: string }) => `${new Date(x.date).toDateString()}|${x.mealType}`;
+  const dupSlots = new Set<string>();
+  if (detail) {
+    const seen = new Map<string, number>();
+    for (const x of detail.sessions) {
+      if (x.status === "CANCELLED") continue;
+      seen.set(slotId(x), (seen.get(slotId(x)) ?? 0) + 1);
+    }
+    for (const [k, n] of seen) if (n > 1) dupSlots.add(k);
+  }
 
   return (
     <div className="space-y-8">
@@ -1300,6 +1333,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                         ))}
                       </ul>
                       {rebalanceError && <p className="text-xs text-red-600">{rebalanceError}</p>}
+                      {moveError && <p className="text-xs text-red-600">{moveError}</p>}
                       <p className="font-medium text-slate-700 mt-2">Lịch buổi ăn</p>
                       <ul className="list-disc pl-5 max-h-40 overflow-y-auto">
                         {[...detail.sessions]
@@ -1328,6 +1362,21 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                                       : ""}
                                 {sx.note ? ` — ${sx.note}` : ""}
                               </span>
+                              {sx.status !== "CANCELLED" && dupSlots.has(slotId(sx)) && (
+                                <span className="flex items-center gap-1 text-xs no-underline">
+                                  <span className="font-semibold text-red-600">⚠ Trùng buổi</span>
+                                  {canResetAll && !sx.pickedUp && (
+                                    <button
+                                      onClick={() => moveDuplicate(s.id, sx.id)}
+                                      disabled={movingId === sx.id}
+                                      title="Dời buổi này sang ngày trống tiếp theo để bạn ấy vẫn đủ số buổi đã mua"
+                                      className="text-red-600 underline hover:text-red-700 disabled:opacity-50"
+                                    >
+                                      {movingId === sx.id ? "Đang dời..." : "Dời sang ngày trống"}
+                                    </button>
+                                  )}
+                                </span>
+                              )}
                               {canResetAll && sx.status !== "CANCELLED" && (
                                 removeConfirmId === sx.id ? (
                                   <span className="flex items-center gap-1 no-underline">

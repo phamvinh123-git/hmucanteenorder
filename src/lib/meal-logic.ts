@@ -216,6 +216,22 @@ export async function restoreSession(
     throw new Error("Suất bù cho lần hủy này đã được dùng, không thể khôi phục.");
   }
 
+  // The slot may have been taken meanwhile (a renewal that starts on that day, a make-up meal): putting this
+  // meal back would give the student two meals at the same day and meal.
+  const clash = await prisma.mealSession.findFirst({
+    where: {
+      studentId: session.studentId,
+      date: session.date,
+      mealType: session.mealType,
+      status: { not: "CANCELLED" },
+      id: { not: session.id },
+    },
+    select: { id: true },
+  });
+  if (clash) {
+    throw new Error("Sinh viên đã có một suất khác vào đúng ngày và bữa này (từ đợt đăng ký khác), không khôi phục được.");
+  }
+
   const [restored] = await prisma.$transaction([
     prisma.mealSession.update({
       where: { id: sessionId },
@@ -225,6 +241,51 @@ export async function restoreSession(
   ]);
 
   return { restored, removedCompensationId: compensation.id };
+}
+
+/**
+ * Staff fix for a double booking: the student has two meals at the same day and meal. The extra one (not
+ * picked up) moves to the first free day after the registration's last slot, following the meal pattern, so
+ * the student still gets every meal they bought. A meal already marked finished goes back to "scheduled".
+ */
+export async function moveDuplicateSession(sessionId: string) {
+  const session = await prisma.mealSession.findUniqueOrThrow({
+    where: { id: sessionId },
+    include: { registration: true },
+  });
+  if (session.status === "CANCELLED") throw new Error("Buổi này đã bị hủy.");
+  if (session.pickedUp) throw new Error("Buổi này đã được lấy cơm, không dời được.");
+
+  const clash = await prisma.mealSession.findFirst({
+    where: {
+      studentId: session.studentId,
+      date: session.date,
+      mealType: session.mealType,
+      status: { not: "CANCELLED" },
+      id: { not: session.id },
+    },
+    select: { id: true },
+  });
+  if (!clash) throw new Error("Buổi này không bị trùng với buổi nào khác.");
+
+  const [regSlots, studentSlots] = await Promise.all([
+    prisma.mealSession.findMany({ where: { registrationId: session.registrationId }, select: { date: true, mealType: true } }),
+    prisma.mealSession.findMany({ where: { studentId: session.studentId }, select: { date: true, mealType: true } }),
+  ]);
+  const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
+  const last = [...regSlots, yesterday].sort(compareSlots).at(-1)!;
+  const slot = nextFreeSlot(last, session.registration.mealPattern, new Set(studentSlots.map(slotKey)), true);
+
+  const moved = await prisma.mealSession.update({
+    where: { id: session.id },
+    data: {
+      date: slot.date,
+      mealType: slot.mealType,
+      status: "SCHEDULED",
+      note: `Dời từ ngày ${localDateKey(session.date).split("-").reverse().join("/")} (${session.mealType === "LUNCH" ? "trưa" : "tối"}) do trùng buổi`,
+    },
+  });
+  return { moved, from: { date: session.date, mealType: session.mealType } };
 }
 
 /** Is this note the one left by a staff removal or a package trim? */
