@@ -486,7 +486,7 @@ export async function reconcileRegistration(registrationId: string) {
   const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: registrationId } });
   const balance = (await registrationBalances([registration])).get(registration.id)!;
   const none = { added: 0, trimmed: 0, slots: [] as { date: Date; mealType: MealType }[] };
-  if (balance.missing === 0) return none;
+  if (balance.missing === 0) throw new Error("Gói này đã khớp số buổi, không cần chỉnh.");
 
   if (balance.missing > 0) {
     // Cancelled meals still without a make-up (not removed, swapped or trimmed on purpose), oldest first.
@@ -525,7 +525,11 @@ export async function reconcileRegistration(registrationId: string) {
     select: { id: true, date: true, mealType: true },
   });
   const drop = [...upcoming].sort(compareSlots).slice(-Math.min(-balance.missing, upcoming.length));
-  if (drop.length === 0) return none;
+  if (drop.length === 0) {
+    throw new Error(
+      "Không có buổi nào chưa ăn để bớt: các buổi dư đều đã dùng. Muốn bỏ một buổi đã dùng, hãy bấm Xóa ở đúng hàng buổi đó trong Lịch buổi ăn.",
+    );
+  }
   await prisma.mealSession.updateMany({
     where: { id: { in: drop.map((d) => d.id) } },
     data: { status: "CANCELLED", cancelledAt: new Date(), note: `${TRIMMED_NOTE} (admin bớt buổi dư so với gói)` },
