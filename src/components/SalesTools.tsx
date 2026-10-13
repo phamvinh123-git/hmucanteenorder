@@ -207,7 +207,8 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   // Search is filtered entirely client-side (see `visibleStudents`) so it can ignore case and
   // diacritics ("khue" still finds "Khuê") — a server `contains` query couldn't do that without
   // extra DB setup, so the full list is simply kept in memory and re-fetched on changes.
-  async function runScan() {
+  // `silent` is the automatic check when the page opens: it only shows something when it finds a double booking.
+  async function runScan(silent = false) {
     setScanBusy(true);
     setScanError(null);
     setConfirmMergeAll(false);
@@ -215,10 +216,12 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
       const res = await fetch("/api/students/duplicates");
       const data = await res.json();
       if (!res.ok) {
-        setScanError(data.error ?? "Không quét được.");
+        if (!silent) setScanError(data.error ?? "Không quét được.");
         return;
       }
-      setScan(data);
+      setScan(silent && data.students.length === 0 ? null : data);
+    } catch {
+      if (!silent) setScanError("Không quét được.");
     } finally {
       setScanBusy(false);
     }
@@ -263,7 +266,9 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     loadStudents();
+    runScan(true);
   }, []);
 
   // Meals auto-complete at fixed clock times (14:00 lunch, 20:00 dinner) with nobody clicking
@@ -1064,19 +1069,27 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
         {scanError && <p className="text-sm rounded-lg bg-red-50 text-red-700 px-3 py-2 mb-2">{scanError}</p>}
         {scan && (
-          <div className="mb-2 rounded-xl border border-slate-200 bg-white p-3 text-sm animate-pop-in">
+          <div
+            className={`mb-2 rounded-xl border p-3 text-sm animate-pop-in ${
+              scan.students.length > 0 ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+            }`}
+          >
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium text-slate-700">
                 {scan.students.length === 0
                   ? `Đã quét ${scan.checked} sinh viên: không có bạn nào bị trùng buổi.`
-                  : `Đã quét ${scan.checked} sinh viên: ${scan.students.length} bạn bị trùng buổi.`}
+                  : `⚠ Có ${scan.students.length} sinh viên bị trùng buổi (hai suất cùng ngày, cùng bữa):`}
               </p>
               <button onClick={() => setScan(null)} className="text-xs text-slate-400 hover:text-slate-600">
                 Đóng
               </button>
             </div>
             {scanMessage && <p className="mt-1 text-xs text-green-700">{scanMessage}</p>}
+            {scan.students.length > 0 && !canResetAll && (
+              <p className="mt-1 text-xs text-slate-600">Hãy báo Quản lý hoặc Admin để gộp các suất trùng này.</p>
+            )}
             {scan.students.length > 0 &&
+              canResetAll &&
               (confirmMergeAll ? (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-red-50 p-2 text-xs animate-pop-in">
                   <span className="text-slate-700">
@@ -1123,6 +1136,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                       >
                         Xem
                       </button>
+                      {canResetAll && (
                       <button
                         onClick={() => mergeDuplicates(st.studentId)}
                         disabled={fixingScanId !== null}
@@ -1130,6 +1144,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                       >
                         {fixingScanId === st.studentId ? "Đang gộp..." : "Gộp buổi trùng"}
                       </button>
+                      )}
                     </span>
                   </li>
                 ))}

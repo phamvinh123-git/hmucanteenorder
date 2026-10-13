@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessStats, getSession } from "@/lib/auth";
+import { canAccessSalesTools, canAccessStats, getSession } from "@/lib/auth";
 import { mergeDuplicateSessions, syncCompletedSessions } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 
-// Manager/admin: scans every student for double bookings, i.e. two live (not cancelled) meals at the same day
-// and meal. Read-only; the fix is the per-meal "move to a free day" action.
+// Scans every student for double bookings, i.e. two live (not cancelled) meals at the same day and meal.
+// Read-only, open to everyone with the sales tools: the Bán hàng page runs it when it opens and warns if
+// anyone is double-booked. Merging them (POST below) is for managers and admins.
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
-    return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được quét." }, { status: 403 });
+  if (!session || !canAccessSalesTools(session.role)) {
+    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 
   await syncCompletedSessions();
