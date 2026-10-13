@@ -149,6 +149,25 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
 
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState("");
+  // Scan of all students for double bookings (two live meals at the same day and meal).
+  type DuplicateScan = {
+    checked: number;
+    students: {
+      studentId: string;
+      name: string;
+      phone: string;
+      orderCode: number | null;
+      slots: {
+        date: string;
+        mealType: "LUNCH" | "DINNER";
+        sessions: { id: string; status: string; pickedUp: boolean; registrationStart: string }[];
+      }[];
+    }[];
+  };
+  const [scan, setScan] = useState<DuplicateScan | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [fixingScanId, setFixingScanId] = useState<string | null>(null);
   const [lowMealOnly, setLowMealOnly] = useState(false);
   const [mismatchOnly, setMismatchOnly] = useState(false);
   // Admin: editing a meal package (number of meals, price, note).
@@ -186,6 +205,47 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   // Search is filtered entirely client-side (see `visibleStudents`) so it can ignore case and
   // diacritics ("khue" still finds "Khuê") — a server `contains` query couldn't do that without
   // extra DB setup, so the full list is simply kept in memory and re-fetched on changes.
+  async function runScan() {
+    setScanBusy(true);
+    setScanError(null);
+    try {
+      const res = await fetch("/api/students/duplicates");
+      const data = await res.json();
+      if (!res.ok) {
+        setScanError(data.error ?? "Không quét được.");
+        return;
+      }
+      setScan(data);
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
+  // Moves the extra meal of every double-booked slot of one student to the next free day, one after another
+  // (each move looks at the days taken by the previous ones). A picked-up meal stays; otherwise the later one moves.
+  async function fixScanStudent(student: DuplicateScan["students"][number]) {
+    setFixingScanId(student.studentId);
+    setScanError(null);
+    try {
+      for (const slot of student.slots) {
+        const keeper = slot.sessions.find((x) => x.pickedUp) ?? slot.sessions[0];
+        for (const x of slot.sessions.filter((y) => y.id !== keeper.id && !y.pickedUp)) {
+          const res = await fetch(`/api/sessions/${x.id}/move-duplicate`, { method: "POST" });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setScanError(`${student.name}: ${data.error ?? "không dời được"}`);
+            await runScan();
+            return;
+          }
+        }
+      }
+      await runScan();
+      loadStudents();
+    } finally {
+      setFixingScanId(null);
+    }
+  }
+
   async function loadStudents() {
     setLoadingList(true);
     try {
@@ -198,7 +258,6 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load on mount
     loadStudents();
   }, []);
 
@@ -952,6 +1011,16 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
             Lệch buổi ({students.filter((x) => x.missing !== 0).length})
           </button>
           )}
+          {canResetAll && (
+            <button
+              onClick={runScan}
+              disabled={scanBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+              title="Quét tất cả sinh viên xem còn bạn nào có hai suất cùng ngày và cùng bữa"
+            >
+              {scanBusy ? "Đang quét..." : "Quét trùng buổi"}
+            </button>
+          )}
           {priceOptions.length > 1 && (
             <>
               <span className="text-xs text-slate-300">|</span>
@@ -985,6 +1054,55 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
           )}
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
+        {scanError && <p className="text-sm rounded-lg bg-red-50 text-red-700 px-3 py-2 mb-2">{scanError}</p>}
+        {scan && (
+          <div className="mb-2 rounded-xl border border-slate-200 bg-white p-3 text-sm animate-pop-in">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-slate-700">
+                {scan.students.length === 0
+                  ? `Đã quét ${scan.checked} sinh viên: không có bạn nào bị trùng buổi.`
+                  : `Đã quét ${scan.checked} sinh viên: ${scan.students.length} bạn bị trùng buổi.`}
+              </p>
+              <button onClick={() => setScan(null)} className="text-xs text-slate-400 hover:text-slate-600">
+                Đóng
+              </button>
+            </div>
+            {scan.students.length > 0 && (
+              <ul className="mt-2 divide-y divide-slate-100">
+                {scan.students.map((st) => (
+                  <li key={st.studentId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                    <span className="w-14 font-mono text-base font-extrabold text-red-700">{st.orderCode ?? "—"}</span>
+                    <span className="font-medium text-slate-800">{st.name}</span>
+                    <span className="text-xs text-slate-400">{st.phone}</span>
+                    <span className="text-xs text-red-600">
+                      {st.slots
+                        .map((sl) => `${fmtDate(sl.date)} ${sl.mealType === "LUNCH" ? "trưa" : "tối"} (${sl.sessions.length} suất)`)
+                        .join(" · ")}
+                    </span>
+                    <span className="ml-auto flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSearch(st.phone);
+                          toggleExpand(st.studentId);
+                        }}
+                        className="text-xs text-slate-500 hover:underline"
+                      >
+                        Xem
+                      </button>
+                      <button
+                        onClick={() => fixScanStudent(st)}
+                        disabled={fixingScanId !== null}
+                        className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {fixingScanId === st.studentId ? "Đang dời..." : "Dời sang ngày trống"}
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {resetAllMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{resetAllMessage}</p>
         )}
