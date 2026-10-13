@@ -244,6 +244,44 @@ export async function restoreSession(
 }
 
 /**
+ * Merges double bookings into one meal: where a student has several live meals at the same day and meal, one
+ * stays (a picked-up one first, then a finished one, then the one from the oldest registration) and the others
+ * are taken out as removed (kept in the record, not owed back, and can be put back by an admin if one was
+ * right). Meals already picked up are never touched. With `studentId` only that student is merged.
+ */
+export async function mergeDuplicateSessions(studentId?: string) {
+  const groups = await prisma.mealSession.groupBy({
+    by: ["studentId", "date", "mealType"],
+    where: { status: { not: "CANCELLED" }, student: { role: "STUDENT" }, ...(studentId ? { studentId } : {}) },
+    having: { id: { _count: { gt: 1 } } },
+    _count: { id: true },
+  });
+
+  const students = new Set<string>();
+  let merged = 0;
+  let skipped = 0;
+  for (const g of groups) {
+    const slot = await prisma.mealSession.findMany({
+      where: { studentId: g.studentId, date: g.date, mealType: g.mealType, status: { not: "CANCELLED" } },
+      select: { id: true, status: true, pickedUp: true, registration: { select: { createdAt: true } } },
+    });
+    const rank = (x: (typeof slot)[number]) => (x.pickedUp ? 0 : x.status === "COMPLETED" ? 1 : 2);
+    slot.sort((a, b) => rank(a) - rank(b) || a.registration.createdAt.getTime() - b.registration.createdAt.getTime());
+    const extras = slot.slice(1);
+    const removable = extras.filter((x) => !x.pickedUp);
+    skipped += extras.length - removable.length;
+    if (removable.length === 0) continue;
+    await prisma.mealSession.updateMany({
+      where: { id: { in: removable.map((x) => x.id) } },
+      data: { status: "CANCELLED", cancelledAt: new Date(), note: `${REMOVED_NOTE} - gộp buổi trùng` },
+    });
+    merged += removable.length;
+    students.add(g.studentId);
+  }
+  return { students: students.size, merged, skipped };
+}
+
+/**
  * Staff fix for a double booking: the student has two meals at the same day and meal. The extra one (not
  * picked up) moves to the first free day after the registration's last slot, following the meal pattern, so
  * the student still gets every meal they bought. A meal already marked finished goes back to "scheduled".

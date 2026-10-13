@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canAccessStats, getSession } from "@/lib/auth";
-import { syncCompletedSessions } from "@/lib/meal-logic";
+import { mergeDuplicateSessions, syncCompletedSessions } from "@/lib/meal-logic";
+import { logActivity } from "@/lib/log";
 
 // Manager/admin: scans every student for double bookings, i.e. two live (not cancelled) meals at the same day
 // and meal. Read-only; the fix is the per-meal "move to a free day" action.
@@ -68,4 +69,25 @@ export async function GET() {
 
 function countStudents() {
   return prisma.user.count({ where: { role: "STUDENT" } });
+}
+
+// Manager/admin: merges the double bookings into one meal each, for one student (body: { studentId }) or for
+// everyone. See mergeDuplicateSessions.
+export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session || !canAccessStats(session.role)) {
+    return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được gộp buổi trùng." }, { status: 403 });
+  }
+  const body = (await req.json().catch(() => ({}))) as { studentId?: unknown };
+  const studentId = typeof body.studentId === "string" && body.studentId ? body.studentId : undefined;
+
+  const result = await mergeDuplicateSessions(studentId);
+  if (result.merged > 0) {
+    await logActivity(
+      session.userId,
+      "MERGE_DUPLICATES",
+      `Gộp buổi ăn trùng${studentId ? " của 1 sinh viên" : ""}: bỏ ${result.merged} suất trùng của ${result.students} sinh viên${result.skipped ? `, ${result.skipped} suất đã lấy cơm nên giữ nguyên` : ""}`,
+    );
+  }
+  return NextResponse.json({ ok: true, ...result });
 }

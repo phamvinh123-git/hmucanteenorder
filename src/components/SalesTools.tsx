@@ -168,6 +168,8 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   const [scanBusy, setScanBusy] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [fixingScanId, setFixingScanId] = useState<string | null>(null);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [confirmMergeAll, setConfirmMergeAll] = useState(false);
   const [lowMealOnly, setLowMealOnly] = useState(false);
   const [mismatchOnly, setMismatchOnly] = useState(false);
   // Admin: editing a meal package (number of meals, price, note).
@@ -208,6 +210,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
   async function runScan() {
     setScanBusy(true);
     setScanError(null);
+    setConfirmMergeAll(false);
     try {
       const res = await fetch("/api/students/duplicates");
       const data = await res.json();
@@ -221,24 +224,26 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
     }
   }
 
-  // Moves the extra meal of every double-booked slot of one student to the next free day, one after another
-  // (each move looks at the days taken by the previous ones). A picked-up meal stays; otherwise the later one moves.
-  async function fixScanStudent(student: DuplicateScan["students"][number]) {
-    setFixingScanId(student.studentId);
+  // Merges the double bookings into one meal each, for one student or for everyone (see the server action).
+  async function mergeDuplicates(studentId?: string) {
+    setFixingScanId(studentId ?? "ALL");
     setScanError(null);
     try {
-      for (const slot of student.slots) {
-        const keeper = slot.sessions.find((x) => x.pickedUp) ?? slot.sessions[0];
-        for (const x of slot.sessions.filter((y) => y.id !== keeper.id && !y.pickedUp)) {
-          const res = await fetch(`/api/sessions/${x.id}/move-duplicate`, { method: "POST" });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            setScanError(`${student.name}: ${data.error ?? "không dời được"}`);
-            await runScan();
-            return;
-          }
-        }
+      const res = await fetch("/api/students/duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(studentId ? { studentId } : {}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setScanError(data.error ?? "Không gộp được.");
+        return;
       }
+      setScanMessage(
+        data.merged > 0
+          ? `Đã gộp: bỏ ${data.merged} suất trùng của ${data.students} sinh viên${data.skipped ? `; ${data.skipped} suất đã lấy cơm nên giữ nguyên` : ""}.`
+          : "Không có suất nào cần gộp.",
+      );
       await runScan();
       loadStudents();
     } finally {
@@ -1013,7 +1018,10 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
           )}
           {canResetAll && (
             <button
-              onClick={runScan}
+              onClick={() => {
+                setScanMessage(null);
+                runScan();
+              }}
               disabled={scanBusy}
               className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
               title="Quét tất cả sinh viên xem còn bạn nào có hai suất cùng ngày và cùng bữa"
@@ -1067,6 +1075,32 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                 Đóng
               </button>
             </div>
+            {scanMessage && <p className="mt-1 text-xs text-green-700">{scanMessage}</p>}
+            {scan.students.length > 0 &&
+              (confirmMergeAll ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-red-50 p-2 text-xs animate-pop-in">
+                  <span className="text-slate-700">
+                    Gộp mỗi ngày và bữa trùng thành 1 suất cho cả {scan.students.length} sinh viên? Suất thừa bị bỏ (không bù).
+                  </span>
+                  <button
+                    onClick={() => mergeDuplicates()}
+                    disabled={fixingScanId !== null}
+                    className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {fixingScanId === "ALL" ? "Đang gộp..." : "Xác nhận gộp tất cả"}
+                  </button>
+                  <button onClick={() => setConfirmMergeAll(false)} className="rounded-lg border border-slate-300 px-3 py-1 hover:bg-slate-50">
+                    Thôi
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmMergeAll(true)}
+                  className="mt-2 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                >
+                  Gộp tất cả buổi trùng
+                </button>
+              ))}
             {scan.students.length > 0 && (
               <ul className="mt-2 divide-y divide-slate-100">
                 {scan.students.map((st) => (
@@ -1090,11 +1124,11 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                         Xem
                       </button>
                       <button
-                        onClick={() => fixScanStudent(st)}
+                        onClick={() => mergeDuplicates(st.studentId)}
                         disabled={fixingScanId !== null}
                         className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                       >
-                        {fixingScanId === st.studentId ? "Đang dời..." : "Dời sang ngày trống"}
+                        {fixingScanId === st.studentId ? "Đang gộp..." : "Gộp buổi trùng"}
                       </button>
                     </span>
                   </li>
