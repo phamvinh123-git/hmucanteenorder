@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessAdmin, getSession } from "@/lib/auth";
+import { canAccessStats, getSession } from "@/lib/auth";
 import { reconcileRegistration } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
 
-// Admin-only: gives one registration the meals it is short of compared with what the student bought.
+// Manager/admin: gives one registration the meals it is short of compared with what the student bought.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessStats(session.role)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const { id } = await params;

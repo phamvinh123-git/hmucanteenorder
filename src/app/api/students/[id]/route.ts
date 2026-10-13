@@ -32,8 +32,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Không tìm thấy sinh viên." }, { status: 404 });
   }
 
-  // The balance of each package (bought vs eaten, remaining, cancelled) is for the admin only.
-  const balances = session.role === "ADMIN" ? await registrationBalances(student.registrations) : new Map();
+  // The balance of each package (bought vs eaten, remaining, cancelled) is for managers and admins.
+  const balances = canAccessStats(session.role) ? await registrationBalances(student.registrations) : new Map();
 
   return NextResponse.json({
     id: student.id,

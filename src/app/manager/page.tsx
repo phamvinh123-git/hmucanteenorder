@@ -7,7 +7,7 @@ export default async function ManagerPage() {
 
   return (
     <AppShell role={user.role} name={user.name}>
-      <SalesTools canResetAll isAdmin={user.role === "ADMIN"} />
+      <SalesTools canResetAll />
     </AppShell>
   );
 }

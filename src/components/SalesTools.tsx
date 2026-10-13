@@ -115,7 +115,7 @@ const emptyForm = {
   note: "",
 };
 
-export default function SalesTools({ canResetAll = false, isAdmin = false }: { canResetAll?: boolean; isAdmin?: boolean }) {
+export default function SalesTools({ canResetAll = false }: { canResetAll?: boolean }) {
   const [showResetAll, setShowResetAll] = useState(false);
   const [resettingAll, setResettingAll] = useState(false);
   const [resetAllError, setResetAllError] = useState<string | null>(null);
@@ -1008,7 +1008,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
           >
             ⚠ Cần gia hạn
           </button>
-          {isAdmin && (
+          {canResetAll && (
           <button
             onClick={() => setMismatchOnly((v) => !v)}
             className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
@@ -1323,7 +1323,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                 </div>
                 <div className={`text-sm font-medium whitespace-nowrap xl:text-right ${s.lowMeal ? "text-red-600" : "text-slate-700"}`}>
                   Còn {s.remaining} buổi
-                  {isAdmin && s.missing !== 0 && (
+                  {canResetAll && s.missing !== 0 && (
                     <span
                       className={`block text-xs font-semibold ${s.missing > 0 ? "text-red-600" : "text-amber-600"}`}
                       title="So với số buổi đã mua trừ buổi đã ăn và buổi đã xóa. Mở Chi tiết để xem và bù."
@@ -1378,7 +1378,7 @@ export default function SalesTools({ canResetAll = false, isAdmin = false }: { c
                             {r.totalSessions} buổi ({PATTERN_LABEL[r.mealPattern]}), {currency.format(r.pricePerMeal)}/suất,
                             bắt đầu {fmtDate(r.startDate)}
                             {r.note ? ` — ${r.note}` : ""}
-                            {isAdmin &&
+                            {canResetAll &&
                               (editPkgId === r.id ? (
                                 <span className="mt-1 block rounded-lg bg-white p-2 animate-pop-in">
                                   <span className="flex flex-wrap items-end gap-2">

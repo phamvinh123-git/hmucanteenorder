@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { canAccessAdmin, getSession } from "@/lib/auth";
+import { canAccessStats, getSession } from "@/lib/auth";
 import { updateRegistrationPackage } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 
@@ -12,11 +12,11 @@ const schema = z.object({
   priceForEaten: z.boolean().optional(),
 });
 
-// Admin-only: edit a meal package (number of meals, price per meal, note).
+// Manager/admin: edit a meal package (number of meals, price per meal, note).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
-    return NextResponse.json({ error: "Chỉ Admin mới được chỉnh sửa gói ăn." }, { status: 403 });
+  if (!session || !canAccessStats(session.role)) {
+    return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được chỉnh sửa gói ăn." }, { status: 403 });
   }
   const { id } = await params;
 
