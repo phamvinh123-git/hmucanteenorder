@@ -182,6 +182,10 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [pkgError, setPkgError] = useState<string | null>(null);
   // Two meals on the same day and meal: moving the extra one to a free day.
   const [movingId, setMovingId] = useState<string | null>(null);
+  // Cancelling a meal on the student's behalf (with a make-up meal), after a confirmation on the row.
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   // Giving back meals a student is short of (or taking off a surplus), one registration at a time with a confirmation.
   const [rebalanceConfirmId, setRebalanceConfirmId] = useState<string | null>(null);
@@ -429,6 +433,32 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       }
     } finally {
       setPkgBusy(false);
+    }
+  }
+
+  async function cancelForStudent(studentId: string, sessionId: string) {
+    setCancellingId(sessionId);
+    setCancelError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setCancelError(data.error ?? "Không thể hủy buổi ăn.");
+        return;
+      }
+      setCancelConfirmId(null);
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) {
+        const d: StudentDetail = await res2.json();
+        setDetail(d);
+        const remaining = d.sessions.filter((x) => x.status === "SCHEDULED").length;
+        setStudents((prev) =>
+          prev.map((x) => (x.id === studentId ? { ...x, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : x)),
+        );
+      }
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -1559,7 +1589,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                       <div>
                         <p className="font-semibold text-slate-700">Lịch buổi ăn</p>
                         <p className="mb-1 text-xs text-slate-500">
-                          <b>Xóa</b>: bỏ hẳn buổi, không bù · <b>Khôi phục</b>: trả buổi đã hủy về lịch · <b>Dời</b>: chuyển buổi trùng sang
+                          <b>Hủy hộ + bù</b>: sinh viên hủy buổi, được bù 1 buổi · <b>Xóa</b>: bỏ hẳn buổi, không bù · <b>Khôi phục</b>: trả buổi đã hủy về lịch · <b>Dời</b>: chuyển buổi trùng sang
                           ngày trống.
                         </p>
                         <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
@@ -1602,6 +1632,36 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                           {movingId === sx.id ? "Đang dời..." : "Dời sang ngày trống"}
                                         </button>
                                       )}
+                                      {canRemove && !sx.pickedUp &&
+                                        (cancelConfirmId === sx.id ? (
+                                          <>
+                                            <span className="text-red-700">Hủy buổi này và bù 1 buổi?</span>
+                                            <button
+                                              onClick={() => cancelForStudent(s.id, sx.id)}
+                                              disabled={cancellingId === sx.id}
+                                              className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                            >
+                                              {cancellingId === sx.id ? "Đang hủy..." : "Hủy + bù"}
+                                            </button>
+                                            <button
+                                              onClick={() => setCancelConfirmId(null)}
+                                              className="rounded-lg border border-slate-300 px-2.5 py-1 hover:bg-slate-50"
+                                            >
+                                              Thôi
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <button
+                                            onClick={() => {
+                                              setCancelConfirmId(sx.id);
+                                              setCancelError(null);
+                                            }}
+                                            title="Hủy buổi này giúp sinh viên (bỏ qua giờ chốt) và tự thêm một buổi bù vào ngày trống"
+                                            className="rounded-lg border border-red-300 bg-white px-2.5 py-1 font-medium text-red-700 hover:bg-red-50"
+                                          >
+                                            Hủy hộ + bù
+                                          </button>
+                                        ))}
                                       {canRemove &&
                                         (removeConfirmId === sx.id ? (
                                           <>
@@ -1675,6 +1735,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                         {restoreError && <p className="mt-1 text-xs text-red-600">{restoreError}</p>}
                         {removeError && <p className="mt-1 text-xs text-red-600">{removeError}</p>}
                         {moveError && <p className="mt-1 text-xs text-red-600">{moveError}</p>}
+                        {cancelError && <p className="mt-1 text-xs text-red-600">{cancelError}</p>}
                       </div>
 
                       {/* ---- 4. A meal the student ate that was never entered */}

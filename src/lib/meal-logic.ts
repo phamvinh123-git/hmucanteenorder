@@ -131,7 +131,10 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
   });
 
   if (opts.bypassDeadline) {
-    if (session.status !== "SCHEDULED") {
+    // Staff cancelling for the student: the cutoff does not apply, and a meal that has just passed
+    // without being picked up can still be cancelled (and made up).
+    const open = session.status === "SCHEDULED" || (session.status === "COMPLETED" && !session.pickedUp);
+    if (!open) {
       throw new Error("Buổi ăn này không còn ở trạng thái có thể hủy.");
     }
   } else {

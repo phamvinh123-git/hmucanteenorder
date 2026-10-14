@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { canAccessStats, getSession } from "@/lib/auth";
 import { cancelOfficerSession, cancelSessionAndExtend } from "@/lib/meal-logic";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Anyone may cancel their own meal: a student, an officer, or a manager who is also an officer.
   const isOwner = target.studentId === session.userId;
-  const isAdmin = session.role === "ADMIN";
+  // Managers and admins can also cancel a student's meal for them (the student asked, or missed the cutoff).
+  const isAdmin = canAccessStats(session.role);
   if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: "Không có quyền hủy buổi ăn này." }, { status: 403 });
   }
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await logActivity(
       session.userId,
       "CANCEL_SESSION",
-      `Hủy buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), tự động thêm buổi ${localDateKey(
+      `${isOwner ? "" : "Hủy hộ sinh viên: "}Hủy buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), tự động thêm buổi ${localDateKey(
         result.newSession.date,
       )} (${result.newSession.mealType})`,
     );
