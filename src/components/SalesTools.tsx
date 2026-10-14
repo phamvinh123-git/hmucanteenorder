@@ -1745,8 +1745,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             <p className="text-xs font-semibold text-slate-700">Ghi nhận buổi đã ăn nhưng chưa có trong lịch</p>
                             <p className="text-xs text-slate-500">
                               Dùng khi nhân viên quên đăng ký một buổi mà bạn ấy đã ăn (ví dụ chọn nhầm &quot;Bắt đầu từ tối&quot; dù
-                              bạn ấy đã ăn trưa). Buổi được ghi là đã ăn, và hệ thống bớt 1 buổi cuối lịch để tổng số buổi không đổi. Ghi
-                              nhận được cả bữa trưa lẫn tối.
+                              bạn ấy đã ăn trưa). Buổi được ghi là đã ăn, và hệ thống lấy đúng buổi cuối cùng còn lại trong lịch hiện tại của bạn
+                              ấy (kể cả gói khác, kể cả buổi bù) chuyển sang ngày đã ăn, nên tổng số buổi không đổi. Ghi nhận được cả
+                              bữa trưa lẫn tối.
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               {detail.registrations.length > 1 && (

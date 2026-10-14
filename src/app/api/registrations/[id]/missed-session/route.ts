@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { recordMissedSession } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
+import { localDateKey } from "@/lib/client-session-rules";
 
 const schema = z.object({
   date: z.string().min(1),
@@ -39,9 +40,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       session.userId,
       "RECORD_MISSED_SESSION",
       `Ghi nhận buổi ${parsed.data.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${parsed.data.date} bị bỏ sót cho ${registration.student.name} (${registration.student.phone})` +
-        (result.removedFutureSessionId ? ", tự động bớt 1 buổi cuối để bù" : ", không có buổi tương lai nào để bớt"),
+        (result.movedFrom
+          ? `, lấy buổi cuối lịch (${localDateKey(result.movedFrom.date)} ${result.movedFrom.mealType === "LUNCH" ? "trưa" : "tối"}) chuyển sang`
+          : ", không còn buổi nào sắp tới để lấy nên thêm như buổi phát sinh"),
     );
-    return NextResponse.json({ ok: true, removedFutureSessionId: result.removedFutureSessionId });
+    return NextResponse.json({ ok: true, moved: result.movedFrom !== null });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Không thể ghi nhận buổi ăn.";
     return NextResponse.json({ error: message }, { status: 400 });

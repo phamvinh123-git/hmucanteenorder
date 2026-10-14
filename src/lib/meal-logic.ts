@@ -348,10 +348,33 @@ async function unremoveSession(session: { id: string; studentId: string; date: D
   if (clash) throw new Error("Sinh viên đã có một buổi ăn khác vào đúng ngày và bữa này, không khôi phục được.");
   // A removed meal that had been eaten goes back to "finished"; an unused one goes back to "scheduled".
   const wasEaten = session.pickedUp || !!session.note?.includes("buổi đã ăn");
-  const restored = await prisma.mealSession.update({
-    where: { id: session.id },
-    data: { status: wasEaten ? "COMPLETED" : "SCHEDULED", cancelledAt: null, note: null },
-  });
+
+  // A meal that was given up when a missed meal was recorded comes back in exchange for the student's real last
+  // meal (which may be a different one by now), so the student keeps the same number of meals.
+  const swappedBack = session.note?.startsWith(SWAPPED_NOTE)
+    ? await lastUpcomingSession(session.studentId, session.id)
+    : null;
+  const giveUp =
+    swappedBack && compareSlots(swappedBack, session) > 0 ? swappedBack : null;
+
+  const [restored] = await prisma.$transaction([
+    prisma.mealSession.update({
+      where: { id: session.id },
+      data: { status: wasEaten ? "COMPLETED" : "SCHEDULED", cancelledAt: null, note: null },
+    }),
+    ...(giveUp
+      ? [
+          prisma.mealSession.update({
+            where: { id: giveUp.id },
+            data: {
+              status: "CANCELLED",
+              cancelledAt: new Date(),
+              note: `${SWAPPED_NOTE} để đổi chỗ khi khôi phục buổi ngày ${localDateKey(session.date).split("-").reverse().join("/")}`,
+            },
+          }),
+        ]
+      : []),
+  ]);
   return { restored, removedCompensationId: undefined as string | undefined };
 }
 
@@ -692,12 +715,23 @@ export async function backfillMissingOrderCodes() {
   return missing.length;
 }
 
+/** The student's last meal still to come, over every registration: what the schedule ends with right now. */
+async function lastUpcomingSession(studentId: string, exceptId?: string) {
+  const upcoming = await prisma.mealSession.findMany({
+    where: { studentId, status: "SCHEDULED", pickedUp: false, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    select: { id: true, date: true, mealType: true, registrationId: true },
+  });
+  return upcoming.length > 0 ? [...upcoming].sort(compareSlots).at(-1)! : null;
+}
+
 /**
  * Data-entry fix: staff forgot to register a meal the student already ate (e.g. picked "start
  * from dinner" although lunch that day was already served). Either lunch or dinner can be recorded
- * whatever the registration's package (lunch only, dinner only or both). Records that meal as eaten today
- * (or an earlier date), and — since the student only paid for `totalSessions` meals — gives up
- * the registration's last still-scheduled slot so the total actually served doesn't grow.
+ * whatever the package. The student only paid for so many meals, so the schedule must not grow: the meal
+ * that is LAST in the student's schedule as it stands now (over all their registrations, make-up meals
+ * included) is moved to the missed day and marked as eaten. The student ends up with the same number of
+ * meals, the schedule loses its last one, and every registration still adds up. Only when nothing is left
+ * to come is the missed meal added to the chosen registration as an extra.
  */
 export async function recordMissedSession(params: { registrationId: string; date: Date; mealType: MealType }) {
   const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
@@ -714,41 +748,38 @@ export async function recordMissedSession(params: { registrationId: string; date
     throw new Error("Sinh viên đã có buổi ăn vào đúng ngày và bữa này rồi.");
   }
 
-  const scheduled = await prisma.mealSession.findMany({
-    where: { registrationId: registration.id, status: "SCHEDULED" },
-    select: { id: true, date: true, mealType: true },
-  });
-  const last = scheduled.length > 0 ? [...scheduled].sort(compareSlots).at(-1)! : null;
+  const last = await lastUpcomingSession(registration.studentId);
+  const note = "Bổ sung buổi bị bỏ sót khi đăng ký (sinh viên đã ăn nhưng chưa được ghi nhận)";
 
-  const [created] = await prisma.$transaction([
-    prisma.mealSession.create({
+  if (last) {
+    const created = await prisma.mealSession.update({
+      where: { id: last.id },
       data: {
-        registrationId: registration.id,
-        studentId: registration.studentId,
         date: day,
         mealType: params.mealType,
         status: "COMPLETED",
         pickedUp: true,
         pickedUpAt: new Date(),
-        price: registration.pricePerMeal,
-        note: "Bổ sung buổi bị bỏ sót khi đăng ký (sinh viên đã ăn nhưng chưa được ghi nhận)",
+        note: `${note}; lấy buổi cuối lịch (${localDateKey(last.date).split("-").reverse().join("/")} ${last.mealType === "LUNCH" ? "trưa" : "tối"}) chuyển sang`,
       },
-    }),
-    ...(last
-      ? [
-          prisma.mealSession.update({
-            where: { id: last.id },
-            data: {
-              status: "CANCELLED",
-              cancelledAt: new Date(),
-              note: `${SWAPPED_NOTE} để bù cho buổi bị bỏ sót ở trên`,
-            },
-          }),
-        ]
-      : []),
-  ]);
+    });
+    return { created, movedFrom: { date: last.date, mealType: last.mealType } };
+  }
 
-  return { created, removedFutureSessionId: last?.id ?? null };
+  const created = await prisma.mealSession.create({
+    data: {
+      registrationId: registration.id,
+      studentId: registration.studentId,
+      date: day,
+      mealType: params.mealType,
+      status: "COMPLETED",
+      pickedUp: true,
+      pickedUpAt: new Date(),
+      price: registration.pricePerMeal,
+      note,
+    },
+  });
+  return { created, movedFrom: null };
 }
 
 /**
