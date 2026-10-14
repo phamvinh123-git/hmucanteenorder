@@ -1597,7 +1597,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                             .map((sx) => {
                               const cancelled = sx.status === "CANCELLED";
-                              const removed = !!sx.note && (sx.note.startsWith("Xóa thủ công") || sx.note.startsWith("Giảm gói"));
+                              const removed = !!sx.note && (sx.note.startsWith("Xóa thủ công") || sx.note.startsWith("Giảm gói") || sx.note.startsWith("Tự động bớt"));
                               const dup = !cancelled && dupSlots.has(slotId(sx));
                               const badge = cancelled
                                 ? { text: removed ? "Đã xóa" : "Đã hủy", cls: "bg-slate-100 text-slate-500" }

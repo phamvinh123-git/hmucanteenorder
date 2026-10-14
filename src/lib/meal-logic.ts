@@ -101,7 +101,7 @@ export const REMOVED_NOTE = "Xóa thủ công";
 /** Start of the note on a scheduled meal taken off the end of a registration when an admin shrinks the package. */
 const TRIMMED_NOTE = "Giảm gói";
 /** Start of the note on the last meal given up when a missed meal is recorded (see recordMissedSession). */
-const SWAPPED_NOTE = "Tự động bớt buổi cuối";
+export const SWAPPED_NOTE = "Tự động bớt buổi cuối";
 
 const slotKey = (slot: { date: Date; mealType: MealType }) => `${localDateKey(slot.date)}-${slot.mealType}`;
 
@@ -332,9 +332,12 @@ export async function moveDuplicateSession(sessionId: string) {
   return { moved, from: { date: session.date, mealType: session.mealType } };
 }
 
-/** Is this note the one left by a staff removal or a package trim? */
+/**
+ * Is this note the one left by a meal that staff took out on purpose: a removal, a package trim, or the last
+ * meal given up when a missed meal was recorded? Such a meal can be put back by a manager or admin.
+ */
 function isStaffRemoval(note: string | null) {
-  return !!note && (note.startsWith(REMOVED_NOTE) || note.startsWith(TRIMMED_NOTE));
+  return !!note && (note.startsWith(REMOVED_NOTE) || note.startsWith(TRIMMED_NOTE) || note.startsWith(SWAPPED_NOTE));
 }
 
 /** Puts back a meal that staff removed (or that a package trim dropped), as it was before. */
