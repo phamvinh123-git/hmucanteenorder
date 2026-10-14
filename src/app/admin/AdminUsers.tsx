@@ -288,47 +288,47 @@ export default function AdminUsers() {
           {visible.map((u, i) => (
             <div
               key={u.id}
-              className="p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 animate-rise-in hover:bg-red-50/40 transition-colors"
+              className="p-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 animate-rise-in hover:bg-red-50/40 transition-colors"
               style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
             >
-              <div className="sm:w-56">
+              <div className="sm:w-44 sm:flex-shrink-0">
                 <p className="text-sm font-medium text-slate-800">{u.name}</p>
                 <p className="text-xs text-slate-400">
                   {u.staffCode ? `Mã CB: ${u.staffCode}${u.phone !== u.staffCode ? ` · ${u.phone}` : ""}` : u.phone}
                 </p>
                 {u.department && <p className="text-xs text-slate-500">{u.department}</p>}
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">{ROLE_LABEL[u.role]}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit whitespace-nowrap sm:flex-shrink-0">{ROLE_LABEL[u.role]}</span>
               {u.isOfficer && u.role !== "OFFICER" && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit" title="Tài khoản này cũng đặt cơm trưa như cán bộ">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit whitespace-nowrap sm:flex-shrink-0" title="Tài khoản này cũng đặt cơm trưa như cán bộ">
                   + Cán bộ
                 </span>
               )}
               {u.isOfficer && u.autoRegister && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 w-fit" title="Cơm trưa thứ 2 đến thứ 6 được đăng ký tự động mỗi tuần">
-                  Tự động đăng ký
+                <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 w-fit whitespace-nowrap sm:flex-shrink-0" title="Cơm trưa thứ 2 đến thứ 6 được đăng ký tự động mỗi tuần">
+                  Tự động ĐK
                 </span>
               )}
-              {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit">Đã khóa</span>}
+              {!u.active && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 w-fit whitespace-nowrap sm:flex-shrink-0">Đã khóa</span>}
               {u.mustChangePassword && u.role === "STUDENT" && (
                 <span
-                  className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit"
+                  className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit whitespace-nowrap sm:flex-shrink-0"
                   title="Sinh viên chưa đổi mật khẩu nên vẫn dùng mật khẩu mặc định"
                 >
                   Chưa đổi MK · mật khẩu là <span className="font-mono font-semibold">123</span>
                 </span>
               )}
               {u.mustChangePassword && u.role !== "STUDENT" && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit">Chưa đổi MK</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 w-fit whitespace-nowrap sm:flex-shrink-0">Chưa đổi MK</span>
               )}
               {!u.mustChangePassword && u.role === "STUDENT" && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 w-fit">Đã tự đặt mật khẩu</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 w-fit whitespace-nowrap sm:flex-shrink-0">Đã tự đặt mật khẩu</span>
               )}
               <div className="flex-1" />
-              <div className="flex gap-2">
+              <div className="flex flex-nowrap items-center gap-1.5 sm:flex-shrink-0">
                 <button
                   onClick={() => patchUser(u.id, { active: !u.active })}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  className="whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                 >
                   {u.active ? "Khóa" : "Mở khóa"}
                 </button>
@@ -339,13 +339,13 @@ export default function AdminUsers() {
                         setConfirmingResetId(null);
                         patchUser(u.id, { resetPassword: true });
                       }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md hover:-translate-y-0.5 animate-pop-in"
+                      className="whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md hover:-translate-y-0.5 animate-pop-in"
                     >
                       Xác nhận reset
                     </button>
                     <button
                       onClick={() => setConfirmingResetId(null)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 animate-pop-in"
+                      className="whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 animate-pop-in"
                     >
                       Thôi
                     </button>
@@ -353,7 +353,7 @@ export default function AdminUsers() {
                 ) : (
                   <button
                     onClick={() => setConfirmingResetId(u.id)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                    className="whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                   >
                     Reset mật khẩu
                   </button>
@@ -366,7 +366,7 @@ export default function AdminUsers() {
                         ? "Bỏ quyền đặt cơm trưa như cán bộ của tài khoản này"
                         : "Cho tài khoản này đặt cơm trưa như cán bộ (vẫn dùng chung một đăng nhập)"
                     }
-                    className={`text-xs px-3 py-1.5 rounded-lg border ${
+                    className={`whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border ${
                       u.isOfficer
                         ? "border-red-300 bg-red-50 text-red-700"
                         : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
@@ -383,7 +383,7 @@ export default function AdminUsers() {
                         ? "Tắt tự động đăng ký cơm trưa mỗi tuần cho cán bộ này"
                         : "Tự động đăng ký cơm trưa thứ 2 đến thứ 6 mỗi tuần cho cán bộ này (vẫn bỏ được từng ngày)"
                     }
-                    className={`text-xs px-3 py-1.5 rounded-lg border ${
+                    className={`whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border ${
                       u.autoRegister
                         ? "border-sky-300 bg-sky-50 text-sky-700"
                         : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
@@ -395,7 +395,7 @@ export default function AdminUsers() {
                 <button
                   onClick={() => (editingId === u.id ? setEditingId(null) : startEdit(u))}
                   title="Sửa số điện thoại hoặc mã cán bộ nếu nhập sai"
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  className="whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                 >
                   {editingId === u.id ? "Đóng" : "Sửa đăng nhập"}
                 </button>
