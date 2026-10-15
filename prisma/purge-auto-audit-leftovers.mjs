@@ -4,6 +4,8 @@
 // Each such row was the make-up of a cancelled meal. To keep every package adding up, that cancelled meal is
 // marked as one staff took out on purpose ("Xóa thủ công - hủy không bù"): it is not owed a make-up. A row with
 // no cancelled meal behind it is left alone (deleting it would make its package look short), and counted in the log.
+// Only data from the Excel import is touched: registrations created at or before the import (the IMPORT_ROSTER
+// log entry; without one, before 21/09/2026). Students who registered new in the app after that are left exactly as they are.
 // Runs once (activity-log marker) and must never stop the server from starting: failures are caught and logged,
 // exit code is 0.
 import { PrismaClient } from "@prisma/client";
@@ -18,10 +20,14 @@ try {
   if (done) {
     console.log("purge-auto-audit-leftovers: already handled, skipping");
   } else {
-    const leftovers = await prisma.mealSession.findMany({
-      where: { status: "CANCELLED", note: { startsWith: LEFTOVER } },
+    const importLog = await prisma.activityLog.findFirst({ where: { action: "IMPORT_ROSTER" }, orderBy: { createdAt: "asc" } });
+    const importedUntil = importLog?.createdAt ?? new Date("2026-09-21T00:00:00+07:00");
+
+    const found = await prisma.mealSession.findMany({
+      where: { status: "CANCELLED", note: { startsWith: LEFTOVER }, registration: { createdAt: { lte: importedUntil } } },
       select: { id: true, compensationForId: true },
     });
+    const leftovers = found;
     const linked = leftovers.filter((l) => l.compensationForId);
     const unlinked = leftovers.length - linked.length;
 
@@ -50,7 +56,8 @@ try {
 
     const detail =
       `Dọn các buổi bù tự động đã hoàn tác: xóa ${linked.length} buổi` +
-      (unlinked > 0 ? `, giữ nguyên ${unlinked} buổi không gắn với buổi hủy nào` : "");
+      (unlinked > 0 ? `, giữ nguyên ${unlinked} buổi không gắn với buổi hủy nào` : "") +
+      " (chỉ dữ liệu nhập từ Excel; sinh viên đăng ký mới trong hệ thống được giữ nguyên)";
     await prisma.activityLog.create({ data: { userId: null, action: ACTION, detail } });
     console.log("purge-auto-audit-leftovers:", detail);
   }
