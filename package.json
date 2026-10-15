@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "start:render": "prisma migrate deploy && node prisma/bootstrap.mjs && node prisma/import-roster.mjs && node prisma/fix-student-schedule.mjs && node prisma/delete-test-officer.mjs && node prisma/import-officers.mjs && node prisma/set-officer-departments.mjs && node prisma/undo-auto-audit.mjs && next start",
+    "start:render": "prisma migrate deploy && node prisma/bootstrap.mjs && node prisma/import-roster.mjs && node prisma/fix-student-schedule.mjs && node prisma/delete-test-officer.mjs && node prisma/import-officers.mjs && node prisma/set-officer-departments.mjs && node prisma/undo-auto-audit.mjs && node prisma/purge-auto-audit-leftovers.mjs && next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts"
   },
