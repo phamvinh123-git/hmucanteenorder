@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
 import { logActivity } from "@/lib/log";
+import { setPickedUp } from "@/lib/meal-logic";
 
 const schema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(500),
@@ -23,16 +23,13 @@ export async function PATCH(req: NextRequest) {
   }
   const { ids, pickedUp } = parsed.data;
 
-  const result = await prisma.mealSession.updateMany({
-    where: { id: { in: ids } },
-    data: { pickedUp, pickedUpAt: pickedUp ? new Date() : null },
-  });
+  const count = await setPickedUp(ids, pickedUp);
 
   await logActivity(
     session.userId,
     "BULK_PICKUP",
-    `${pickedUp ? "Tích" : "Bỏ tích"} "Đã lấy" cho ${result.count} suất ăn cùng lúc`,
+    `${pickedUp ? "Tích" : "Bỏ tích"} "Đã lấy" cho ${count} suất ăn cùng lúc`,
   );
 
-  return NextResponse.json({ ok: true, count: result.count });
+  return NextResponse.json({ ok: true, count });
 }

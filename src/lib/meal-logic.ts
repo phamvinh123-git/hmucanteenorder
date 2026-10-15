@@ -84,6 +84,8 @@ export async function syncCompletedSessions(studentId?: string) {
       status: "SCHEDULED",
       OR: [
         { date: { lt: today } },
+        // A meal ticked "Đã lấy" is used, even before its finishing time.
+        { pickedUp: true },
         // (Not on a launch day when lunch stays open for registering and cancelling until midnight.)
         ...(hour >= LUNCH_DONE_HOUR && !ALL_DAY_LUNCH_DATES.includes(localDateKey(today))
           ? [{ date: today, mealType: "LUNCH" as const }]
@@ -94,6 +96,50 @@ export async function syncCompletedSessions(studentId?: string) {
     },
     data: { status: "COMPLETED" },
   });
+}
+
+/** Has the time of this meal passed (so it counts as finished even if nobody picked it up)? */
+function mealTimeOver(date: Date, mealType: MealType, now: Date) {
+  const today = startOfDay(now);
+  if (date.getTime() < today.getTime()) return true;
+  if (date.getTime() > today.getTime()) return false;
+  if (mealType === "DINNER") return now.getHours() >= DINNER_DONE_HOUR;
+  return now.getHours() >= LUNCH_DONE_HOUR && !ALL_DAY_LUNCH_DATES.includes(localDateKey(today));
+}
+
+/**
+ * Ticks or unticks "Đã lấy" for meals. A meal that is picked up is used up at once: it moves from "scheduled"
+ * to "completed" and drops out of the student's remaining count (it used to stay in until 14:00 / 20:00).
+ * Unticking puts it back to "scheduled" if its time has not passed yet. Cancelled meals are left alone.
+ * Returns how many meals were changed.
+ */
+export async function setPickedUp(ids: string[], pickedUp: boolean) {
+  const now = new Date();
+  const sessions = await prisma.mealSession.findMany({
+    where: { id: { in: ids }, status: { not: "CANCELLED" } },
+    select: { id: true, date: true, mealType: true },
+  });
+  if (sessions.length === 0) return 0;
+
+  if (pickedUp) {
+    await prisma.mealSession.updateMany({
+      where: { id: { in: sessions.map((s) => s.id) } },
+      data: { pickedUp: true, pickedUpAt: now, status: "COMPLETED" },
+    });
+  } else {
+    const back = sessions.filter((s) => !mealTimeOver(s.date, s.mealType, now)).map((s) => s.id);
+    const stay = sessions.filter((s) => mealTimeOver(s.date, s.mealType, now)).map((s) => s.id);
+    if (back.length > 0) {
+      await prisma.mealSession.updateMany({
+        where: { id: { in: back } },
+        data: { pickedUp: false, pickedUpAt: null, status: "SCHEDULED" },
+      });
+    }
+    if (stay.length > 0) {
+      await prisma.mealSession.updateMany({ where: { id: { in: stay } }, data: { pickedUp: false, pickedUpAt: null } });
+    }
+  }
+  return sessions.length;
 }
 
 /** Start of the note on a meal staff took out for good: it has no make-up and is not owed back. */

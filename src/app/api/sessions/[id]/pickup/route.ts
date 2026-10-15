@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessSalesTools, getSession } from "@/lib/auth";
+import { setPickedUp } from "@/lib/meal-logic";
 
 const schema = z.object({ pickedUp: z.boolean() });
 
@@ -22,13 +23,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy buổi ăn." }, { status: 404 });
   }
 
-  await prisma.mealSession.update({
-    where: { id },
-    data: {
-      pickedUp: parsed.data.pickedUp,
-      pickedUpAt: parsed.data.pickedUp ? new Date() : null,
-    },
-  });
+  if (target.status === "CANCELLED") {
+    return NextResponse.json({ error: "Buổi ăn này đã hủy, không thể tích đã lấy." }, { status: 400 });
+  }
+
+  await setPickedUp([id], parsed.data.pickedUp);
 
   return NextResponse.json({ ok: true });
 }
