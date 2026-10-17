@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+canteen
+deploy
+backups
+*.db
+*.db.backup*
+npm-debug.log*
+tsconfig.tsbuildinfo

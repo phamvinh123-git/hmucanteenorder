@@ -31,7 +31,8 @@ export async function createSessionCookie(payload: SessionPayload) {
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // HTTPS in production. COOKIE_SECURE=false allows logging in over plain HTTP (a test server without a certificate).
+    secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "true" : process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });

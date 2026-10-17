@@ -41,3 +41,7 @@ npm run start
 ```
 
 SQLite phù hợp để chạy thử/nội bộ. Khi triển khai thật, nên đổi `DATABASE_URL` trong `.env` sang PostgreSQL/MySQL và cập nhật `provider` trong `prisma/schema.prisma`.
+
+## Triển khai trên máy chủ riêng (Docker)
+
+Ngoài Render, hệ thống chạy được trên bất kỳ máy chủ Linux có Docker (ví dụ máy chủ của Viettel): cơ sở dữ liệu PostgreSQL, website và HTTPS tự động. Xem hướng dẫn từng bước, kể cả cách chuyển dữ liệu từ Render, trong [deploy/HUONG-DAN-CHUYEN-SANG-VIETTEL.md](deploy/HUONG-DAN-CHUYEN-SANG-VIETTEL.md).

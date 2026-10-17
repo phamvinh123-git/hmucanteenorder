@@ -1,0 +1,56 @@
+# Canteen site on one server: PostgreSQL + the app + Caddy (web server that also gets the HTTPS certificate).
+# Put the settings in a file named ".env" next to this file (copy deploy/env.example), then:
+#   docker compose up -d --build
+services:
+  db:
+    # Same major version as the database on Render (it is shown in the Render dashboard), so the dump restores cleanly.
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: canteen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Hãy đặt POSTGRES_PASSWORD trong file .env}
+      POSTGRES_DB: canteen
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canteen -d canteen"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # No "ports": the database is only reachable from the app, never from outside.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://canteen:${POSTGRES_PASSWORD}@db:5432/canteen
+      AUTH_SECRET: ${AUTH_SECRET:?Hãy đặt AUTH_SECRET trong file .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TZ: Asia/Ho_Chi_Minh
+      # Only needed the first time a list is imported; leave empty afterwards.
+      OFFICERS_DATA_B64: ${OFFICERS_DATA_B64:-}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # A domain name (the certificate is obtained by itself), or ":80" to serve plain HTTP.
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

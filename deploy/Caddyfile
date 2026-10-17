@@ -1,0 +1,4 @@
+{$CADDY_DOMAIN::80} {
+	encode gzip
+	reverse_proxy app:3000
+}
