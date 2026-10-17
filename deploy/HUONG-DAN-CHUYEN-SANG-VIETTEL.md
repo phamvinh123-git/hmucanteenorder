@@ -157,6 +157,18 @@ cd /opt/canteen && sh deploy/update.sh
 
 Lệnh tự lấy mã mới, build lại, chạy lại website. Cơ sở dữ liệu giữ nguyên, các thay đổi cấu trúc dữ liệu tự áp dụng khi khởi động. Website ngừng khoảng 1 đến 2 phút trong lúc khởi động lại.
 
+### Tự động cập nhật (không cần ai đăng nhập vào máy chủ)
+
+Để mỗi lần đẩy code lên GitHub, máy chủ tự lấy bản mới và chạy lại trong vòng vài phút, thêm vào cron:
+
+```bash
+crontab -e
+# thêm dòng:
+*/5 * * * * /opt/canteen/deploy/auto-update.sh >> /opt/canteen/backups/auto-update.log 2>&1
+```
+
+Mỗi lần có bản mới, script tự sao lưu cơ sở dữ liệu trước rồi mới cập nhật. Không cần mật khẩu nào ngoài lần cài đặt ban đầu. Xem kết quả: `tail /opt/canteen/backups/auto-update.log`. Muốn tạm dừng tự cập nhật thì đặt dấu `#` đầu dòng trong cron.
+
 ## 12. Bảo mật tối thiểu
 
 - Tường lửa chỉ mở cổng 80 và 443 ra ngoài, SSH (22) giới hạn theo IP của bạn. Không mở cổng 5432 (database chỉ nội bộ, đã cấu hình sẵn như vậy).
