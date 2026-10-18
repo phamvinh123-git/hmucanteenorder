@@ -1012,10 +1012,12 @@ async function lastUpcomingSession(studentId: string, exceptId?: string) {
 }
 
 /**
- * Staff fix for a meal the student cancelled that never made it into the schedule (so its make-up was never
- * given): the meal is added to the registration as already cancelled (the package grows by that one meal) and its
- * make-up meal goes to the first empty slot after it, exactly as if the student had cancelled it in time.
- * The student ends up with one more meal to come; the package still adds up.
+ * Staff fix for a meal the student cancelled that never made it into the schedule: it is added to the registration
+ * as already cancelled. The package keeps the number of meals that was paid for, so nobody gets a meal for free:
+ *  - if the package already has all its meals (eaten + to come + removed = bought), the cancelled meal is only
+ *    recorded and no make-up is added;
+ *  - if the package is short (so the student really lost this meal), one make-up meal is added at the first
+ *    empty slot after it, as if the student had cancelled in time.
  */
 export async function addCancelledWithMakeup(params: { registrationId: string; date: Date; mealType: MealType }) {
   const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
@@ -1035,7 +1037,11 @@ export async function addCancelledWithMakeup(params: { registrationId: string; d
     );
   }
 
-  const makeup = nextFreeSlot({ date: day, mealType: params.mealType }, registration.mealPattern, blockedSlotKeys(studentSlots), true);
+  const balance = (await registrationBalances([registration])).get(registration.id)!;
+  const short = balance.missing > 0;
+  const makeup = short
+    ? nextFreeSlot({ date: day, mealType: params.mealType }, registration.mealPattern, blockedSlotKeys(studentSlots), true)
+    : null;
 
   return prisma.$transaction(async (tx) => {
     const cancelled = await tx.mealSession.create({
@@ -1049,18 +1055,19 @@ export async function addCancelledWithMakeup(params: { registrationId: string; d
         price: registration.pricePerMeal,
       },
     });
-    const created = await tx.mealSession.create({
-      data: {
-        registrationId: registration.id,
-        studentId: registration.studentId,
-        date: makeup.date,
-        mealType: makeup.mealType,
-        status: "SCHEDULED",
-        price: registration.pricePerMeal,
-        compensationForId: cancelled.id,
-      },
-    });
-    await tx.mealRegistration.update({ where: { id: registration.id }, data: { totalSessions: { increment: 1 } } });
+    const created = makeup
+      ? await tx.mealSession.create({
+          data: {
+            registrationId: registration.id,
+            studentId: registration.studentId,
+            date: makeup.date,
+            mealType: makeup.mealType,
+            status: "SCHEDULED",
+            price: registration.pricePerMeal,
+            compensationForId: cancelled.id,
+          },
+        })
+      : null;
     return { cancelled, newSession: created };
   });
 }

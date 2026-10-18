@@ -11,8 +11,8 @@ const schema = z.object({
   mealType: z.enum(["LUNCH", "DINNER"]),
 });
 
-// Manager/admin: adds a meal the student cancelled but that was never in the schedule, as already cancelled,
-// together with its make-up meal. See addCancelledWithMakeup.
+// Manager/admin: adds a meal the student cancelled but that was never in the schedule, as already cancelled. A
+// make-up meal is added only when the package is short of meals. See addCancelledWithMakeup.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || !canAccessStats(session.role)) {
@@ -40,9 +40,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await logActivity(
       session.userId,
       "ADD_CANCELLED_MEAL",
-      `Hủy hộ ${registration.student.name} (${registration.student.phone}) buổi ${parsed.data.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${parsed.data.date} chưa có trong lịch, thêm buổi bù ${localDateKey(result.newSession.date)} (${result.newSession.mealType === "LUNCH" ? "trưa" : "tối"}), gói tăng 1 buổi`,
+      `Thêm buổi ${parsed.data.mealType === "LUNCH" ? "trưa" : "tối"} ngày ${parsed.data.date} đã hủy (chưa có trong lịch) cho ${registration.student.name} (${registration.student.phone}): ${
+        result.newSession
+          ? `gói đang thiếu buổi nên thêm buổi bù ${localDateKey(result.newSession.date)} (${result.newSession.mealType === "LUNCH" ? "trưa" : "tối"})`
+          : "gói đã đủ số buổi nên không thêm buổi bù"
+      }`,
     );
-    return NextResponse.json({ ok: true, newSession: result.newSession });
+    return NextResponse.json({
+      ok: true,
+      makeup: result.newSession ? { date: result.newSession.date, mealType: result.newSession.mealType } : null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Không thể thêm buổi hủy.";
     return NextResponse.json({ error: message }, { status: 400 });

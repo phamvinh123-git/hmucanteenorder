@@ -191,6 +191,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [addCancelMeal, setAddCancelMeal] = useState<"LUNCH" | "DINNER">("LUNCH");
   const [addCancelBusy, setAddCancelBusy] = useState(false);
   const [addCancelError, setAddCancelError] = useState<string | null>(null);
+  const [addCancelMessage, setAddCancelMessage] = useState<string | null>(null);
   const [compactBusy, setCompactBusy] = useState(false);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
   const [lowMealOnly, setLowMealOnly] = useState(false);
@@ -514,6 +515,11 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         return;
       }
       setAddCancelOpenId(null);
+      setAddCancelMessage(
+        data.makeup
+          ? `Đã thêm buổi đã hủy. Gói đang thiếu buổi nên có thêm buổi bù ngày ${fmtDate(data.makeup.date)} (${data.makeup.mealType === "LUNCH" ? "trưa" : "tối"}).`
+          : "Đã thêm buổi đã hủy vào lịch. Gói đã đủ số buổi đã mua nên không thêm buổi bù và số buổi giữ nguyên.",
+      );
       loadStudents();
       const res2 = await fetch(`/api/students/${studentId}`);
       if (res2.ok) {
@@ -1961,11 +1967,11 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
                           {addCancelOpenId === s.id ? (
                             <div className="space-y-2 animate-pop-in">
-                              <p className="text-xs font-semibold text-slate-700">Thêm buổi hủy hộ (có bù)</p>
+                              <p className="text-xs font-semibold text-slate-700">Thêm buổi đã hủy vào lịch</p>
                               <p className="text-xs text-slate-500">
-                                Dùng khi bạn ấy đã hủy một buổi mà buổi đó không còn trong lịch (nên chưa được bù). Hệ thống thêm buổi
-                                đó vào gói dưới dạng đã hủy, rồi thêm một buổi bù vào ngày trống đầu tiên sau đó. Gói tăng 1 buổi,
-                                bạn ấy có thêm 1 buổi sắp tới.
+                                Dùng khi bạn ấy đã hủy một buổi mà buổi đó không còn trong lịch. Hệ thống thêm buổi đó vào lịch dưới
+                                dạng <b>đã hủy</b>. Số buổi của gói giữ nguyên như đã mua: nếu gói đã đủ buổi thì chỉ ghi nhận, không
+                                thêm buổi bù; chỉ khi gói đang thiếu buổi mới thêm một buổi bù.
                               </p>
                               <div className="flex flex-wrap items-center gap-2">
                                 {detail.registrations.length > 1 && (
@@ -2000,7 +2006,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                   disabled={addCancelBusy}
                                   className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
                                 >
-                                  {addCancelBusy ? "Đang lưu..." : "Thêm buổi hủy + bù"}
+                                  {addCancelBusy ? "Đang lưu..." : "Thêm buổi đã hủy"}
                                 </button>
                                 <button
                                   onClick={() => setAddCancelOpenId(null)}
@@ -2013,7 +2019,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                             </div>
                           ) : (
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-xs text-slate-500">Bạn ấy đã hủy một buổi mà buổi đó không có trong lịch?</p>
+                              <p className="text-xs text-slate-500">
+                                {addCancelMessage ?? "Bạn ấy đã hủy một buổi mà buổi đó không có trong lịch?"}
+                              </p>
                               <button
                                 onClick={() => {
                                   setAddCancelOpenId(s.id);
@@ -2021,11 +2029,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                   setAddCancelDate(localDateKey(new Date()));
                                   setAddCancelMeal("LUNCH");
                                   setAddCancelError(null);
+                                  setAddCancelMessage(null);
                                 }}
                                 disabled={detail.registrations.length === 0}
                                 className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                + Thêm buổi hủy hộ
+                                + Thêm buổi đã hủy
                               </button>
                             </div>
                           )}
