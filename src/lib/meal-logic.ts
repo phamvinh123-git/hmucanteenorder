@@ -1012,6 +1012,60 @@ async function lastUpcomingSession(studentId: string, exceptId?: string) {
 }
 
 /**
+ * Staff fix for a meal the student cancelled that never made it into the schedule (so its make-up was never
+ * given): the meal is added to the registration as already cancelled (the package grows by that one meal) and its
+ * make-up meal goes to the first empty slot after it, exactly as if the student had cancelled it in time.
+ * The student ends up with one more meal to come; the package still adds up.
+ */
+export async function addCancelledWithMakeup(params: { registrationId: string; date: Date; mealType: MealType }) {
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
+  const day = startOfDay(params.date);
+
+  const studentSlots = await prisma.mealSession.findMany({
+    where: { studentId: registration.studentId },
+    select: { date: true, mealType: true, status: true, note: true },
+  });
+  const key = slotKey({ date: day, mealType: params.mealType });
+  const taken = studentSlots.find((s) => slotKey(s) === key && (s.status !== "CANCELLED" || s.note === null));
+  if (taken) {
+    throw new Error(
+      taken.status === "CANCELLED"
+        ? "Buổi này đã được hủy rồi, không cần thêm."
+        : "Sinh viên đang có buổi ăn này trong lịch. Hãy dùng nút Hủy hộ + bù ở hàng buổi đó.",
+    );
+  }
+
+  const makeup = nextFreeSlot({ date: day, mealType: params.mealType }, registration.mealPattern, blockedSlotKeys(studentSlots), true);
+
+  return prisma.$transaction(async (tx) => {
+    const cancelled = await tx.mealSession.create({
+      data: {
+        registrationId: registration.id,
+        studentId: registration.studentId,
+        date: day,
+        mealType: params.mealType,
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        price: registration.pricePerMeal,
+      },
+    });
+    const created = await tx.mealSession.create({
+      data: {
+        registrationId: registration.id,
+        studentId: registration.studentId,
+        date: makeup.date,
+        mealType: makeup.mealType,
+        status: "SCHEDULED",
+        price: registration.pricePerMeal,
+        compensationForId: cancelled.id,
+      },
+    });
+    await tx.mealRegistration.update({ where: { id: registration.id }, data: { totalSessions: { increment: 1 } } });
+    return { cancelled, newSession: created };
+  });
+}
+
+/**
  * Data-entry fix: staff forgot to register a meal the student already ate (e.g. picked "start
  * from dinner" although lunch that day was already served). Either lunch or dinner can be recorded
  * whatever the package. The student only paid for so many meals, so the schedule must not grow: the meal

@@ -184,6 +184,13 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [audit, setAudit] = useState<SystemAudit | null>(null);
   const [auditBusy, setAuditBusy] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  // Adding a cancelled meal that was never in the schedule (with its make-up meal).
+  const [addCancelOpenId, setAddCancelOpenId] = useState<string | null>(null);
+  const [addCancelRegId, setAddCancelRegId] = useState("");
+  const [addCancelDate, setAddCancelDate] = useState(localDateKey(new Date()));
+  const [addCancelMeal, setAddCancelMeal] = useState<"LUNCH" | "DINNER">("LUNCH");
+  const [addCancelBusy, setAddCancelBusy] = useState(false);
+  const [addCancelError, setAddCancelError] = useState<string | null>(null);
   const [compactBusy, setCompactBusy] = useState(false);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
   const [lowMealOnly, setLowMealOnly] = useState(false);
@@ -488,6 +495,37 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       }
     } finally {
       setPkgBusy(false);
+    }
+  }
+
+  async function submitAddCancelled(studentId: string) {
+    if (!addCancelRegId) return;
+    setAddCancelBusy(true);
+    setAddCancelError(null);
+    try {
+      const res = await fetch(`/api/registrations/${addCancelRegId}/add-cancelled`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: addCancelDate, mealType: addCancelMeal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAddCancelError(data.error ?? "Không thể thêm buổi hủy.");
+        return;
+      }
+      setAddCancelOpenId(null);
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) {
+        const d: StudentDetail = await res2.json();
+        setDetail(d);
+        const remaining = d.sessions.filter((x) => x.status === "SCHEDULED").length;
+        setStudents((prev) =>
+          prev.map((x) => (x.id === studentId ? { ...x, remaining, lowMeal: remaining <= LOW_MEAL_THRESHOLD } : x)),
+        );
+      }
+    } finally {
+      setAddCancelBusy(false);
     }
   }
 
@@ -1917,6 +1955,82 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                         {moveError && <p className="mt-1 text-xs text-red-600">{moveError}</p>}
                         {cancelError && <p className="mt-1 text-xs text-red-600">{cancelError}</p>}
                       </div>
+
+                      {/* ---- 4b. A meal the student cancelled that was never in the schedule */}
+                      {canResetAll && (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                          {addCancelOpenId === s.id ? (
+                            <div className="space-y-2 animate-pop-in">
+                              <p className="text-xs font-semibold text-slate-700">Thêm buổi hủy hộ (có bù)</p>
+                              <p className="text-xs text-slate-500">
+                                Dùng khi bạn ấy đã hủy một buổi mà buổi đó không còn trong lịch (nên chưa được bù). Hệ thống thêm buổi
+                                đó vào gói dưới dạng đã hủy, rồi thêm một buổi bù vào ngày trống đầu tiên sau đó. Gói tăng 1 buổi,
+                                bạn ấy có thêm 1 buổi sắp tới.
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {detail.registrations.length > 1 && (
+                                  <select
+                                    value={addCancelRegId}
+                                    onChange={(e) => setAddCancelRegId(e.target.value)}
+                                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                  >
+                                    {detail.registrations.map((r) => (
+                                      <option key={r.id} value={r.id}>
+                                        Gói từ {fmtDate(r.startDate)} ({r.totalSessions} buổi)
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                                <input
+                                  type="date"
+                                  value={addCancelDate}
+                                  onChange={(e) => setAddCancelDate(e.target.value)}
+                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                />
+                                <select
+                                  value={addCancelMeal}
+                                  onChange={(e) => setAddCancelMeal(e.target.value as "LUNCH" | "DINNER")}
+                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                >
+                                  <option value="LUNCH">Bữa trưa</option>
+                                  <option value="DINNER">Bữa tối</option>
+                                </select>
+                                <button
+                                  onClick={() => submitAddCancelled(s.id)}
+                                  disabled={addCancelBusy}
+                                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {addCancelBusy ? "Đang lưu..." : "Thêm buổi hủy + bù"}
+                                </button>
+                                <button
+                                  onClick={() => setAddCancelOpenId(null)}
+                                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+                                >
+                                  Thôi
+                                </button>
+                              </div>
+                              {addCancelError && <p className="text-xs text-red-600">{addCancelError}</p>}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs text-slate-500">Bạn ấy đã hủy một buổi mà buổi đó không có trong lịch?</p>
+                              <button
+                                onClick={() => {
+                                  setAddCancelOpenId(s.id);
+                                  setAddCancelRegId(detail.registrations[0]?.id ?? "");
+                                  setAddCancelDate(localDateKey(new Date()));
+                                  setAddCancelMeal("LUNCH");
+                                  setAddCancelError(null);
+                                }}
+                                disabled={detail.registrations.length === 0}
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                + Thêm buổi hủy hộ
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* ---- 4. A meal the student ate that was never entered */}
                       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
