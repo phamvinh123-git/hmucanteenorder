@@ -75,9 +75,8 @@ export const REGISTRATION_DEADLINE_HOUR = 15;
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
 const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
-  // Trial week: the whole week of 12/10 (Mon-Fri) can be ordered so everyone gets used to it; the week of
-  // 19/10 is open at the same time under the normal rule.
-  { monday: "2026-10-12", until: "2026-10-16" },
+  // The week of 19/10 can be ordered until 9:00 on Monday 19/10 (instead of 15:00 the Sunday before).
+  { monday: "2026-10-19", until: "2026-10-19", untilTime: "09:00" },
 ];
 
 /** The Sunday before `weekMonday` at 15:00 — the last moment that week can be ordered. */
