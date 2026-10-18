@@ -738,10 +738,10 @@ export async function updateRegistrationPackage(params: {
 /**
  * Closes the gaps in one student's upcoming make-up meals: each make-up meal that is still to come moves to the
  * earliest free slot that is after the meal it makes up for and can still be booked (following its package's
- * pattern), when that is earlier than where it sits now. Only the day and meal of those make-up meals change:
+ * pattern), when that is earlier than where it sits now. With `apply` false nothing is written: it only counts. Only the day and meal of those make-up meals change:
  * nobody gains or loses a meal, and meals already eaten or picked up are never touched. Returns how many moved.
  */
-export async function compactStudentUpcoming(studentId: string) {
+export async function compactStudentUpcoming(studentId: string, apply = true) {
   const sessions = await prisma.mealSession.findMany({
     where: { studentId },
     select: {
@@ -778,12 +778,151 @@ export async function compactStudentUpcoming(studentId: string) {
       break;
     }
     if (!target) continue;
-    await prisma.mealSession.update({ where: { id: m.id }, data: { date: target.date, mealType: target.mealType } });
+    if (apply) {
+      await prisma.mealSession.update({ where: { id: m.id }, data: { date: target.date, mealType: target.mealType } });
+    }
     blocked.delete(slotKey(m));
     blocked.add(slotKey(target));
     moved += 1;
   }
   return moved;
+}
+
+export type AuditStudentRef = { studentId: string; name: string; phone: string; orderCode: number | null };
+
+export type SystemAudit = {
+  checkedStudents: number;
+  checkedRegistrations: number;
+  /** Two live meals on the same day and meal. */
+  duplicates: (AuditStudentRef & { slots: number })[];
+  /** Registrations whose meals do not add up with what was bought. */
+  mismatches: (AuditStudentRef & {
+    registrationId: string;
+    startDate: Date;
+    total: number;
+    used: number;
+    upcoming: number;
+    removed: number;
+    missing: number;
+  })[];
+  /** Make-up meals that would move to an earlier empty slot (gaps in the schedule). */
+  gaps: (AuditStudentRef & { moves: number })[];
+  /** Make-up meals that sit before the cancelled meal they make up for. */
+  outOfOrder: (AuditStudentRef & { count: number })[];
+  /** Registrations whose start date is not the day of their first meal. */
+  startMismatch: (AuditStudentRef & { registrationId: string; startDate: Date; firstMeal: Date })[];
+};
+
+/**
+ * Read-only check of every active student: double bookings, packages that do not add up, gaps in the make-up
+ * meals, make-up meals out of order and registrations whose start date does not match their first meal.
+ * Nothing is changed; each finding has its own fix.
+ */
+export async function auditSystem(): Promise<SystemAudit> {
+  const students = await prisma.user.findMany({
+    where: { role: "STUDENT", active: true },
+    select: { id: true, name: true, phone: true, orderCode: true },
+  });
+  const ref = new Map(students.map((s) => [s.id, { studentId: s.id, name: s.name, phone: s.phone, orderCode: s.orderCode }]));
+  const ids = students.map((s) => s.id);
+
+  const [registrations, sessions] = await Promise.all([
+    prisma.mealRegistration.findMany({
+      where: { studentId: { in: ids } },
+      select: { id: true, studentId: true, startDate: true, totalSessions: true },
+    }),
+    prisma.mealSession.findMany({
+      where: { studentId: { in: ids } },
+      select: {
+        id: true,
+        studentId: true,
+        registrationId: true,
+        date: true,
+        mealType: true,
+        status: true,
+        compensationForId: true,
+        compensationFor: { select: { date: true, mealType: true } },
+      },
+    }),
+  ]);
+
+  // Double bookings
+  const live = new Map<string, number>();
+  for (const s of sessions) {
+    if (s.status === "CANCELLED") continue;
+    const key = `${s.studentId}|${slotKey(s)}`;
+    live.set(key, (live.get(key) ?? 0) + 1);
+  }
+  const dupByStudent = new Map<string, number>();
+  for (const [key, n] of live) {
+    if (n > 1) {
+      const id = key.split("|")[0];
+      dupByStudent.set(id, (dupByStudent.get(id) ?? 0) + 1);
+    }
+  }
+  const duplicates = [...dupByStudent].map(([id, slots]) => ({ ...ref.get(id)!, slots }));
+
+  // Packages that do not add up
+  const balances = await registrationBalances(registrations);
+  const mismatches = registrations
+    .filter((r) => (balances.get(r.id)?.missing ?? 0) !== 0)
+    .map((r) => {
+      const b = balances.get(r.id)!;
+      return {
+        ...ref.get(r.studentId)!,
+        registrationId: r.id,
+        startDate: r.startDate,
+        total: r.totalSessions,
+        used: b.completed,
+        upcoming: b.scheduled,
+        removed: b.removed,
+        missing: b.missing,
+      };
+    });
+
+  // Make-up meals before the meal they make up for
+  const outByStudent = new Map<string, number>();
+  for (const s of sessions) {
+    if (s.status === "CANCELLED" || !s.compensationFor) continue;
+    if (compareSlots(s, s.compensationFor) < 0) outByStudent.set(s.studentId, (outByStudent.get(s.studentId) ?? 0) + 1);
+  }
+  const outOfOrder = [...outByStudent].map(([id, count]) => ({ ...ref.get(id)!, count }));
+
+  // Start date vs first meal of each registration
+  const firstByReg = new Map<string, Date>();
+  for (const s of sessions) {
+    const cur = firstByReg.get(s.registrationId);
+    if (!cur || s.date.getTime() < cur.getTime()) firstByReg.set(s.registrationId, s.date);
+  }
+  const startMismatch = registrations
+    .filter((r) => {
+      const first = firstByReg.get(r.id);
+      return first && localDateKey(first) !== localDateKey(r.startDate);
+    })
+    .map((r) => ({ ...ref.get(r.studentId)!, registrationId: r.id, startDate: r.startDate, firstMeal: firstByReg.get(r.id)! }));
+
+  // Gaps: a dry run of the compaction
+  const withUpcomingMakeup = [
+    ...new Set(
+      sessions.filter((s) => s.status === "SCHEDULED" && s.compensationForId).map((s) => s.studentId),
+    ),
+  ];
+  const gaps: SystemAudit["gaps"] = [];
+  for (const id of withUpcomingMakeup) {
+    const moves = await compactStudentUpcoming(id, false);
+    if (moves > 0) gaps.push({ ...ref.get(id)!, moves });
+  }
+
+  const byOrder = <T extends AuditStudentRef>(a: T, b: T) => (a.orderCode ?? 1e9) - (b.orderCode ?? 1e9) || a.name.localeCompare(b.name, "vi");
+  return {
+    checkedStudents: students.length,
+    checkedRegistrations: registrations.length,
+    duplicates: duplicates.sort(byOrder),
+    mismatches: mismatches.sort(byOrder),
+    gaps: gaps.sort(byOrder),
+    outOfOrder: outOfOrder.sort(byOrder),
+    startMismatch: startMismatch.sort(byOrder),
+  };
 }
 
 /** Runs compactStudentUpcoming for every active student that has an upcoming make-up meal. */

@@ -170,6 +170,20 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [fixingScanId, setFixingScanId] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmMergeAll, setConfirmMergeAll] = useState(false);
+  // Read-only check of every student's meals (see /api/students/audit).
+  type AuditRef = { studentId: string; name: string; phone: string; orderCode: number | null };
+  type SystemAudit = {
+    checkedStudents: number;
+    checkedRegistrations: number;
+    duplicates: (AuditRef & { slots: number })[];
+    mismatches: (AuditRef & { registrationId: string; startDate: string; total: number; used: number; upcoming: number; removed: number; missing: number })[];
+    gaps: (AuditRef & { moves: number })[];
+    outOfOrder: (AuditRef & { count: number })[];
+    startMismatch: (AuditRef & { registrationId: string; startDate: string; firstMeal: string })[];
+  };
+  const [audit, setAudit] = useState<SystemAudit | null>(null);
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const [compactBusy, setCompactBusy] = useState(false);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
   const [lowMealOnly, setLowMealOnly] = useState(false);
@@ -229,8 +243,27 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           : (data.error ?? "Không dồn được."),
       );
       loadStudents();
+      if (audit) runAudit();
     } finally {
       setCompactBusy(false);
+    }
+  }
+
+  async function runAudit() {
+    setAuditBusy(true);
+    setAuditError(null);
+    try {
+      const res = await fetch("/api/students/audit");
+      const data = await res.json();
+      if (!res.ok) {
+        setAuditError(data.error ?? "Không rà soát được.");
+        return;
+      }
+      setAudit(data);
+    } catch {
+      setAuditError("Không rà soát được.");
+    } finally {
+      setAuditBusy(false);
     }
   }
 
@@ -1097,6 +1130,16 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           )}
           {canResetAll && (
             <button
+              onClick={runAudit}
+              disabled={auditBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+              title="Kiểm tra toàn bộ sinh viên: buổi trùng, gói không khớp số buổi, khoảng trống trong lịch bù, bù sai thứ tự, ngày bắt đầu lệch. Chỉ xem, không sửa gì."
+            >
+              {auditBusy ? "Đang rà soát..." : "Rà soát hệ thống"}
+            </button>
+          )}
+          {canResetAll && (
+            <button
               onClick={compactMakeups}
               disabled={compactBusy}
               className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
@@ -1138,6 +1181,108 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           )}
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
+        {auditError && <p className="text-sm rounded-lg bg-red-50 text-red-700 px-3 py-2 mb-2">{auditError}</p>}
+        {audit && canResetAll && (
+          <div className="mb-2 rounded-xl border border-slate-200 bg-white p-3 text-sm animate-pop-in">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-slate-700">
+                Đã rà soát {audit.checkedStudents} sinh viên, {audit.checkedRegistrations} gói ăn.
+                {audit.duplicates.length + audit.mismatches.length + audit.gaps.length + audit.outOfOrder.length + audit.startMismatch.length === 0 && (
+                  <span className="text-green-700"> ✓ Mọi thứ khớp.</span>
+                )}
+              </p>
+              <button onClick={() => setAudit(null)} className="text-xs text-slate-400 hover:text-slate-600">
+                Đóng
+              </button>
+            </div>
+
+            {(
+              [
+                {
+                  key: "dup",
+                  title: "Buổi bị trùng (hai suất cùng ngày, cùng bữa)",
+                  fix: (
+                    <button onClick={() => runScan()} className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700">
+                      Xem và gộp
+                    </button>
+                  ),
+                  rows: audit.duplicates.map((r) => ({ ref: r, text: `${r.slots} ngày bị trùng` })),
+                },
+                {
+                  key: "mismatch",
+                  title: "Gói không khớp số buổi (mua − đã dùng − sắp tới − đã xóa ≠ 0)",
+                  fix: null,
+                  rows: audit.mismatches.map((r) => ({
+                    ref: r,
+                    text: `Gói từ ${fmtDate(r.startDate)}: mua ${r.total}, đã dùng ${r.used}, sắp tới ${r.upcoming}, đã xóa ${r.removed} → ${r.missing > 0 ? `thiếu ${r.missing}` : `dư ${-r.missing}`}`,
+                  })),
+                },
+                {
+                  key: "gap",
+                  title: "Lịch bù còn khoảng trống (buổi bù có thể dồn về sớm hơn)",
+                  fix: (
+                    <button
+                      onClick={compactMakeups}
+                      disabled={compactBusy}
+                      className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {compactBusy ? "Đang dồn..." : "Dồn lịch bù"}
+                    </button>
+                  ),
+                  rows: audit.gaps.map((r) => ({ ref: r, text: `${r.moves} buổi bù có thể dồn sớm hơn` })),
+                },
+                {
+                  key: "order",
+                  title: "Buổi bù nằm trước buổi hủy mà nó bù cho",
+                  fix: null,
+                  rows: audit.outOfOrder.map((r) => ({ ref: r, text: `${r.count} buổi` })),
+                },
+                {
+                  key: "start",
+                  title: "Ngày bắt đầu gói khác ngày của buổi đầu tiên",
+                  fix: null,
+                  rows: audit.startMismatch.map((r) => ({
+                    ref: r,
+                    text: `Gói ghi bắt đầu ${fmtDate(r.startDate)}, buổi đầu tiên là ${fmtDate(r.firstMeal)}`,
+                  })),
+                },
+              ] as const
+            ).map((section) => (
+              <div key={section.key} className="mt-3 border-t border-slate-100 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-slate-700">
+                    {section.rows.length === 0 ? "✓ " : "⚠ "}
+                    {section.title}: <span className={section.rows.length === 0 ? "text-green-700" : "text-red-700"}>{section.rows.length}</span>
+                  </p>
+                  {section.rows.length > 0 && section.fix}
+                </div>
+                {section.rows.length > 0 && (
+                  <ul className="mt-1 max-h-48 divide-y divide-slate-100 overflow-y-auto">
+                    {section.rows.slice(0, 40).map((row, i) => (
+                      <li key={`${row.ref.studentId}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1 text-xs">
+                        <span className="w-10 font-mono font-bold text-red-700">{row.ref.orderCode ?? "—"}</span>
+                        <span className="font-medium text-slate-800">{row.ref.name}</span>
+                        <span className="text-slate-500">{row.text}</span>
+                        <button
+                          onClick={() => {
+                            setSearch(row.ref.phone);
+                            toggleExpand(row.ref.studentId);
+                          }}
+                          className="ml-auto text-slate-500 hover:underline"
+                        >
+                          Xem
+                        </button>
+                      </li>
+                    ))}
+                    {section.rows.length > 40 && (
+                      <li className="py-1 text-xs text-slate-400">… và {section.rows.length - 40} dòng khác</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {compactMessage && (
           <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{compactMessage}</p>
         )}
