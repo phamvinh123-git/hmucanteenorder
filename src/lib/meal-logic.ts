@@ -76,6 +76,8 @@ const DINNER_DONE_HOUR = 20;
  */
 export async function syncCompletedSessions(studentId?: string) {
   await syncOfficerAutoRegistrations();
+  // In the background: closes gaps in make-up meals once, the first time this version runs.
+  void syncOneTimeCompaction();
   const now = new Date();
   const today = startOfDay(now);
   const hour = now.getHours();
@@ -151,6 +153,17 @@ export const SWAPPED_NOTE = "Tự động bớt buổi cuối";
 
 const slotKey = (slot: { date: Date; mealType: MealType }) => `${localDateKey(slot.date)}-${slot.mealType}`;
 
+type SlotRow = { date: Date; mealType: MealType; status: SessionStatus; note: string | null };
+
+/**
+ * The slots a student's schedule really holds: every live meal, plus the meals they cancelled themselves (or that
+ * were imported as cancelled), which they gave up on purpose and must not be refilled. A cancelled row that
+ * carries a note was taken out by staff or by a clean-up (removed, merged, trimmed, undone): its slot is free.
+ */
+function blockedSlotKeys(rows: SlotRow[]) {
+  return new Set(rows.filter((r) => r.status !== "CANCELLED" || r.note === null).map(slotKey));
+}
+
 /**
  * The first slot after `from` (following the meal pattern) that is not in `occupied`. With `bookableOnly` it
  * must also still be possible to book it (not in the past, not past today's cutoff).
@@ -192,17 +205,17 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
 
   const studentSlots = await prisma.mealSession.findMany({
     where: { studentId: session.studentId },
-    select: { date: true, mealType: true },
+    select: { date: true, mealType: true, status: true, note: true },
   });
 
   // The make-up meal goes into the first empty slot after the cancelled one (following the package's meal
   // pattern) that can still be booked: a gap in the student's schedule when there is one, otherwise the day
-  // right after everything they already have. Slots the student holds in any package — or cancelled — are
-  // skipped, so two meals never land on the same day and meal, even with packages running side by side.
+  // right after everything they already have, so the schedule stays unbroken. Slots held by a live meal of any
+  // package — or cancelled by the student — are skipped: two meals never share a day and meal.
   const appended = nextFreeSlot(
     { date: session.date, mealType: session.mealType },
     session.registration.mealPattern,
-    new Set(studentSlots.map(slotKey)),
+    blockedSlotKeys(studentSlots),
     true,
   );
 
@@ -360,11 +373,11 @@ export async function moveDuplicateSession(sessionId: string) {
 
   const [regSlots, studentSlots] = await Promise.all([
     prisma.mealSession.findMany({ where: { registrationId: session.registrationId }, select: { date: true, mealType: true } }),
-    prisma.mealSession.findMany({ where: { studentId: session.studentId }, select: { date: true, mealType: true } }),
+    prisma.mealSession.findMany({ where: { studentId: session.studentId }, select: { date: true, mealType: true, status: true, note: true } }),
   ]);
   const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
   const last = [...regSlots, yesterday].sort(compareSlots).at(-1)!;
-  const slot = nextFreeSlot(last, session.registration.mealPattern, new Set(studentSlots.map(slotKey)), true);
+  const slot = nextFreeSlot(last, session.registration.mealPattern, blockedSlotKeys(studentSlots), true);
 
   const moved = await prisma.mealSession.update({
     where: { id: session.id },
@@ -622,9 +635,9 @@ async function appendMeals(
 ) {
   const [regSlots, studentSlots] = await Promise.all([
     prisma.mealSession.findMany({ where: { registrationId: registration.id }, select: { date: true, mealType: true } }),
-    prisma.mealSession.findMany({ where: { studentId: registration.studentId }, select: { date: true, mealType: true } }),
+    prisma.mealSession.findMany({ where: { studentId: registration.studentId }, select: { date: true, mealType: true, status: true, note: true } }),
   ]);
-  const occupied = new Set(studentSlots.map(slotKey));
+  const occupied = blockedSlotKeys(studentSlots);
   const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
   const last = [...regSlots, yesterday].sort(compareSlots).at(-1)!;
 
@@ -720,6 +733,93 @@ export async function updateRegistrationPackage(params: {
   }
   if (params.note !== undefined && params.note !== registration.note) summary.push("ghi chú");
   return { summary, added: Math.max(delta, 0), removed: trimmedIds.length };
+}
+
+/**
+ * Closes the gaps in one student's upcoming make-up meals: each make-up meal that is still to come moves to the
+ * earliest free slot that is after the meal it makes up for and can still be booked (following its package's
+ * pattern), when that is earlier than where it sits now. Only the day and meal of those make-up meals change:
+ * nobody gains or loses a meal, and meals already eaten or picked up are never touched. Returns how many moved.
+ */
+export async function compactStudentUpcoming(studentId: string) {
+  const sessions = await prisma.mealSession.findMany({
+    where: { studentId },
+    select: {
+      id: true,
+      date: true,
+      mealType: true,
+      status: true,
+      note: true,
+      pickedUp: true,
+      compensationForId: true,
+      compensationFor: { select: { date: true, mealType: true } },
+      registration: { select: { mealPattern: true } },
+    },
+  });
+  const blocked = blockedSlotKeys(sessions);
+  const movable = sessions
+    .filter((s) => s.status === "SCHEDULED" && !s.pickedUp && s.compensationForId)
+    .sort(compareSlots);
+
+  const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
+  let moved = 0;
+  for (const m of movable) {
+    // After the cancelled meal it makes up for, and never in the past.
+    const origin = m.compensationFor ? [m.compensationFor, yesterday].sort(compareSlots).at(-1)! : yesterday;
+    let cursor: { date: Date; mealType: MealType } = origin;
+    let target: { date: Date; mealType: MealType } | null = null;
+    for (let i = 0; i < 800; i++) {
+      cursor = nextSlot(cursor, m.registration.mealPattern);
+      if (compareSlots(cursor, m) >= 0) break;
+      if (blocked.has(slotKey(cursor)) || !canBookSlot(cursor).ok) continue;
+      target = cursor;
+      break;
+    }
+    if (!target) continue;
+    await prisma.mealSession.update({ where: { id: m.id }, data: { date: target.date, mealType: target.mealType } });
+    blocked.delete(slotKey(m));
+    blocked.add(slotKey(target));
+    moved += 1;
+  }
+  return moved;
+}
+
+/** Runs compactStudentUpcoming for every active student that has an upcoming make-up meal. */
+export async function compactAllStudents() {
+  const students = await prisma.mealSession.findMany({
+    where: { status: "SCHEDULED", pickedUp: false, compensationForId: { not: null }, student: { role: "STUDENT", active: true } },
+    select: { studentId: true },
+    distinct: ["studentId"],
+  });
+  let moved = 0;
+  let touched = 0;
+  for (const { studentId } of students) {
+    const n = await compactStudentUpcoming(studentId);
+    if (n > 0) touched += 1;
+    moved += n;
+  }
+  return { students: students.length, touched, moved };
+}
+
+let compactionChecked = false;
+
+/** Once ever (activity-log marker): closes the gaps already in the schedules. Runs in the background, never throws. */
+export async function syncOneTimeCompaction() {
+  if (compactionChecked) return;
+  compactionChecked = true;
+  try {
+    const done = await prisma.activityLog.findFirst({ where: { action: "COMPACT_MAKEUPS" } });
+    if (done) return;
+    const result = await compactAllStudents();
+    await logActivity(
+      null,
+      "COMPACT_MAKEUPS",
+      `Dồn các buổi bù về liền ngày: ${result.touched}/${result.students} sinh viên, dời ${result.moved} buổi bù vào chỗ trống`,
+    );
+  } catch (err) {
+    compactionChecked = false;
+    console.error("Compaction failed", err);
+  }
 }
 
 /** Next free order code: one past the highest currently assigned to any student. */

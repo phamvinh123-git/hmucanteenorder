@@ -170,6 +170,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [fixingScanId, setFixingScanId] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmMergeAll, setConfirmMergeAll] = useState(false);
+  const [compactBusy, setCompactBusy] = useState(false);
+  const [compactMessage, setCompactMessage] = useState<string | null>(null);
   const [lowMealOnly, setLowMealOnly] = useState(false);
   const [mismatchOnly, setMismatchOnly] = useState(false);
   // Admin: editing a meal package (number of meals, price, note).
@@ -212,6 +214,26 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   // diacritics ("khue" still finds "Khuê") — a server `contains` query couldn't do that without
   // extra DB setup, so the full list is simply kept in memory and re-fetched on changes.
   // `silent` is the automatic check when the page opens: it only shows something when it finds a double booking.
+  // Closes the gaps in every student's make-up meals (only days move; nobody gains or loses a meal).
+  async function compactMakeups() {
+    setCompactBusy(true);
+    setCompactMessage(null);
+    try {
+      const res = await fetch("/api/students/compact", { method: "POST" });
+      const data = await res.json();
+      setCompactMessage(
+        res.ok
+          ? data.moved > 0
+            ? `Đã dồn lịch bù: dời ${data.moved} buổi bù của ${data.touched} sinh viên vào chỗ trống.`
+            : "Không có buổi bù nào cần dồn: các lịch bù đã liền ngày."
+          : (data.error ?? "Không dồn được."),
+      );
+      loadStudents();
+    } finally {
+      setCompactBusy(false);
+    }
+  }
+
   async function runScan(silent = false) {
     setScanBusy(true);
     setScanError(null);
@@ -1073,6 +1095,16 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
               {scanBusy ? "Đang quét..." : "Quét trùng buổi"}
             </button>
           )}
+          {canResetAll && (
+            <button
+              onClick={compactMakeups}
+              disabled={compactBusy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+              title="Dồn các buổi bù về cho liền ngày, lấp các ngày trống. Chỉ đổi ngày, không thêm hay bớt buổi nào."
+            >
+              {compactBusy ? "Đang dồn..." : "Dồn lịch bù liền ngày"}
+            </button>
+          )}
           {priceOptions.length > 1 && (
             <>
               <span className="text-xs text-slate-300">|</span>
@@ -1106,6 +1138,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           )}
         </div>
         {backfillMessage && <p className="text-xs text-slate-500 mb-2">{backfillMessage}</p>}
+        {compactMessage && (
+          <p className="text-sm rounded-lg bg-green-50 text-green-700 px-3 py-2 mb-2 animate-pop-in">{compactMessage}</p>
+        )}
         {scanError && <p className="text-sm rounded-lg bg-red-50 text-red-700 px-3 py-2 mb-2">{scanError}</p>}
         {scan && (
           <div

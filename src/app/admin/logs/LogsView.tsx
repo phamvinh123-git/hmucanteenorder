@@ -19,6 +19,7 @@ const ACTION_LABEL: Record<string, string> = {
   IMPORT_OFFICERS: "Nhập danh sách cán bộ",
   DELETE_TEST_OFFICER: "Xóa tài khoản cán bộ thử",
   OFFICER_SAVE_WEEK: "Cán bộ đăng ký cơm tuần",
+  COMPACT_MAKEUPS: "Dồn buổi bù liền ngày",
   MERGE_DUPLICATES: "Gộp buổi ăn trùng",
   MOVE_DUPLICATE_SESSION: "Dời buổi ăn bị trùng",
   UPDATE_REGISTRATION: "Sửa gói ăn",
