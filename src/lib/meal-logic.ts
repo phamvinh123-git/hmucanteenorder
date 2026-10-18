@@ -761,7 +761,8 @@ export async function compactStudentUpcoming(studentId: string) {
     .filter((s) => s.status === "SCHEDULED" && !s.pickedUp && s.compensationForId)
     .sort(compareSlots);
 
-  const yesterday = { date: addDays(startOfDay(new Date()), -1), mealType: "DINNER" as MealType };
+  const now = new Date();
+  const yesterday = { date: addDays(startOfDay(now), -1), mealType: "DINNER" as MealType };
   let moved = 0;
   for (const m of movable) {
     // After the cancelled meal it makes up for, and never in the past.
@@ -771,7 +772,8 @@ export async function compactStudentUpcoming(studentId: string) {
     for (let i = 0; i < 800; i++) {
       cursor = nextSlot(cursor, m.registration.mealPattern);
       if (compareSlots(cursor, m) >= 0) break;
-      if (blocked.has(slotKey(cursor)) || !canBookSlot(cursor).ok) continue;
+      // Staff-side fix, so today counts until the meal itself is over (the students' own cutoff does not apply).
+      if (blocked.has(slotKey(cursor)) || mealTimeOver(cursor.date, cursor.mealType, now)) continue;
       target = cursor;
       break;
     }
