@@ -32,9 +32,20 @@ function isAllDayLunch(date: Date, now: Date) {
 
 type Cancellable = { date: Date; mealType: MealType; status: SessionStatus };
 
+/**
+ * One-off: on these days the lunch of that same day can still be added or dropped until the given hour (instead of
+ * the usual 9:00), because registration was extended. Remove an entry once it has passed.
+ */
+const LUNCH_BOOK_UNTIL_HOUR: Record<string, number> = { "2026-10-19": 10 };
+
 /** Can this lunch still be added or dropped? Same cutoff as students, except on a launch day, which lasts all day. */
 export function officerCanBook(slot: { date: Date; mealType: MealType }, now: Date = new Date()) {
   if (slot.mealType === "LUNCH" && isAllDayLunch(slot.date, now)) return { ok: true as const };
+  const key = localDateKey(slot.date);
+  const until = LUNCH_BOOK_UNTIL_HOUR[key];
+  if (slot.mealType === "LUNCH" && until !== undefined && key === localDateKey(now) && now.getHours() < until) {
+    return { ok: true as const };
+  }
   return canBookSlot(slot, now);
 }
 
@@ -75,8 +86,8 @@ export const REGISTRATION_DEADLINE_HOUR = 15;
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
 const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
-  // The week of 19/10 can be ordered until 9:00 on Monday 19/10 (instead of 15:00 the Sunday before).
-  { monday: "2026-10-19", until: "2026-10-19", untilTime: "09:00" },
+  // The week of 19/10 can be ordered until 10:00 on Monday 19/10 (instead of 15:00 the Sunday before).
+  { monday: "2026-10-19", until: "2026-10-19", untilTime: "10:00" },
 ];
 
 /** The Sunday before `weekMonday` at 15:00 — the last moment that week can be ordered. */
