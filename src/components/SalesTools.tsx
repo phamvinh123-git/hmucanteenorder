@@ -191,6 +191,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [addCancelMeal, setAddCancelMeal] = useState<"LUNCH" | "DINNER">("LUNCH");
   const [addCancelBusy, setAddCancelBusy] = useState(false);
   const [addCancelError, setAddCancelError] = useState<string | null>(null);
+  // Moving one upcoming meal to another day and meal, from a form under its row.
+  const [moveOpenId, setMoveOpenId] = useState<string | null>(null);
+  const [moveDate, setMoveDate] = useState(localDateKey(new Date()));
+  const [moveMeal, setMoveMeal] = useState<"LUNCH" | "DINNER">("LUNCH");
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [moveFormError, setMoveFormError] = useState<string | null>(null);
   const [addCancelMessage, setAddCancelMessage] = useState<string | null>(null);
   const [compactBusy, setCompactBusy] = useState(false);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
@@ -496,6 +502,29 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
       }
     } finally {
       setPkgBusy(false);
+    }
+  }
+
+  async function submitMove(studentId: string, sessionId: string) {
+    setMoveBusy(true);
+    setMoveFormError(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: moveDate, mealType: moveMeal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMoveFormError(data.error ?? "Không thể đổi ngày buổi ăn.");
+        return;
+      }
+      setMoveOpenId(null);
+      loadStudents();
+      const res2 = await fetch(`/api/students/${studentId}`);
+      if (res2.ok) setDetail(await res2.json());
+    } finally {
+      setMoveBusy(false);
     }
   }
 
@@ -1813,7 +1842,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                       <div>
                         <p className="font-semibold text-slate-700">Lịch buổi ăn</p>
                         <p className="mb-1 text-xs text-slate-500">
-                          <b>Hủy hộ + bù</b>: sinh viên hủy buổi, được bù 1 buổi · <b>Xóa</b>: bỏ hẳn buổi, không bù · <b>Khôi phục</b>: trả buổi đã hủy về lịch · <b>Dời</b>: chuyển buổi trùng sang
+                          <b>Đổi ngày</b>: chuyển buổi sang ngày khác, số buổi không đổi · <b>Hủy hộ + bù</b>: sinh viên hủy buổi, được bù 1 buổi · <b>Xóa</b>: bỏ hẳn buổi, không bù · <b>Khôi phục</b>: trả buổi đã hủy về lịch · <b>Dời</b>: chuyển buổi trùng sang
                           ngày trống.
                         </p>
                         <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
@@ -1854,6 +1883,20 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                           className="rounded-lg bg-red-600 px-2.5 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                                         >
                                           {movingId === sx.id ? "Đang dời..." : "Dời sang ngày trống"}
+                                        </button>
+                                      )}
+                                      {canRemove && !sx.pickedUp && sx.status === "SCHEDULED" && (
+                                        <button
+                                          onClick={() => {
+                                            setMoveOpenId(moveOpenId === sx.id ? null : sx.id);
+                                            setMoveDate(localDateKey(new Date()));
+                                            setMoveMeal("LUNCH");
+                                            setMoveFormError(null);
+                                          }}
+                                          title="Chuyển buổi này sang ngày và bữa khác (số buổi không đổi)"
+                                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                        >
+                                          Đổi ngày
                                         </button>
                                       )}
                                       {canRemove && !sx.pickedUp &&
@@ -1952,6 +1995,37 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                         ))}
                                     </span>
                                   </div>
+                                  {moveOpenId === sx.id && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-red-50/60 p-2 text-xs animate-pop-in">
+                                      <span className="text-slate-600">Chuyển buổi này sang:</span>
+                                      <input
+                                        type="date"
+                                        value={moveDate}
+                                        min={localDateKey(new Date())}
+                                        onChange={(e) => setMoveDate(e.target.value)}
+                                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      />
+                                      <select
+                                        value={moveMeal}
+                                        onChange={(e) => setMoveMeal(e.target.value as "LUNCH" | "DINNER")}
+                                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      >
+                                        <option value="LUNCH">Bữa trưa</option>
+                                        <option value="DINNER">Bữa tối</option>
+                                      </select>
+                                      <button
+                                        onClick={() => submitMove(s.id, sx.id)}
+                                        disabled={moveBusy}
+                                        className="rounded-lg bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                      >
+                                        {moveBusy ? "Đang đổi..." : "Đổi"}
+                                      </button>
+                                      <button onClick={() => setMoveOpenId(null)} className="rounded-lg border border-slate-300 bg-white px-3 py-1 hover:bg-slate-50">
+                                        Thôi
+                                      </button>
+                                      {moveFormError && <span className="basis-full text-red-600">{moveFormError}</span>}
+                                    </div>
+                                  )}
                                 </li>
                               );
                             })}

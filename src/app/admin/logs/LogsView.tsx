@@ -36,7 +36,7 @@ const ACTION_LABEL: Record<string, string> = {
   CANCEL_SESSIONS_BULK: "Hủy nhiều buổi ăn",
   RESTORE_SESSIONS_BULK: "Khôi phục nhiều buổi ăn",
   BULK_PICKUP: "Tích/bỏ tích đã lấy hàng loạt",
-  MOVE_SESSION: "Đổi ngày buổi bù",
+  MOVE_SESSION: "Đổi ngày buổi ăn",
   DELETE_STUDENT: "Xóa sinh viên",
   RESET_ALL_STUDENTS: "Reset toàn bộ sinh viên",
   RESTORE_ARCHIVE: "Khôi phục bản lưu trữ",

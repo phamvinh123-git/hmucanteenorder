@@ -347,6 +347,44 @@ export async function mergeDuplicateSessions(studentId?: string) {
 }
 
 /**
+ * Staff action: moves one meal that is still to come to another day and meal (e.g. a meal at the end of the
+ * schedule to today). The student keeps the same number of meals and the meal stays in its registration. The
+ * target slot must not already hold a live meal of the student, must not be in the past, and today only counts
+ * until that meal is over.
+ */
+export async function moveSessionTo(sessionId: string, target: { date: Date; mealType: MealType }) {
+  const session = await prisma.mealSession.findUniqueOrThrow({ where: { id: sessionId } });
+  if (session.status !== "SCHEDULED" || session.pickedUp) {
+    throw new Error("Chỉ đổi ngày được buổi sắp tới và chưa lấy cơm.");
+  }
+
+  const day = startOfDay(target.date);
+  const now = new Date();
+  if (mealTimeOver(day, target.mealType, now)) {
+    throw new Error("Buổi này đã qua giờ (hoặc là ngày đã qua), không đổi sang được. Hãy dùng Ghi nhận buổi đã ăn nếu bạn ấy đã ăn.");
+  }
+  if (day.getTime() === session.date.getTime() && target.mealType === session.mealType) {
+    throw new Error("Buổi này đang ở đúng ngày và bữa đó rồi.");
+  }
+
+  const clash = await prisma.mealSession.findFirst({
+    where: { studentId: session.studentId, date: day, mealType: target.mealType, status: { not: "CANCELLED" }, id: { not: session.id } },
+    select: { id: true },
+  });
+  if (clash) throw new Error("Sinh viên đã có một buổi ăn vào đúng ngày và bữa này rồi.");
+
+  const moved = await prisma.mealSession.update({
+    where: { id: session.id },
+    data: {
+      date: day,
+      mealType: target.mealType,
+      note: `Đổi từ ngày ${localDateKey(session.date).split("-").reverse().join("/")} (${session.mealType === "LUNCH" ? "trưa" : "tối"})`,
+    },
+  });
+  return { moved, from: { date: session.date, mealType: session.mealType } };
+}
+
+/**
  * Staff fix for a double booking: the student has two meals at the same day and meal. The extra one (not
  * picked up) moves to the first free day after the registration's last slot, following the meal pattern, so
  * the student still gets every meal they bought. A meal already marked finished goes back to "scheduled".
