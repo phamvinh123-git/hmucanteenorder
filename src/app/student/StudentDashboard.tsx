@@ -450,7 +450,9 @@ export default function StudentDashboard({
           }
           renderCell={(date, mealType) => {
             const key = localDateKey(date);
-            const s = (sessionsByDay.get(key) ?? []).find((x) => x.mealType === mealType);
+            // A slot can hold a cancelled leftover next to the live meal: show the live one.
+            const inSlot = (sessionsByDay.get(key) ?? []).filter((x) => x.mealType === mealType);
+            const s = inSlot.find((x) => x.status !== "CANCELLED") ?? inSlot[0];
             if (!s) {
               return <div className="h-full flex items-center justify-center text-slate-300 text-xs">—</div>;
             }

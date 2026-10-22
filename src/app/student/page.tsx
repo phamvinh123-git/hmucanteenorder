@@ -30,7 +30,11 @@ export default async function StudentPage() {
         orderCode={user.orderCode}
         major={user.major}
         className={user.className}
-        sessions={sessions.map((s) => ({
+        // Meals that staff took out for good (removed, merged, trimmed, swapped) are internal corrections: the
+        // student does not see them, or they would look like meals the student cancelled.
+        sessions={sessions
+          .filter((s) => !(s.status === "CANCELLED" && s.note && /^(Xóa thủ công|Giảm gói|Tự động bớt)/.test(s.note)))
+          .map((s) => ({
           id: s.id,
           date: s.date.toISOString(),
           mealType: s.mealType,
