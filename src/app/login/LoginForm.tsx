@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function LoginForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -78,13 +79,26 @@ export default function LoginForm() {
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
         <input
-          type="password"
+          type={showPassword ? "text" : "password"}
+          autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
           placeholder="Mật khẩu"
         />
+        <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={showPassword}
+            onChange={(e) => setShowPassword(e.target.checked)}
+            className="accent-red-600"
+          />
+          Hiện mật khẩu (để kiểm tra gõ đúng chưa)
+        </label>
       </div>
       {error && <p className="text-sm text-red-600 animate-pop-in">{error}</p>}
       <button

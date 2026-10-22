@@ -15,12 +15,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Thiếu số điện thoại / mã cán bộ hoặc mật khẩu." }, { status: 400 });
   }
 
-  const login = body.data.phone.trim();
+  // Phone keyboards and autofill often add things the person did not type: spaces or dots inside a number, a
+  // "+84" prefix, zero-width characters, a trailing space. Clean the login before looking it up.
+  const login = body.data.phone.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, " ").trim();
+  const compact = login.replace(/[\s.\-()]/g, "");
+  const phoneForm = compact.replace(/^\+?84/, "0");
+  const candidates = Array.from(new Set([login, compact, phoneForm]));
   const { password } = body.data;
   // Officers ("cán bộ") can sign in with either their phone number or their staff code (any case).
-  const user =
-    (await prisma.user.findUnique({ where: { phone: login } })) ??
-    (await prisma.user.findUnique({ where: { staffCode: login.toUpperCase() } }));
+  let user = null;
+  for (const c of candidates) {
+    user = (await prisma.user.findUnique({ where: { phone: c } })) ?? (await prisma.user.findUnique({ where: { staffCode: c.toUpperCase() } }));
+    if (user) break;
+  }
 
   if (!user || !user.active) {
     await logActivity(
@@ -31,7 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
   }
 
-  const valid = await verifyPassword(password, user.passwordHash);
+  // The password is checked as typed first. If it does not match and has spaces at either end (a phone keyboard
+  // adding one after a word is the usual cause), the trimmed text is tried too.
+  const valid =
+    (await verifyPassword(password, user.passwordHash)) ||
+    (password !== password.trim() && (await verifyPassword(password.trim(), user.passwordHash)));
   if (!valid) {
     await logActivity(user.id, "LOGIN_FAILED", `${user.name}: sai mật khẩu (nhập "${login.slice(0, 30)}")`);
     return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
