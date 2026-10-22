@@ -23,11 +23,17 @@ export async function POST(req: NextRequest) {
     (await prisma.user.findUnique({ where: { staffCode: login.toUpperCase() } }));
 
   if (!user || !user.active) {
+    await logActivity(
+      user?.id ?? null,
+      "LOGIN_FAILED",
+      user ? `${user.name}: tài khoản đang bị khóa (nhập "${login.slice(0, 30)}")` : `Không có tài khoản nào khớp với "${login.slice(0, 30)}"`,
+    );
     return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    await logActivity(user.id, "LOGIN_FAILED", `${user.name}: sai mật khẩu (nhập "${login.slice(0, 30)}")`);
     return NextResponse.json({ error: "Số điện thoại / mã cán bộ hoặc mật khẩu không đúng." }, { status: 401 });
   }
 

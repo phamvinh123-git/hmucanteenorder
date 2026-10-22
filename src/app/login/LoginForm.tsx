@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
-  const router = useRouter();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,19 +27,28 @@ export default function LoginForm() {
       try {
         sessionStorage.setItem("canteenRulesPending", "1");
       } catch {}
-      if (data.mustChangePassword) {
-        router.push("/change-password");
-      } else {
-        const homeByRole: Record<string, string> = {
-          ADMIN: "/admin",
-          MANAGER: "/manager",
-          SALES: "/sales",
-          STUDENT: "/student",
-          OFFICER: "/officer",
-        };
-        router.push(homeByRole[data.role] ?? "/");
+      // The password was right. Make sure the browser really kept the login (some in-app browsers, private
+      // windows or phones with a wrong clock drop the cookie, and the page then silently falls back to this
+      // form with no message).
+      const check = await fetch("/api/profile", { cache: "no-store", credentials: "same-origin" });
+      if (!check.ok) {
+        setError(
+          "Mật khẩu đúng nhưng trình duyệt không lưu được phiên đăng nhập. Hãy mở trang bằng Chrome hoặc Safari (không dùng trình duyệt trong Zalo/Facebook), bật cookie, tắt chế độ ẩn danh và kiểm tra ngày giờ của điện thoại.",
+        );
+        return;
       }
-      router.refresh();
+      const homeByRole: Record<string, string> = {
+        ADMIN: "/admin",
+        MANAGER: "/manager",
+        SALES: "/sales",
+        STUDENT: "/student",
+        OFFICER: "/officer",
+      };
+      // A full page load (not the client router), so the new cookie is always sent and no cached redirect is reused.
+      window.location.assign(data.mustChangePassword ? "/change-password" : (homeByRole[data.role] ?? "/"));
+      return;
+    } catch {
+      setError("Không kết nối được tới máy chủ. Hãy kiểm tra mạng rồi thử lại.");
     } finally {
       setLoading(false);
     }
