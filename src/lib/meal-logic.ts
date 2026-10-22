@@ -942,6 +942,8 @@ export async function auditSystem(): Promise<SystemAudit> {
   const outByStudent = new Map<string, number>();
   for (const s of sessions) {
     if (s.status === "CANCELLED" || !s.compensationFor) continue;
+    // A make-up meal that staff moved by hand ("Đổi ngày") may sit anywhere on purpose.
+    if (s.note?.startsWith("Đổi từ ngày")) continue;
     if (compareSlots(s, s.compensationFor) < 0) outByStudent.set(s.studentId, (outByStudent.get(s.studentId) ?? 0) + 1);
   }
   const outOfOrder = [...outByStudent].map(([id, count]) => ({ ...ref.get(id)!, count }));
