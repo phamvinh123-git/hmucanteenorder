@@ -849,6 +849,11 @@ export type SystemAudit = {
   outOfOrder: (AuditStudentRef & { count: number })[];
   /** Registrations whose start date is not the day of their first meal. */
   startMismatch: (AuditStudentRef & { registrationId: string; startDate: Date; firstMeal: Date })[];
+  /**
+   * Days and meals that hold a live meal next to a meal staff removed (the usual result of removing a double
+   * booking). Nothing to fix: the live meal counts and is what the student sees. Listed for information.
+   */
+  removedBesideLive: (AuditStudentRef & { slots: number })[];
 };
 
 /**
@@ -878,11 +883,26 @@ export async function auditSystem(): Promise<SystemAudit> {
         date: true,
         mealType: true,
         status: true,
+        note: true,
         compensationForId: true,
         compensationFor: { select: { date: true, mealType: true } },
       },
     }),
   ]);
+
+  // Slots with a live meal beside a meal staff took out
+  const liveSlots = new Set<string>();
+  for (const s of sessions) if (s.status !== "CANCELLED") liveSlots.add(`${s.studentId}|${slotKey(s)}`);
+  const besideByStudent = new Map<string, Set<string>>();
+  for (const s of sessions) {
+    if (s.status !== "CANCELLED" || !s.note || !isStaffRemoval(s.note)) continue;
+    const key = `${s.studentId}|${slotKey(s)}`;
+    if (!liveSlots.has(key)) continue;
+    const set = besideByStudent.get(s.studentId) ?? new Set<string>();
+    set.add(key);
+    besideByStudent.set(s.studentId, set);
+  }
+  const removedBesideLive = [...besideByStudent].map(([id, set]) => ({ ...ref.get(id)!, slots: set.size }));
 
   // Double bookings
   const live = new Map<string, number>();
@@ -960,6 +980,7 @@ export async function auditSystem(): Promise<SystemAudit> {
     gaps: gaps.sort(byOrder),
     outOfOrder: outOfOrder.sort(byOrder),
     startMismatch: startMismatch.sort(byOrder),
+    removedBesideLive: removedBesideLive.sort(byOrder),
   };
 }
 

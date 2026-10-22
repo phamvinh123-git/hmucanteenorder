@@ -180,6 +180,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     gaps: (AuditRef & { moves: number })[];
     outOfOrder: (AuditRef & { count: number })[];
     startMismatch: (AuditRef & { registrationId: string; startDate: string; firstMeal: string })[];
+    removedBesideLive: (AuditRef & { slots: number })[];
   };
   const [audit, setAudit] = useState<SystemAudit | null>(null);
   const [auditBusy, setAuditBusy] = useState(false);
@@ -1309,6 +1310,12 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   title: "Buổi bù nằm trước buổi hủy mà nó bù cho",
                   fix: null,
                   rows: audit.outOfOrder.map((r) => ({ ref: r, text: `${r.count} buổi` })),
+                },
+                {
+                  key: "beside",
+                  title: "Ô có buổi đã xóa nằm cạnh buổi còn hiệu lực (kết quả của việc xóa buổi trùng, không cần sửa; chỉ để biết)",
+                  fix: null,
+                  rows: audit.removedBesideLive.map((r) => ({ ref: r, text: `${r.slots} ngày/bữa` })),
                 },
                 {
                   key: "start",
