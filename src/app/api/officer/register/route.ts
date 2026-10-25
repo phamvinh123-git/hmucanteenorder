@@ -12,7 +12,7 @@ const schema = z.object({
 });
 
 // An officer ("cán bộ") sets which weekdays of a coming week they want lunch. The rules
-// (lunch only, Mon-Fri, deadline = 15:00 on the Sunday before the week) are enforced in saveOfficerWeek.
+// (lunch only, Mon-Fri, deadline = 9:00 on the Monday of the week) are enforced in saveOfficerWeek.
 export async function POST(req: NextRequest) {
   const session = await getSession();
   const officer = session ? await prisma.user.findUnique({ where: { id: session.userId }, select: { isOfficer: true, active: true } }) : null;

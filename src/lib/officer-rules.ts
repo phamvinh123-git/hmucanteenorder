@@ -2,7 +2,7 @@
 // officer page and the API.
 //
 //  - Lunch only, Monday to Friday.
-//  - A week must be ordered in the week before it: the deadline is 15:00 on the Sunday before.
+//  - A week can be ordered until 9:00 on its own Monday (the lunch cutoff of that Monday), and it opens a week ahead.
 //  - Cancelling a single day follows the same lunch cutoff as students (see session-rules.ts).
 
 import {
@@ -77,20 +77,17 @@ export function mondayOf(d: Date) {
   return x;
 }
 
-/** Hour (local time) on the Sunday before a week at which ordering that week closes. */
-export const REGISTRATION_DEADLINE_HOUR = 15;
+/** Hour (local time) on a week's own Monday at which ordering that week closes. */
+export const REGISTRATION_DEADLINE_HOUR = 9;
 
 /**
  * One-off exceptions: these weeks can still be ordered after the usual deadline — up to the end of
  * `until` (inclusive), or up to `untilTime` ("HH:MM") on that day when given. Individual days must still be
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
-const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
-  // The week of 19/10 can be ordered until 10:00 on Monday 19/10 (instead of 15:00 the Sunday before).
-  { monday: "2026-10-19", until: "2026-10-19", untilTime: "10:00" },
-];
+const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [];
 
-/** The Sunday before `weekMonday` at 15:00 — the last moment that week can be ordered. */
+/** 9:00 on `weekMonday` itself — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
   const launch = LAUNCH_WEEKS.find((w) => w.monday === localDateKey(weekMonday));
   if (launch) {
@@ -100,28 +97,32 @@ export function registrationDeadline(weekMonday: Date) {
     else end.setHours(23, 59, 59, 999);
     return end;
   }
-  const x = addDaysLocal(weekMonday, -1);
+  const x = new Date(weekMonday.getFullYear(), weekMonday.getMonth(), weekMonday.getDate());
   x.setHours(REGISTRATION_DEADLINE_HOUR, 0, 0, 0);
   return x;
 }
 
-/** Monday of the one week that is currently open for ordering. */
-export function openWeekMonday(now: Date = new Date()) {
-  const nextWeek = addDaysLocal(mondayOf(now), 7);
-  return now.getTime() <= registrationDeadline(nextWeek).getTime() ? nextWeek : addDaysLocal(nextWeek, 7);
-}
-
-/** Mondays of every week that can be ordered right now: the regular one plus any launch-exception week. */
+/**
+ * Mondays of every week that can be ordered right now. The next week is open for the whole of this week; the
+ * current week stays open until 9:00 on its Monday, so on a Monday morning both are. Any launch-exception week
+ * is added too.
+ */
 export function openWeekMondays(now: Date = new Date()) {
-  const regular = openWeekMonday(now);
-  const mondays = [regular];
+  const thisMonday = mondayOf(now);
+  const mondays = [thisMonday, addDaysLocal(thisMonday, 7)].filter((m) => now.getTime() <= registrationDeadline(m).getTime());
   for (const w of LAUNCH_WEEKS) {
     const monday = parseLocalDate(w.monday);
-    if (monday && now.getTime() <= registrationDeadline(monday).getTime() && monday.getTime() !== regular.getTime()) {
+    if (monday && now.getTime() <= registrationDeadline(monday).getTime() && !mondays.some((m) => m.getTime() === monday.getTime())) {
       mondays.push(monday);
     }
   }
   return mondays.sort((a, b) => a.getTime() - b.getTime());
+}
+
+/** Monday of the next week that can be ordered right now (the last one in `openWeekMondays`). */
+export function openWeekMonday(now: Date = new Date()) {
+  const open = openWeekMondays(now);
+  return open[open.length - 1];
 }
 
 /** Monday to Friday of the week starting at `weekMonday`. */

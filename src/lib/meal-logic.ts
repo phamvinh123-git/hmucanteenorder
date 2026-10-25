@@ -1219,7 +1219,7 @@ export async function removeSession(sessionId: string) {
 
 /**
  * Officer ("cán bộ") ordering: saves which weekdays of the week starting `weekMonday` they want
- * lunch. Only allowed until 15:00 on the Sunday before that week. Days dropped before the
+ * lunch. Only allowed until 9:00 on that week's own Monday. Days dropped before the
  * deadline are simply removed (the officer never committed to them); days that were cancelled
  * earlier and are picked again are switched back on.
  */
@@ -1228,7 +1228,7 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
   const monday = startOfDay(params.weekMonday);
   if (monday.getDay() !== 1) throw new Error("Tuần đăng ký không hợp lệ.");
   if (now.getTime() > registrationDeadline(monday).getTime()) {
-    throw new Error("Đã hết hạn đăng ký cho tuần này. Cán bộ phải đăng ký trước 15h Chủ nhật của tuần trước đó.");
+    throw new Error("Đã hết hạn đăng ký cho tuần này. Cán bộ phải đăng ký trước 9h sáng thứ 2 của tuần đó.");
   }
   // Only the week(s) currently open can be ordered — not any week further ahead.
   if (!openWeekMondays(now).some((m) => m.getTime() === monday.getTime())) {

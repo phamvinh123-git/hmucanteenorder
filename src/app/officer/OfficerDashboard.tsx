@@ -181,7 +181,7 @@ export default function OfficerDashboard({
     <div className="space-y-6">
       <PageHeader
         title="Đặt cơm trưa cho cán bộ"
-        subtitle={`Đăng ký trước 15h Chủ nhật của tuần trước · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
+        subtitle={`Đăng ký đến 9h sáng thứ 2 của tuần ăn · chỉ ăn trưa · hủy cơm trước ${cutoffHour}h00 sáng cùng ngày.`}
       >
         <a
           href="/huong-dan"
