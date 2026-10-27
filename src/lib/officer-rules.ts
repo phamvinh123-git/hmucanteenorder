@@ -85,7 +85,10 @@ export const REGISTRATION_DEADLINE_HOUR = 9;
  * `until` (inclusive), or up to `untilTime` ("HH:MM") on that day when given. Individual days must still be
  * bookable (not in the past, and today only before the lunch cutoff). Remove an entry once it has passed.
  */
-const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [];
+const LAUNCH_WEEKS: { monday: string; until: string; untilTime?: string }[] = [
+  // The week of 26/10 can still be ordered until 9:00 on Tuesday 27/10 (the usual deadline was 9:00 on Monday 26/10).
+  { monday: "2026-10-26", until: "2026-10-27", untilTime: "09:00" },
+];
 
 /** 9:00 on `weekMonday` itself — the last moment that week can be ordered. */
 export function registrationDeadline(weekMonday: Date) {
