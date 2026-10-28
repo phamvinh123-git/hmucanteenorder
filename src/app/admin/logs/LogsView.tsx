@@ -21,6 +21,8 @@ const ACTION_LABEL: Record<string, string> = {
   OFFICER_SAVE_WEEK: "Cán bộ đăng ký cơm tuần",
   ADD_CANCELLED_MEAL: "Thêm buổi đã hủy vào lịch",
   LOGIN_FAILED: "Đăng nhập không thành công",
+  COSTLY_ADD: "Giá vốn: thêm mục",
+  COSTLY_DELETE: "Giá vốn: xóa mục",
   COMPACT_MAKEUPS: "Dồn buổi bù liền ngày",
   MERGE_DUPLICATES: "Gộp buổi ăn trùng",
   MOVE_DUPLICATE_SESSION: "Dời buổi ăn bị trùng",

@@ -69,6 +69,17 @@ model User {
   logs              ActivityLog[]
 }
 
+/// The "Giá vốn" (Cost Ly) notebook: ingredients, semi-finished products ("batches") and recipes, kept as small
+/// JSON documents exactly like the original Cost Ly app stored them. One shared set for the whole canteen.
+model CostDocument {
+  collection String
+  id         String
+  data       Json
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@id([collection, id])
+}
+
 model MealRegistration {
   id            String       @id @default(cuid())
   studentId     String
