@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Cách đăng ký, hủy và nhận cơm trưa dành cho cán bộ, viên chức tại HMU THC Canteen.",
 };
 
-const SITE_URL = "https://hmu-canteen.onrender.com";
+const SITE_URL = "https://canteen.taichinhketoan-hmu.edu.vn";
 
 // A public page (no login needed) so it can be sent to staff before they have signed in once.
 // It deliberately does not state the initial password.
@@ -83,7 +83,7 @@ export default function GuidePage() {
       <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm print:shadow-none">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Địa chỉ truy cập</p>
         <a href={SITE_URL} className="mt-1 block text-xl font-extrabold text-red-600 underline decoration-red-300 underline-offset-4 sm:text-2xl">
-          hmu-canteen.onrender.com
+          canteen.taichinhketoan-hmu.edu.vn
         </a>
         <p className="mt-1 text-xs text-slate-500">Dùng được trên điện thoại và máy tính. Bấm vào địa chỉ để mở trang đăng nhập.</p>
       </section>
@@ -110,7 +110,7 @@ export default function GuidePage() {
         <p>
           Mở trang web của căng tin tại{" "}
           <a href={SITE_URL} className="font-semibold text-red-600 underline">
-            hmu-canteen.onrender.com
+            canteen.taichinhketoan-hmu.edu.vn
           </a>{" "}
           trên điện thoại hoặc máy tính, rồi nhập:
         </p>
@@ -247,7 +247,7 @@ export default function GuidePage() {
       </section>
 
       <footer className="pb-6 text-center text-xs text-slate-400">
-        HMU THC Canteen · hmu-canteen.onrender.com · Mọi thắc mắc xin liên hệ quản trị viên hệ thống.
+        HMU THC Canteen · canteen.taichinhketoan-hmu.edu.vn · Mọi thắc mắc xin liên hệ quản trị viên hệ thống.
       </footer>
     </main>
   );
