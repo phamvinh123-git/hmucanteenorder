@@ -134,6 +134,50 @@ export default function AdminUsers() {
   const departments = Array.from(new Set(users.map((u) => u.department).filter((d): d is string => !!d))).sort((a, b) =>
     a.localeCompare(b, "vi"),
   );
+  // Registering officers' lunches for them (a range of days, no weekly deadline).
+  const [regOpen, setRegOpen] = useState(false);
+  const [regSearch, setRegSearch] = useState("");
+  const [regIds, setRegIds] = useState<string[]>([]);
+  const [regFrom, setRegFrom] = useState(() => new Date().toLocaleDateString("sv"));
+  const [regTo, setRegTo] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7)); // this Friday
+    return d.toLocaleDateString("sv");
+  });
+  const [regBusy, setRegBusy] = useState(false);
+  const [regMessage, setRegMessage] = useState<string | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
+
+  async function submitRegister() {
+    setRegBusy(true);
+    setRegMessage(null);
+    setRegError(null);
+    try {
+      const res = await fetch("/api/admin/officer-register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ officerIds: regIds, from: regFrom, to: regTo }),
+      });
+      const data = await res.json();
+      if (!data.results) {
+        setRegError(data.error ?? "Không đăng ký được.");
+        return;
+      }
+      setRegMessage(
+        data.results
+          .map(
+            (r: { name: string; added: number; revived: number; skipped: number; error?: string }) =>
+              r.error
+                ? `${r.name}: ${r.error}`
+                : `${r.name}: thêm ${r.added} ngày${r.revived ? `, bật lại ${r.revived}` : ""}${r.skipped ? `, bỏ qua ${r.skipped} (đã qua hoặc đã có)` : ""}`,
+          )
+          .join(" · "),
+      );
+    } finally {
+      setRegBusy(false);
+    }
+  }
+
   const q = foldText(search);
   const visible = users.filter(
     (u) =>
@@ -150,6 +194,83 @@ export default function AdminUsers() {
   return (
     <div className="space-y-8">
       <PageHeader title="Quản lý tài khoản" subtitle="Toàn quyền tạo, khóa và phân quyền tài khoản trong hệ thống." />
+
+      <section>
+        <button
+          onClick={() => setRegOpen((v) => !v)}
+          className="text-sm font-semibold text-slate-700 hover:text-red-700"
+        >
+          {regOpen ? "▾" : "▸"} Đăng ký cơm trưa hộ cán bộ
+        </button>
+        {regOpen && (
+          <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-rise-in">
+            <p className="text-xs text-slate-500">
+              Dùng khi cán bộ lỡ hạn đăng ký hoặc không đăng nhập được. Hệ thống đăng ký cơm trưa các ngày thứ 2 đến thứ 6 trong
+              khoảng đã chọn, <b>không cần chờ hạn tuần</b>. Ngày đã qua được bỏ qua, bữa trưa hôm nay còn đăng ký được đến 14:00.
+            </p>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
+              <div>
+                <input
+                  type="search"
+                  value={regSearch}
+                  onChange={(e) => setRegSearch(e.target.value)}
+                  placeholder="Tìm cán bộ theo tên hoặc mã..."
+                  className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                />
+                <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+                  {users
+                    .filter((u) => u.isOfficer || u.role === "OFFICER")
+                    .filter((u) => !regSearch.trim() || foldText(u.name).includes(foldText(regSearch)) || (u.staffCode ?? "").toLowerCase().includes(regSearch.trim().toLowerCase()))
+                    .map((u) => (
+                      <li key={u.id}>
+                        <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-red-50/50">
+                          <input
+                            type="checkbox"
+                            checked={regIds.includes(u.id)}
+                            onChange={(e) => setRegIds((prev) => (e.target.checked ? [...prev, u.id] : prev.filter((x) => x !== u.id)))}
+                            className="accent-red-600"
+                          />
+                          <span className="font-medium text-slate-800">{u.name}</span>
+                          <span className="text-xs text-slate-400">{u.staffCode ?? u.phone}</span>
+                          {u.department && <span className="text-xs text-slate-400">· {u.department}</span>}
+                        </label>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-slate-600">
+                  Từ ngày
+                  <input
+                    type="date"
+                    value={regFrom}
+                    onChange={(e) => setRegFrom(e.target.value)}
+                    className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  />
+                </label>
+                <label className="text-xs font-medium text-slate-600">
+                  Đến ngày
+                  <input
+                    type="date"
+                    value={regTo}
+                    onChange={(e) => setRegTo(e.target.value)}
+                    className="mt-1 block rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  />
+                </label>
+                <button
+                  onClick={submitRegister}
+                  disabled={regBusy || regIds.length === 0}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {regBusy ? "Đang đăng ký..." : `Đăng ký cho ${regIds.length} cán bộ`}
+                </button>
+              </div>
+            </div>
+            {regError && <p className="mt-2 text-sm text-red-600">{regError}</p>}
+            {regMessage && <p className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{regMessage}</p>}
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="text-sm font-semibold text-slate-700 mb-2">Tạo tài khoản nhân sự mới</h2>

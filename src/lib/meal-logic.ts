@@ -17,6 +17,7 @@ import {
   officerCanCancel,
   officerCanRestore,
   officerWeekDays,
+  mondayOf,
   officerCanBook,
   openWeekMondays,
   registrationDeadline,
@@ -1320,6 +1321,102 @@ export async function saveOfficerWeek(params: { officerId: string; weekMonday: D
 
     return { added: createDays.length, removed: removeIds.length, revived: reviveIds.length, total, sessions };
   });
+}
+
+/**
+ * Staff registers an officer's lunches for them, from `from` to `to` (Monday to Friday days only), without the
+ * weekly deadline: for an officer who missed it or could not sign in. Days already registered are left alone, days
+ * the officer had cancelled are switched back on, past days are skipped, and today's lunch counts until it is over.
+ * Returns what was added, switched back on and skipped.
+ */
+export async function registerOfficerLunchesFor(params: { officerId: string; from: Date; to: Date; actorId: string }) {
+  const officer = await prisma.user.findUniqueOrThrow({ where: { id: params.officerId } });
+  if (!(officer.isOfficer || officer.role === "OFFICER")) throw new Error("Tài khoản này không phải cán bộ.");
+
+  const now = new Date();
+  const from = startOfDay(params.from);
+  const to = startOfDay(params.to);
+  if (to.getTime() < from.getTime()) throw new Error("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
+  if ((to.getTime() - from.getTime()) / 86400000 > 120) throw new Error("Chỉ đăng ký tối đa 120 ngày một lần.");
+
+  const days: Date[] = [];
+  const skipped: { date: Date; reason: string }[] = [];
+  for (let d = from; d.getTime() <= to.getTime(); d = addDays(d, 1)) {
+    const wd = d.getDay();
+    if (wd === 0 || wd === 6) continue; // officers eat Monday to Friday only
+    if (mealTimeOver(d, "LUNCH", now)) {
+      skipped.push({ date: d, reason: "đã qua" });
+      continue;
+    }
+    days.push(d);
+  }
+
+  let added = 0;
+  let revived = 0;
+  const weeks = new Map<string, Date[]>();
+  for (const d of days) {
+    const monday = mondayOf(d);
+    const key = localDateKey(monday);
+    weeks.set(key, [...(weeks.get(key) ?? []), d]);
+  }
+
+  for (const [key, weekDays] of weeks) {
+    const monday = startOfDay(new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10))));
+    const weekEnd = addDays(monday, 7);
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.mealSession.findMany({
+        where: { studentId: officer.id, mealType: "LUNCH", date: { gte: monday, lt: weekEnd } },
+      });
+      const byKey = new Map(existing.map((s) => [localDateKey(s.date), s]));
+
+      const reviveIds: string[] = [];
+      const createDays: Date[] = [];
+      for (const d of weekDays) {
+        const found = byKey.get(localDateKey(d));
+        if (!found) createDays.push(d);
+        else if (found.status === "CANCELLED") reviveIds.push(found.id);
+        else skipped.push({ date: d, reason: "đã có" });
+      }
+
+      let registration = await tx.mealRegistration.findFirst({
+        where: { studentId: officer.id, startDate: monday, mealPattern: "LUNCH" },
+      });
+      if (!registration && createDays.length > 0) {
+        registration = await tx.mealRegistration.create({
+          data: {
+            studentId: officer.id,
+            startDate: monday,
+            totalSessions: 0,
+            mealPattern: "LUNCH",
+            pricePerMeal: OFFICER_MEAL_PRICE,
+            createdById: params.actorId,
+          },
+        });
+      }
+      if (reviveIds.length > 0) {
+        await tx.mealSession.updateMany({ where: { id: { in: reviveIds } }, data: { status: "SCHEDULED", cancelledAt: null } });
+      }
+      if (createDays.length > 0 && registration) {
+        await tx.mealSession.createMany({
+          data: createDays.map((date) => ({
+            registrationId: registration.id,
+            studentId: officer.id,
+            date,
+            mealType: "LUNCH" as const,
+            price: OFFICER_MEAL_PRICE,
+          })),
+        });
+      }
+      const total = await tx.mealSession.count({
+        where: { studentId: officer.id, mealType: "LUNCH", date: { gte: monday, lt: weekEnd }, status: { not: "CANCELLED" } },
+      });
+      if (registration) await tx.mealRegistration.update({ where: { id: registration.id }, data: { totalSessions: total } });
+      added += createDays.length;
+      revived += reviveIds.length;
+    });
+  }
+
+  return { name: officer.name, added, revived, skipped };
 }
 
 let lastAutoRegistrationRun = 0;
