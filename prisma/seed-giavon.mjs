@@ -26,12 +26,12 @@ const COT = [
   {
     name: "Cốt olong nhài sữa",
     yieldQty: 1200,
-    items: [["Trà", "g", 100], ["Bột sữa", "g", 100], ["Đường", "ml", 50], ["Sữa đặc", "g", 200]],
+    items: [["Trà", "g", 100], ["Bột sữa", "g", 100], ["Đường", "ml", 50], ["Sữa đặc", "ml", 200]],
   },
   {
     name: "Cốt trà gạo rang",
     yieldQty: 1500,
-    items: [["Trà", "g", 100], ["Đường", "ml", 100], ["Bột sữa", "g", 200], ["Sữa đặc", "g", 300]],
+    items: [["Trà", "g", 100], ["Đường", "ml", 100], ["Bột sữa", "g", 200], ["Sữa đặc", "ml", 300]],
   },
 ];
 
