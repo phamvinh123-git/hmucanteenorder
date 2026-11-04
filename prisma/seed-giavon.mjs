@@ -4,17 +4,23 @@
 //   node prisma/seed-giavon.mjs                      show what would be added to the first shop (changes nothing)
 //   node prisma/seed-giavon.mjs --shop "Căng tin"    same, for the shop of that name
 //   node prisma/seed-giavon.mjs --apply              really add them
+//   node prisma/seed-giavon.mjs --reset [--apply]    first remove what an earlier run of this script added (see below)
 //
 // Safe to run twice: a cốt or recipe that already exists (same name) is left alone, and an ingredient is reused when
 // one of the same name and unit exists. New ingredients get price 0 — fill the prices in "Giá vốn > Nguyên liệu"
 // afterwards and every cốt and recipe is costed automatically. Recipe lines whose quantity is not known yet are 0:
 // type the quantity where the drink uses it ("Nguyên liệu khác" is priced 1 đ per unit, so type the amount in đồng).
+//
+// --reset deletes the cốt and recipes of this script's list (by name, including quantities typed into them since) and the
+// ingredients it made that nothing uses any more and that nobody has priced, then adds everything fresh. Ingredients
+// somebody priced stay. Anything not in the script's list is never touched.
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const shopArg = args.includes("--shop") ? args[args.indexOf("--shop") + 1] : null;
+const reset = args.includes("--reset");
 
 // ---------------------------------------------------------------- cốt: [ingredient, unit, qty]; yields are in ml
 const COT = [
@@ -96,6 +102,35 @@ try {
   const batches = of("batches");
   const recipes = of("recipes");
 
+  const deletes = [];
+  if (reset) {
+    const take = (arr, collection, names) => {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (!names.has(norm(arr[i].name))) continue;
+        console.log(`- xóa ${collection === "batches" ? "cốt" : "công thức"} ${arr[i].name}`);
+        deletes.push({ collection, id: arr[i].id });
+        arr.splice(i, 1);
+      }
+    };
+    take(batches, "batches", new Set(COT.map((c) => norm(c.name))));
+    take(recipes, "recipes", new Set(RECIPES.map((r) => norm(r.name))));
+
+    // Ingredients this script (in any of its versions) may have made: same base name, ignoring a "(unit)" suffix.
+    const base = (n) => norm(String(n).replace(/\s*\(.*\)\s*$/, ""));
+    const legacy = ["Trà nhài", "Trà olong", "Trà olong nhài", "Trà gạo rang", "Trà đào", "Trà chanh"];
+    const seedBases = new Set([...legacy, ...COT.flatMap((c) => c.items.map((i) => i[0])), ...RECIPES.flatMap((r) => r.items.filter((l) => typeof l !== "string").map((l) => l[0]))].map(base));
+    const used = new Set([...batches, ...recipes].flatMap((d) => (d.items ?? []).map((i) => i.ingredientId)));
+    for (let i = ingredients.length - 1; i >= 0; i--) {
+      const ing = ingredients[i];
+      if (!seedBases.has(base(ing.name)) || used.has(ing.id)) continue;
+      if (norm(ing.name) !== norm("Nguyên liệu khác") && ((ing.price ?? 0) > 0 || (ing.packagePrice ?? 0) > 0)) continue; // priced by hand: keep
+      if (norm(ing.name) === norm("Nguyên liệu khác") && (ing.price ?? 0) !== 1) continue;
+      console.log(`- xóa nguyên liệu ${ing.name} (${ing.unit})`);
+      deletes.push({ collection: "ingredients", id: ing.id });
+      ingredients.splice(i, 1);
+    }
+  }
+
   const writes = [];
   const ingredientId = (name, unit) => {
     const same = ingredients.find((i) => norm(i.name) === norm(name));
@@ -146,21 +181,22 @@ try {
     writes.push({ collection: "recipes", id, data });
   }
 
-  if (!apply || writes.length === 0) {
-    console.log(writes.length === 0 ? "Nothing to add." : `${writes.length} documents would be added.`);
+  if (!apply || writes.length + deletes.length === 0) {
+    console.log(writes.length + deletes.length === 0 ? "Nothing to add." : `${deletes.length} documents would be deleted, ${writes.length} added.`);
   } else {
-    await prisma.$transaction(
-      writes.map((w) => prisma.costDocument.create({ data: { shopId: shop.id, collection: w.collection, id: w.id, data: w.data } })),
-    );
+    await prisma.$transaction([
+      ...deletes.map((d) => prisma.costDocument.deleteMany({ where: { shopId: shop.id, collection: d.collection, id: d.id } })),
+      ...writes.map((w) => prisma.costDocument.create({ data: { shopId: shop.id, collection: w.collection, id: w.id, data: w.data } })),
+    ]);
     const count = (c) => writes.filter((w) => w.collection === c).length;
     await prisma.activityLog.create({
       data: {
         userId: null,
         action: "COSTLY_ADD",
-        detail: `Giá vốn: thêm vào cơ sở "${shop.name}" ${count("ingredients")} nguyên liệu, ${count("batches")} cốt, ${count("recipes")} công thức`,
+        detail: `Giá vốn: ${reset ? `làm lại (xóa ${deletes.length} mục), ` : ""}thêm vào cơ sở "${shop.name}" ${count("ingredients")} nguyên liệu, ${count("batches")} cốt, ${count("recipes")} công thức`,
       },
     });
-    console.log(`Added ${writes.length} documents.`);
+    console.log(`Deleted ${deletes.length}, added ${writes.length} documents.`);
   }
 } finally {
   await prisma.$disconnect();
