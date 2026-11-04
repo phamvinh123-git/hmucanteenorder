@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessAdmin, DEFAULT_STUDENT_PASSWORD, getSession, hashPassword } from "@/lib/auth";
 import { logActivity } from "@/lib/log";
+import { registerOfficerLunchesFor } from "@/lib/meal-logic";
+import { addDaysLocal, openWeekMondays } from "@/lib/officer-rules";
 
 const schema = z.object({
   active: z.boolean().optional(),
@@ -132,6 +134,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const user = await prisma.user.update({ where: { id }, data: updateData });
   if (data.phone === undefined && data.staffCode === undefined) {
     await logActivity(session.userId, "UPDATE_USER", `Cập nhật tài khoản ${user.name} (${user.phone}): ${JSON.stringify(data)}`);
+  }
+
+  // Switching automatic registration on starts it at once: lunches from today to the end of the last week that is
+  // open for ordering are registered now (the weekly deadline does not apply), instead of waiting for the next week to
+  // open. Days already registered or cancelled by the officer are left alone, past days are skipped.
+  if (data.autoRegister === true && user.active) {
+    try {
+      const open = openWeekMondays(new Date());
+      const last = open[open.length - 1];
+      const r = await registerOfficerLunchesFor({
+        officerId: id,
+        from: new Date(),
+        to: addDaysLocal(last, 4),
+        actorId: session.userId,
+      });
+      await logActivity(session.userId, "OFFICER_REGISTER_FOR", `Bật tự động ĐK cho ${r.name}: đăng ký ngay ${r.added} ngày cơm trưa (bật lại ${r.revived})`);
+    } catch (err) {
+      console.error("Immediate auto-registration failed", err);
+    }
   }
 
   return NextResponse.json({ ok: true });
