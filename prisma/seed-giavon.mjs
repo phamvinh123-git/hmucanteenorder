@@ -18,20 +18,20 @@ const shopArg = args.includes("--shop") ? args[args.indexOf("--shop") + 1] : nul
 
 // ---------------------------------------------------------------- cốt: [ingredient, unit, qty]; yields are in ml
 const COT = [
-  { name: "Cốt trà chanh", yieldQty: 1800, items: [["Trà nhài", "g", 80], ["Nước", "ml", 2000]] },
+  { name: "Cốt trà chanh", yieldQty: 1800, items: [["Trà", "g", 80], ["Nước", "ml", 2000]] },
   { name: "Cốt cà phê", yieldQty: 1000, items: [["Cà phê", "g", 800]] },
-  { name: "Cốt trà olong (olong sen vàng)", yieldQty: 800, items: [["Trà olong", "g", 80]] },
-  { name: "Cốt trà nhài sữa", yieldQty: 1200, items: [["Trà nhài", "g", 60], ["Bột sữa", "g", 250], ["Đá", "g", 200]] },
-  { name: "Cốt trà đào", yieldQty: 800, items: [["Trà đào (túi lọc)", "gói", 20]] },
+  { name: "Cốt trà olong (olong sen vàng)", yieldQty: 800, items: [["Trà", "g", 80]] },
+  { name: "Cốt trà nhài sữa", yieldQty: 1200, items: [["Trà", "g", 60], ["Bột sữa", "g", 250], ["Đá", "g", 200]] },
+  { name: "Cốt trà đào", yieldQty: 800, items: [["Trà", "gói", 20]] },
   {
     name: "Cốt olong nhài sữa",
     yieldQty: 1200,
-    items: [["Trà olong nhài", "g", 100], ["Bột sữa", "g", 100], ["Đường", "ml", 50], ["Sữa đặc", "g", 200]],
+    items: [["Trà", "g", 100], ["Bột sữa", "g", 100], ["Đường", "ml", 50], ["Sữa đặc", "g", 200]],
   },
   {
     name: "Cốt trà gạo rang",
     yieldQty: 1500,
-    items: [["Trà gạo rang", "g", 100], ["Đường", "ml", 100], ["Bột sữa", "g", 200], ["Sữa đặc", "g", 300]],
+    items: [["Trà", "g", 100], ["Đường", "ml", 100], ["Bột sữa", "g", 200], ["Sữa đặc", "g", 300]],
   },
 ];
 
