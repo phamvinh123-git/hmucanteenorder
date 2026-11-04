@@ -166,10 +166,10 @@ export default function AdminUsers() {
       setRegMessage(
         data.results
           .map(
-            (r: { name: string; added: number; revived: number; skipped: number; error?: string }) =>
+            (r: { name: string; added: number; revived: number; past: number; existing: number; error?: string }) =>
               r.error
                 ? `${r.name}: ${r.error}`
-                : `${r.name}: thêm ${r.added} ngày${r.revived ? `, bật lại ${r.revived}` : ""}${r.skipped ? `, bỏ qua ${r.skipped} (đã qua hoặc đã có)` : ""}`,
+                : `${r.name}: thêm ${r.added} ngày${r.revived ? `, bật lại ${r.revived}` : ""}${r.existing ? `, ${r.existing} ngày đã có sẵn từ trước` : ""}${r.past ? `, ${r.past} ngày đã qua nên không đăng ký được` : ""}`,
           )
           .join(" · "),
       );

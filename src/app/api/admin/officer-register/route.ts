@@ -28,18 +28,24 @@ export async function POST(req: NextRequest) {
   }
   const { officerIds, from, to } = parsed.data;
 
-  const results: { name: string; added: number; revived: number; skipped: number; error?: string }[] = [];
+  const results: { name: string; added: number; revived: number; past: number; existing: number; error?: string }[] = [];
   for (const officerId of officerIds) {
     try {
       const r = await registerOfficerLunchesFor({ officerId, from: parse(from), to: parse(to), actorId: session.userId });
-      results.push({ name: r.name, added: r.added, revived: r.revived, skipped: r.skipped.length });
+      results.push({
+        name: r.name,
+        added: r.added,
+        revived: r.revived,
+        past: r.skipped.filter((s) => s.reason === "đã qua").length,
+        existing: r.skipped.filter((s) => s.reason === "đã có").length,
+      });
       await logActivity(
         session.userId,
         "OFFICER_REGISTER_FOR",
-        `Đăng ký cơm trưa hộ cán bộ ${r.name} từ ${from} đến ${to}: thêm ${r.added}, bật lại ${r.revived}, bỏ qua ${r.skipped.length} ngày`,
+        `Đăng ký cơm trưa hộ cán bộ ${r.name} từ ${from} đến ${to}: thêm ${r.added}, bật lại ${r.revived}, bỏ qua ${r.skipped.length} ngày (${r.skipped.filter((s) => s.reason === "đã qua").length} đã qua, ${r.skipped.filter((s) => s.reason === "đã có").length} đã có sẵn)`,
       );
     } catch (err) {
-      results.push({ name: officerId, added: 0, revived: 0, skipped: 0, error: err instanceof Error ? err.message : "Không đăng ký được." });
+      results.push({ name: officerId, added: 0, revived: 0, past: 0, existing: 0, error: err instanceof Error ? err.message : "Không đăng ký được." });
     }
   }
   return NextResponse.json({ ok: results.every((r) => !r.error), results });
