@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { foldText } from "@/lib/text";
 
-type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER";
+type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER" | "CANTEEN_SUPPORT";
 
 type UserRow = {
   id: string;
@@ -26,9 +26,10 @@ const ROLE_LABEL: Record<Role, string> = {
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
   OFFICER: "Cán bộ",
+  CANTEEN_SUPPORT: "Hỗ trợ căng tin",
 };
 
-const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" };
+const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -331,6 +332,7 @@ export default function AdminUsers() {
               <option value="MANAGER">Quản lý</option>
               <option value="SALES">Bán hàng</option>
               <option value="OFFICER">Cán bộ</option>
+              <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
             </select>
             {form.role !== "OFFICER" && (
               <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
@@ -382,6 +384,7 @@ export default function AdminUsers() {
             <option value="SALES">Bán hàng</option>
             <option value="STUDENT">Sinh viên</option>
 <option value="OFFICER">Cán bộ</option>
+<option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
           </select>
           {departments.length > 0 && (
             <select
@@ -530,6 +533,7 @@ export default function AdminUsers() {
                   <option value="SALES">Bán hàng</option>
                   <option value="STUDENT">Sinh viên</option>
 <option value="OFFICER">Cán bộ</option>
+<option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
                 </select>
               </div>
               {editingId === u.id && (

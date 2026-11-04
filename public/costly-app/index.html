@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Inside the canteen: its own header, accounts and login are used instead. */
-  #user-badge, #accounts-tab-btn, #tenant-bar { display: none !important; }
+  #user-badge, #accounts-tab-btn { display: none !important; }
   :root {
     --paper: #FFF9F8;
     --surface: #FFFFFF;
@@ -339,6 +339,13 @@
     font-size: 13px; font-weight: 600; color: var(--accent-strong);
   }
   .tenant-bar select { width: auto; min-width: 180px; padding: 5px 10px; font-weight: 700; }
+  .tenant-bar button {
+    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 5px 12px;
+    border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent-strong);
+  }
+  .tenant-bar button:hover { background: var(--accent); color: #fff; }
+  .tenant-bar button.danger { border-color: var(--bad); color: var(--bad); }
+  .tenant-bar button.danger:hover { background: var(--bad); color: #fff; }
 
   /* ---------- modal (change password) ---------- */
   .modal-overlay {
@@ -422,8 +429,10 @@
   </header>
 
   <div class="tenant-bar" id="tenant-bar" hidden>
-    <label for="tenant-select">Đang xem quán:</label>
+    <label for="tenant-select">Đang xem cơ sở:</label>
     <select class="field-input" id="tenant-select"></select>
+    <button type="button" id="add-shop-btn">+ Thêm cơ sở</button>
+    <button type="button" id="delete-shop-btn" class="danger" hidden>Xóa cơ sở</button>
   </div>
 
   <nav class="tabs" role="tablist">
@@ -661,7 +670,7 @@
   let recipes = [];       // {id, name, items:[{id, ingredientId, qty}]} — ingredientId may point at a raw ingredient OR a batch
   let calcItems = [];     // {id, ingredientId, qty} — scratchpad, not persisted
   let lastReceiptTotal = null; // drives the "value-pulse" flash when the total changes
-  let currentTenant = null; // which shop's data is loaded — own shop for an owner, admin's picked shop for admin
+  let currentTenant = null; // id of the shop (cơ sở) whose data is loaded
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -738,7 +747,7 @@
   // more than one account is ever used from the same browser.
   function lsScope() {
     if (!currentUser) return "anon";
-    return currentUser.role === "admin" ? (currentTenant || "none") : currentUser.username;
+    return currentTenant || "none";
   }
   function lsKey(base) { return base + "__" + lsScope(); }
 
@@ -753,13 +762,9 @@
   function lsSaveBatches() { try { localStorage.setItem(lsKey("costly_batches"), JSON.stringify(batches)); } catch (e) {} }
   function lsSaveRecipes() { try { localStorage.setItem(lsKey("costly_recipes"), JSON.stringify(recipes)); } catch (e) {} }
 
-  // admin has no shop of their own — every data call must say which shop
-  // (tenant) it's for. An owner's shop is implicit server-side (their own
-  // login), so this stays empty for them even if currentTenant were set.
+  // every data call must say which shop (cơ sở, "tenant") it's for.
   function tenantQS() {
-    return currentUser && currentUser.role === "admin" && currentTenant
-      ? "?tenant=" + encodeURIComponent(currentTenant)
-      : "";
+    return currentTenant ? "?tenant=" + encodeURIComponent(currentTenant) : "";
   }
   async function apiList(collection) {
     const res = await fetch(`${API_BASE}/${collection}${tenantQS()}`);
@@ -1469,45 +1474,71 @@
     $("#aa-role-field").hidden = user.role !== "admin";
     loginScreen.hidden = true;
     appRoot.hidden = false;
-    if (user.role === "admin") {
-      loadAccounts();
-      await setupTenantSelector();
-    } else {
-      $("#tenant-bar").hidden = true;
-      currentTenant = null;
-    }
+    $("#delete-shop-btn").hidden = !user.canDeleteShop;
+    await setupTenantSelector();
     initStore();
   }
 
-  // Admin picks which shop's data to view/edit — populated from the owner
-  // accounts that exist. Keeps the previous pick if it's still valid (e.g.
-  // after creating a new account), otherwise defaults to the first shop.
-  async function setupTenantSelector() {
+  // The shops (cơ sở) the notebook keeps — anyone using this page can add one; each has its own ingredients,
+  // semi-finished products and recipes. Keeps the previous pick if it still exists, otherwise the first shop.
+  let shopsCache = [];
+  async function setupTenantSelector(pickId) {
     const bar = $("#tenant-bar");
     const select = $("#tenant-select");
     try {
-      const res = await fetch("/api/users");
-      const accounts = res.ok ? await res.json() : [];
-      const owners = accounts.filter((a) => a.role === "owner");
-      if (!owners.length) {
-        bar.hidden = true;
-        currentTenant = null;
-        return;
-      }
-      const previous = currentTenant;
-      select.innerHTML = owners.map((o) => `<option value="${escapeAttr(o.username)}">${escapeAttr(o.username)}</option>`).join("");
-      currentTenant = owners.some((o) => o.username === previous) ? previous : owners[0].username;
-      select.value = currentTenant;
-      bar.hidden = false;
+      const res = await fetch("/api/costly/shops");
+      shopsCache = res.ok ? await res.json() : [];
     } catch (e) {
+      shopsCache = [];
+    }
+    if (!shopsCache.length) {
       bar.hidden = true;
       currentTenant = null;
+      return;
     }
+    const previous = pickId || currentTenant;
+    select.innerHTML = shopsCache.map((o) => `<option value="${escapeAttr(o.id)}">${escapeAttr(o.name)}</option>`).join("");
+    currentTenant = shopsCache.some((o) => o.id === previous) ? previous : shopsCache[0].id;
+    select.value = currentTenant;
+    bar.hidden = false;
   }
 
   $("#tenant-select").addEventListener("change", (e) => {
     currentTenant = e.target.value;
     initStore();
+  });
+
+  $("#add-shop-btn").addEventListener("click", async () => {
+    const name = (window.prompt("Tên cơ sở mới:") || "").trim();
+    if (!name) return;
+    try {
+      const res = await fetch("/api/costly/shops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "Không thêm được cơ sở."); return; }
+      await setupTenantSelector(data.id);
+      initStore();
+    } catch (e) {
+      alert("Không kết nối được máy chủ, thử lại.");
+    }
+  });
+
+  $("#delete-shop-btn").addEventListener("click", async () => {
+    const shop = shopsCache.find((o) => o.id === currentTenant);
+    if (!shop) return;
+    if (!window.confirm(`Xóa cơ sở "${shop.name}" cùng toàn bộ nguyên liệu, bán thành phẩm và công thức của cơ sở này?\nKhông khôi phục được.`)) return;
+    try {
+      const res = await fetch("/api/costly/shops/" + encodeURIComponent(shop.id), { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "Không xóa được cơ sở."); return; }
+      await setupTenantSelector();
+      initStore();
+    } catch (e) {
+      alert("Không kết nối được máy chủ, thử lại.");
+    }
   });
 
   function showLogin() {

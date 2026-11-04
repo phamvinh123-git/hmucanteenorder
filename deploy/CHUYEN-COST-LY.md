@@ -48,7 +48,7 @@ Xem trong file có những quán nào (chưa đổi gì):
 node prisma/import-costly.mjs costly.json
 ```
 
-Kết quả kiểu: `shop "chuquan": 40 nguyên liệu, 6 bán thành phẩm, 12 công thức`. Chọn quán muốn nhập (thường là quán có nhiều dữ liệu nhất), xem thử:
+Kết quả kiểu: `shop "chuquan": 40 nguyên liệu, 6 bán thành phẩm, 12 công thức`. Chọn quán muốn nhập (thường là quán có nhiều dữ liệu nhất), xem thử. Dữ liệu sẽ vào một **cơ sở** cùng tên quán (thêm `--shop "Tên cơ sở"` nếu muốn đặt tên khác; chạy lại cho quán khác để có thêm cơ sở):
 
 ```
 node prisma/import-costly.mjs costly.json --tenant chuquan

@@ -17,7 +17,7 @@ const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "MANAGER", href: "/schedule", label: "Lịch tuần" },
   { role: "MANAGER", href: "/manager/stats", label: "Thống kê" },
   { role: "MANAGER", href: "/report", label: "Báo cáo" },
-  { role: "MANAGER", href: "/costly", label: "Giá vốn" },
+  { role: "CANTEEN_SUPPORT", href: "/costly", label: "Giá vốn" },
   { role: "ADMIN", href: "/sales", label: "Bán hàng" },
   { role: "ADMIN", href: "/schedule", label: "Lịch tuần" },
   { role: "ADMIN", href: "/manager/stats", label: "Thống kê" },
@@ -34,6 +34,7 @@ const ROLE_LABEL: Record<Role, string> = {
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
   OFFICER: "Cán bộ",
+  CANTEEN_SUPPORT: "Hỗ trợ căng tin",
 };
 
 export default async function AppShell({

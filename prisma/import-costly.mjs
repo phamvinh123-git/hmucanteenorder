@@ -7,15 +7,17 @@
 //   node prisma/import-costly.mjs costly.json                    show what the file holds (changes nothing)
 //   node prisma/import-costly.mjs costly.json --tenant chuquan   show what would be imported for that shop
 //   node prisma/import-costly.mjs costly.json --tenant chuquan --apply   really import it
+//   add  --shop "Tên cơ sở"  to import into a shop (cơ sở) of that name instead of one named after the tenant
 //
 // Existing documents with the same collection and id are overwritten, so it is safe to run twice.
 import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 
 const args = process.argv.slice(2);
-const file = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--tenant");
+const file = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--tenant" && args[args.indexOf(a) - 1] !== "--shop");
 const tenantArg = args.includes("--tenant") ? args[args.indexOf("--tenant") + 1] : null;
 const apply = args.includes("--apply");
+const shopArg = args.includes("--shop") ? args[args.indexOf("--shop") + 1] : null;
 const COLLECTIONS = new Set(["ingredients", "batches", "recipes"]);
 
 if (!file) {
@@ -75,6 +77,9 @@ if (!apply) {
 
 const prisma = new PrismaClient();
 try {
+  const shopName = (shopArg ?? tenant).trim();
+  const shop = await prisma.costShop.upsert({ where: { name: shopName }, create: { name: shopName }, update: {} });
+  console.log(`Importing into shop "${shop.name}".`);
   let done = 0;
   for (let i = 0; i < docs.length; i += 200) {
     const chunk = docs.slice(i, i + 200);
@@ -83,8 +88,8 @@ try {
         // The id lives in the key, not in the stored data.
         const { id: _ignored, ...data } = d.data;
         return prisma.costDocument.upsert({
-          where: { collection_id: { collection: d.collection, id: d.id } },
-          create: { collection: d.collection, id: d.id, data },
+          where: { shopId_collection_id: { shopId: shop.id, collection: d.collection, id: d.id } },
+          create: { shopId: shop.id, collection: d.collection, id: d.id, data },
           update: { data },
         });
       }),
@@ -92,9 +97,9 @@ try {
     done += chunk.length;
   }
   await prisma.activityLog.create({
-    data: { userId: null, action: "COSTLY_IMPORT", detail: `Nhập dữ liệu Cost Ly cũ (quán "${tenant}"): ${done} mục` },
+    data: { userId: null, action: "COSTLY_IMPORT", detail: `Nhập dữ liệu Cost Ly cũ (quán "${tenant}") vào cơ sở "${shop.name}": ${done} mục` },
   });
-  console.log(`Imported ${done} documents into the canteen's Giá vốn notebook.`);
+  console.log(`Imported ${done} documents into the shop "${shop.name}" of the canteen's Giá vốn notebook.`);
 } finally {
   await prisma.$disconnect();
 }

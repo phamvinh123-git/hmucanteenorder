@@ -3,9 +3,9 @@ import AppShell from "@/components/AppShell";
 
 export const metadata = { title: "Giá vốn - Căng tin ĐHYHN Thanh Hóa" };
 
-// "Giá vốn" (Cost Ly): the cost notebook, inside the canteen with the same login. Managers and admins only.
+// "Giá vốn" (Cost Ly): the cost notebook, inside the canteen with the same login. Admins and canteen support only.
 export default async function CostlyPage() {
-  const user = await requireUser({ roles: ["MANAGER", "ADMIN"] });
+  const user = await requireUser({ roles: ["CANTEEN_SUPPORT", "ADMIN"] });
 
   return (
     <AppShell role={user.role} name={user.name}>

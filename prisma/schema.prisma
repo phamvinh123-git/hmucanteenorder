@@ -13,6 +13,7 @@ enum Role {
   SALES
   STUDENT
   OFFICER
+  CANTEEN_SUPPORT
 }
 
 enum MealPattern {
@@ -71,13 +72,22 @@ model User {
 
 /// The "Giá vốn" (Cost Ly) notebook: ingredients, semi-finished products ("batches") and recipes, kept as small
 /// JSON documents exactly like the original Cost Ly app stored them. One shared set for the whole canteen.
+model CostShop {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  createdAt DateTime       @default(now())
+  documents CostDocument[]
+}
+
 model CostDocument {
+  shopId     String
+  shop       CostShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
   collection String
   id         String
   data       Json
   updatedAt  DateTime @default(now()) @updatedAt
 
-  @@id([collection, id])
+  @@id([shopId, collection, id])
 }
 
 model MealRegistration {

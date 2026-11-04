@@ -8,7 +8,7 @@ import { addDaysLocal, openWeekMondays } from "@/lib/officer-rules";
 
 const schema = z.object({
   active: z.boolean().optional(),
-  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER"]).optional(),
+  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT"]).optional(),
   // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
   isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),

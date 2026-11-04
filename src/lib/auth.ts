@@ -63,6 +63,11 @@ export function canAccessStats(role: Role) {
   return role === "MANAGER" || role === "ADMIN";
 }
 
+/** The "Giá vốn" notebook: admins and the canteen-support staff who fill it in. */
+export function canAccessCostly(role: Role) {
+  return role === "ADMIN" || role === "CANTEEN_SUPPORT";
+}
+
 export function canAccessAdmin(role: Role) {
   return role === "ADMIN";
 }
@@ -86,5 +91,7 @@ export function homePathForRole(role: Role) {
       return "/student";
     case "OFFICER":
       return "/officer";
+    case "CANTEEN_SUPPORT":
+      return "/costly";
   }
 }

@@ -13,7 +13,7 @@ const schema = z
     // Officers ("cán bộ") are identified by a fixed staff code and may also have a phone number.
     staffCode: z.string().trim().optional(),
     password: z.string().min(4),
-    role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER"]),
+    role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER", "CANTEEN_SUPPORT"]),
     // A manager / sales / admin who is also an officer: one login, both roles.
     alsoOfficer: z.boolean().optional(),
   })
