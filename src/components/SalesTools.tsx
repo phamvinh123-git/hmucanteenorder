@@ -209,6 +209,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
   const [pkgPrice, setPkgPrice] = useState("");
   const [pkgNote, setPkgNote] = useState("");
   const [pkgPriceEaten, setPkgPriceEaten] = useState(false);
+  const [pkgPattern, setPkgPattern] = useState<MealPattern>("BOTH");
+  const [pkgPatternFrom, setPkgPatternFrom] = useState(localDateKey(new Date()));
   const [pkgBusy, setPkgBusy] = useState(false);
   const [pkgError, setPkgError] = useState<string | null>(null);
   // Two meals on the same day and meal: moving the extra one to a free day.
@@ -464,6 +466,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
     setPkgPrice(String(r.pricePerMeal));
     setPkgNote(r.note ?? "");
     setPkgPriceEaten(false);
+    setPkgPattern(r.mealPattern);
+    setPkgPatternFrom(localDateKey(new Date()));
     setPkgError(null);
   }
 
@@ -483,6 +487,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           pricePerMeal: price,
           note: pkgNote.trim() === "" ? null : pkgNote.trim(),
           priceForEaten: pkgPriceEaten,
+          ...(pkgPattern !== r.mealPattern ? { mealPattern: pkgPattern, patternFrom: pkgPatternFrom } : {}),
         }),
       });
       const data = await res.json();
@@ -1785,6 +1790,32 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                       />
                                     </label>
                                     <label className="text-xs font-medium text-slate-600">
+                                      Bữa ăn
+                                      <select
+                                        value={pkgPattern}
+                                        onChange={(e) => setPkgPattern(e.target.value as MealPattern)}
+                                        className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                      >
+                                        {(Object.keys(PATTERN_LABEL) as MealPattern[]).map((p) => (
+                                          <option key={p} value={p}>
+                                            {PATTERN_LABEL[p]}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    {pkgPattern !== r.mealPattern && (
+                                      <label className="text-xs font-medium text-slate-600">
+                                        Đổi từ ngày
+                                        <input
+                                          type="date"
+                                          min={localDateKey(new Date())}
+                                          value={pkgPatternFrom}
+                                          onChange={(e) => setPkgPatternFrom(e.target.value)}
+                                          className="mt-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                        />
+                                      </label>
+                                    )}
+                                    <label className="text-xs font-medium text-slate-600">
                                       Giá mỗi suất (đ)
                                       <input
                                         type="number"
@@ -1818,6 +1849,9 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     </button>
                                   </div>
                                   <p className="mt-2 text-xs text-slate-500">
+                                    {pkgPattern !== r.mealPattern
+                                      ? `Các buổi chưa ăn từ ${pkgPatternFrom.split("-").reverse().join("/")} được xếp lại thành ${PATTERN_LABEL[pkgPattern]} (số buổi giữ nguyên, buổi đã ăn không đổi). `
+                                      : ""}
                                     {Number(pkgTotal) > r.totalSessions
                                       ? `Thêm ${Number(pkgTotal) - r.totalSessions} buổi vào chỗ trống sau buổi cuối. `
                                       : Number(pkgTotal) < r.totalSessions && Number(pkgTotal) >= 1

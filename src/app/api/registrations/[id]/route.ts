@@ -10,9 +10,11 @@ const schema = z.object({
   pricePerMeal: z.coerce.number().int().min(0, "Giá không hợp lệ.").max(1_000_000, "Giá không hợp lệ.").optional(),
   note: z.string().trim().max(200).nullable().optional(),
   priceForEaten: z.boolean().optional(),
+  mealPattern: z.enum(["LUNCH", "DINNER", "BOTH"]).optional(),
+  patternFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ.").optional(),
 });
 
-// Manager/admin: edit a meal package (number of meals, price per meal, note).
+// Manager/admin: edit a meal package (meal pattern, number of meals, price per meal, note).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || !canAccessStats(session.role)) {
@@ -30,10 +32,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy gói ăn." }, { status: 404 });
   }
 
+  const { patternFrom, ...rest } = parsed.data;
+  if (rest.mealPattern && rest.mealPattern !== registration.mealPattern && registration.student.role !== "STUDENT") {
+    return NextResponse.json({ error: "Chỉ đổi được bữa của gói sinh viên." }, { status: 400 });
+  }
+  const [y, m, d] = (patternFrom ?? "").split("-").map(Number);
+
   try {
     const result = await updateRegistrationPackage({
       registrationId: id,
-      ...parsed.data,
+      ...rest,
+      ...(patternFrom ? { patternFrom: new Date(y, m - 1, d) } : {}),
       note: parsed.data.note === "" ? null : parsed.data.note,
     });
     if (result.summary.length > 0) {

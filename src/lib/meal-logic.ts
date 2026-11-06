@@ -703,10 +703,59 @@ async function appendMeals(
   return slots;
 }
 
+const PATTERN_NAME: Record<MealPattern, string> = { LUNCH: "trưa", DINNER: "tối", BOTH: "trưa và tối" };
+
 /**
- * Admin: edits a meal package. A new total adds meals at the end of the schedule, or takes the extra ones off
- * the end (only meals not eaten yet); a new price applies to the meals still to come, and to the eaten ones too
- * when `priceForEaten` is set. Cancelled meals keep their old price.
+ * Switches a package between lunch only, dinner only, and lunch + dinner. Meals already eaten or picked up, and
+ * meals before `from`, stay where they are; the meals still to come from `from` on (not over yet) are laid out
+ * again in order, one per slot of the new pattern, on days where the student has nothing else booked. Nobody
+ * gains or loses a meal. Returns how many meals moved.
+ */
+async function changeMealPattern(registrationId: string, pattern: MealPattern, from: Date) {
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: registrationId } });
+  const now = new Date();
+  const [own, studentSlots] = await Promise.all([
+    prisma.mealSession.findMany({
+      where: { registrationId, status: "SCHEDULED", pickedUp: false },
+      select: { id: true, date: true, mealType: true },
+    }),
+    prisma.mealSession.findMany({
+      where: { studentId: registration.studentId },
+      select: { id: true, date: true, mealType: true, status: true, note: true },
+    }),
+  ]);
+  const fromDay = startOfDay(from);
+  const moving = own.filter((s) => s.date.getTime() >= fromDay.getTime() && !mealTimeOver(s.date, s.mealType, now)).sort(compareSlots);
+  const movingIds = new Set(moving.map((s) => s.id));
+  const occupied = blockedSlotKeys(studentSlots.filter((s) => !movingIds.has(s.id)));
+
+  const perDay: MealType[] = pattern === "LUNCH" ? ["LUNCH"] : pattern === "DINNER" ? ["DINNER"] : ["LUNCH", "DINNER"];
+  const slots: { date: Date; mealType: MealType }[] = [];
+  let day = fromDay.getTime() > startOfDay(now).getTime() ? fromDay : startOfDay(now);
+  for (let i = 0; i < 800 && slots.length < moving.length; i++, day = addDays(day, 1)) {
+    for (const mealType of perDay) {
+      const slot = { date: day, mealType };
+      if (slots.length >= moving.length || occupied.has(slotKey(slot)) || mealTimeOver(day, mealType, now)) continue;
+      occupied.add(slotKey(slot));
+      slots.push(slot);
+    }
+  }
+  if (slots.length < moving.length) throw new Error("Không xếp đủ buổi theo kiểu gói mới.");
+
+  await prisma.$transaction([
+    prisma.mealRegistration.update({ where: { id: registrationId }, data: { mealPattern: pattern } }),
+    ...moving.map((s, i) =>
+      prisma.mealSession.update({ where: { id: s.id }, data: { date: slots[i].date, mealType: slots[i].mealType } }),
+    ),
+  ]);
+  return { moved: moving.length };
+}
+
+/**
+ * Admin: edits a meal package. A new meal pattern (lunch, dinner, both) re-lays the meals still to come; a new
+ * total adds meals at the end of the schedule, or takes the extra ones off the end (only meals not eaten yet); a
+ * new price applies to the meals still to come, and to the eaten ones too when `priceForEaten` is set. Cancelled
+ * meals keep their old price.
  */
 export async function updateRegistrationPackage(params: {
   registrationId: string;
@@ -714,9 +763,17 @@ export async function updateRegistrationPackage(params: {
   pricePerMeal?: number;
   note?: string | null;
   priceForEaten?: boolean;
+  mealPattern?: MealPattern;
+  /** First day the new pattern applies to (default today). */
+  patternFrom?: Date;
 }) {
-  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
   const summary: string[] = [];
+  const before = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
+  if (params.mealPattern && params.mealPattern !== before.mealPattern) {
+    const r = await changeMealPattern(before.id, params.mealPattern, params.patternFrom ?? new Date());
+    summary.push(`đổi bữa ${PATTERN_NAME[before.mealPattern]} → ${PATTERN_NAME[params.mealPattern]} (xếp lại ${r.moved} buổi sắp tới)`);
+  }
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: params.registrationId } });
 
   const total = params.totalSessions ?? registration.totalSessions;
   const delta = total - registration.totalSessions;
