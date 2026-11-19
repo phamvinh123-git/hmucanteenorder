@@ -21,6 +21,22 @@ export default async function StudentPage() {
     }),
   ]);
 
+  // Can a cancelled meal be taken back? Only while the make-up meal given for it (or, when that was cancelled
+  // too, the last one of the chain) is still to come. Staff-removed make-ups can only be undone by staff.
+  const byId = new Map(sessions.map((x) => [x.id, x]));
+  const isRemoval = (note: string | null) => !!note && /^(Xóa thủ công|Giảm gói|Tự động bớt)/.test(note);
+  function compensationState(first: (typeof sessions)[number]): "ok" | "used" | "removed" | null {
+    if (!first.compensatedBy) return null;
+    let c = byId.get(first.compensatedBy.id);
+    for (let hops = 0; c && hops < 50; hops++) {
+      if (c.status === "SCHEDULED" && !c.pickedUp) return "ok";
+      if (c.status !== "CANCELLED") return "used";
+      if (isRemoval(c.note)) return hops === 0 ? "removed" : "used";
+      c = c.compensatedBy ? byId.get(c.compensatedBy.id) : undefined;
+    }
+    return "used";
+  }
+
   const patternById = new Map(registrations.map((r) => [r.id, r.mealPattern]));
 
   return (
@@ -46,6 +62,7 @@ export default async function StudentPage() {
           // A cancelled session can only be restored if something still points back to it as its
           // make-up slot — staff corrections (record-missed-session, remove-session) leave none.
           hasCompensation: s.compensatedBy != null,
+          compensationState: compensationState(s),
           mealPattern: patternById.get(s.registrationId) ?? "BOTH",
         }))}
       />

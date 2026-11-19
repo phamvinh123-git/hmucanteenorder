@@ -274,12 +274,26 @@ export async function restoreSession(
     }
   }
 
-  const compensation = session.compensatedBy;
+  // The make-up meal may itself have been cancelled by the student (which added another make-up meal after it):
+  // follow that chain to the meal that is still to come, which is the one to take back.
+  let compensation = session.compensatedBy;
+  for (let hops = 0; hops < 50 && compensation && compensation.status === "CANCELLED" && !isStaffRemoval(compensation.note); hops++) {
+    const link = await prisma.mealSession.findUnique({ where: { id: compensation.id }, select: { compensatedBy: true } });
+    if (!link?.compensatedBy) break;
+    compensation = link.compensatedBy;
+  }
   if (compensation && compensation.status === "CANCELLED" && isStaffRemoval(compensation.note)) {
     // The make-up meal was taken out by staff: restoring the original simply drops that leftover row.
     if (!opts.allowUnremove) throw new Error("Chỉ Quản lý hoặc Admin mới khôi phục được buổi bù đã xóa.");
-  } else if (!compensation || compensation.status !== "SCHEDULED" || compensation.pickedUp) {
-    throw new Error("Suất bù cho lần hủy này đã được dùng, không thể khôi phục.");
+  } else if (!compensation) {
+    throw new Error("Không còn suất bù nào gắn với lần hủy này nên không khôi phục được.");
+  } else if (compensation.status !== "SCHEDULED" || compensation.pickedUp) {
+    const day = localDateKey(compensation.date).split("-").reverse().join("/");
+    throw new Error(
+      compensation.status === "CANCELLED"
+        ? `Suất bù cho lần hủy này (ngày ${day}) cũng đã bị hủy, không còn buổi nào để lấy lại.`
+        : `Suất bù cho lần hủy này (ngày ${day}) đã được ăn, không thể khôi phục.`,
+    );
   }
 
   // The slot may have been taken meanwhile (a renewal that starts on that day, a make-up meal): putting this

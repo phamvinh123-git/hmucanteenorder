@@ -27,6 +27,8 @@ type SessionDTO = {
   isCompensation: boolean;
   /** Only a cancelled session with a linked make-up slot can be restored (staff corrections have none). */
   hasCompensation: boolean;
+  /** Whether that make-up meal can still be taken back: ok, already used or cancelled, or removed by staff. */
+  compensationState: "ok" | "used" | "removed" | null;
   mealPattern: MealPattern;
 };
 
@@ -52,6 +54,23 @@ function statusLabel(s: StatusInput) {
 function statusStyle(s: StatusInput) {
   if (s.status === "COMPLETED" && !s.pickedUp) return "bg-amber-50 text-amber-700";
   return STATUS_STYLE[s.status];
+}
+
+/** Can this cancelled meal be restored right now, and if not, why (shown next to the button, since a tooltip does not show on a phone). */
+function restoreInfo(s: SessionDTO, all: SessionDTO[]): { ok: boolean; reason?: string } | null {
+  if (s.status !== "CANCELLED" || !s.hasCompensation) return null;
+  const rule = canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status });
+  if (!rule.ok) return rule;
+  if (s.compensationState === "removed") {
+    return { ok: false, reason: "Suất bù của buổi này đã được nhân viên điều chỉnh. Hãy nhờ nhân viên căng tin khôi phục giúp." };
+  }
+  if (s.compensationState === "used") {
+    return { ok: false, reason: "Suất bù của buổi này đã được ăn hoặc đã bị hủy, nên không khôi phục được." };
+  }
+  if (all.some((x) => x.id !== s.id && x.status !== "CANCELLED" && x.date === s.date && x.mealType === s.mealType)) {
+    return { ok: false, reason: "Ngày và bữa này đã có một suất khác trong lịch." };
+  }
+  return { ok: true };
 }
 
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
@@ -116,13 +135,10 @@ export default function StudentDashboard({
     () =>
       history
         .filter(
-          (s) =>
-            s.status === "CANCELLED" &&
-            s.hasCompensation &&
-            canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status }).ok,
+          (s) => restoreInfo(s, sessions)?.ok,
         )
         .map((s) => s.id),
-    [history],
+    [history, sessions],
   );
 
   async function cancelSession(id: string) {
@@ -139,7 +155,7 @@ export default function StudentDashboard({
       setSessions((prev) => {
         const source = prev.find((s) => s.id === id);
         const next = prev.map((s) =>
-          s.id === id ? { ...s, status: "CANCELLED" as SessionStatus, hasCompensation: true } : s,
+          s.id === id ? { ...s, status: "CANCELLED" as SessionStatus, hasCompensation: true, compensationState: "ok" as const } : s,
         );
         next.push({
           id: data.newSession.id,
@@ -151,6 +167,7 @@ export default function StudentDashboard({
           price: data.newSession.price,
           isCompensation: true,
           hasCompensation: false,
+          compensationState: null,
           mealPattern: source?.mealPattern ?? "BOTH",
         });
         return next;
@@ -232,7 +249,7 @@ export default function StudentDashboard({
           if (multi === "cancel" && d.newSession) {
             const source = next.find((x) => x.id === d.id);
             next = next.map((x) =>
-              x.id === d.id ? { ...x, status: "CANCELLED" as SessionStatus, hasCompensation: true } : x,
+              x.id === d.id ? { ...x, status: "CANCELLED" as SessionStatus, hasCompensation: true, compensationState: "ok" as const } : x,
             );
             next.push({
               id: d.newSession.id,
@@ -244,6 +261,7 @@ export default function StudentDashboard({
               price: d.newSession.price,
               isCompensation: true,
               hasCompensation: false,
+          compensationState: null,
               mealPattern: source?.mealPattern ?? "BOTH",
             });
           } else if (multi === "restore") {
@@ -541,13 +559,9 @@ export default function StudentDashboard({
             {selectedSession.status === "CANCELLED" &&
               selectedSession.hasCompensation &&
               (() => {
-                const check = canRestoreSession({
-                  date: new Date(selectedSession.date),
-                  mealType: selectedSession.mealType,
-                  status: selectedSession.status,
-                });
+                const check = restoreInfo(selectedSession, sessions) ?? { ok: false };
                 return (
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     {confirmingId === selectedSession.id ? (
                       <>
                         <button
@@ -574,6 +588,7 @@ export default function StudentDashboard({
                         Khôi phục buổi ăn
                       </button>
                     )}
+                    {!check.ok && check.reason && <p className="basis-full text-xs text-slate-500">{check.reason}</p>}
                   </div>
                 );
               })()}
@@ -726,10 +741,7 @@ export default function StudentDashboard({
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mt-2 animate-rise-in">
             {history.length === 0 && <p className="p-4 text-sm text-slate-400">Chưa có lịch sử.</p>}
             {history.map((s) => {
-              const restoreCheck =
-                s.status === "CANCELLED" && s.hasCompensation
-                  ? canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status })
-                  : null;
+              const restoreCheck = restoreInfo(s, sessions);
               return (
                 <div
                   key={s.id}
@@ -780,6 +792,9 @@ export default function StudentDashboard({
                         Khôi phục
                       </button>
                     ))}
+                  {restoreCheck && !restoreCheck.ok && restoreCheck.reason && (
+                    <p className="basis-full text-xs text-slate-500">{restoreCheck.reason}</p>
+                  )}
                 </div>
               );
             })}
