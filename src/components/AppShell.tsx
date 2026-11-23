@@ -9,7 +9,9 @@ import { prisma } from "@/lib/db";
 
 const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "STUDENT", href: "/student", label: "Đặt suất ăn" },
+  { role: "STUDENT", href: "/courts", label: "Đặt sân" },
   { role: "OFFICER", href: "/officer", label: "Đặt cơm trưa" },
+  { role: "OFFICER", href: "/courts", label: "Đặt sân" },
   { role: "SALES", href: "/sales", label: "Bán hàng" },
   { role: "SALES", href: "/schedule", label: "Lịch tuần" },
   { role: "SALES", href: "/report", label: "Báo cáo" },
@@ -17,12 +19,15 @@ const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "MANAGER", href: "/schedule", label: "Lịch tuần" },
   { role: "MANAGER", href: "/manager/stats", label: "Thống kê" },
   { role: "MANAGER", href: "/report", label: "Báo cáo" },
+  { role: "MANAGER", href: "/courts", label: "Đặt sân" },
   { role: "CANTEEN_SUPPORT", href: "/costly", label: "Giá vốn" },
+  { role: "UNION", href: "/courts", label: "Đặt sân" },
   { role: "ADMIN", href: "/sales", label: "Bán hàng" },
   { role: "ADMIN", href: "/schedule", label: "Lịch tuần" },
   { role: "ADMIN", href: "/manager/stats", label: "Thống kê" },
   { role: "ADMIN", href: "/report", label: "Báo cáo" },
   { role: "ADMIN", href: "/costly", label: "Giá vốn" },
+  { role: "ADMIN", href: "/courts", label: "Đặt sân" },
   { role: "ADMIN", href: "/admin", label: "Tài khoản" },
   { role: "ADMIN", href: "/admin/archives", label: "Lưu trữ" },
   { role: "ADMIN", href: "/admin/logs", label: "Nhật ký" },
@@ -35,6 +40,7 @@ const ROLE_LABEL: Record<Role, string> = {
   STUDENT: "Sinh viên",
   OFFICER: "Cán bộ",
   CANTEEN_SUPPORT: "Hỗ trợ căng tin",
+  UNION: "Liên chi đoàn",
 };
 
 export default async function AppShell({

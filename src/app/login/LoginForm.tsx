@@ -38,16 +38,8 @@ export default function LoginForm() {
         );
         return;
       }
-      const homeByRole: Record<string, string> = {
-        ADMIN: "/admin",
-        MANAGER: "/manager",
-        SALES: "/sales",
-        STUDENT: "/student",
-        OFFICER: "/officer",
-        CANTEEN_SUPPORT: "/costly",
-      };
       // A full page load (not the client router), so the new cookie is always sent and no cached redirect is reused.
-      window.location.assign(data.mustChangePassword ? "/change-password" : (homeByRole[data.role] ?? "/"));
+      window.location.assign(data.mustChangePassword ? "/change-password" : "/");
       return;
     } catch {
       setError("Không kết nối được tới máy chủ. Hãy kiểm tra mạng rồi thử lại.");

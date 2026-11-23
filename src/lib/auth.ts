@@ -93,5 +93,7 @@ export function homePathForRole(role: Role) {
       return "/officer";
     case "CANTEEN_SUPPORT":
       return "/costly";
+    case "UNION":
+      return "/courts";
   }
 }

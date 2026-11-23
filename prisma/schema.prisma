@@ -14,6 +14,7 @@ enum Role {
   STUDENT
   OFFICER
   CANTEEN_SUPPORT
+  UNION
 }
 
 enum MealPattern {
@@ -68,6 +69,65 @@ model User {
   createdRegistrations MealRegistration[] @relation("CreatedByUser")
   sessions          MealSession[] @relation("StudentSessions")
   logs              ActivityLog[]
+  courtBookings     CourtBooking[] @relation("CourtBookings")
+  courtDecisions    CourtBooking[] @relation("CourtDecisions")
+}
+
+enum CourtBookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A court or room that can be booked ("Đặt sân"), with fixed time slots.
+model Court {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?
+  active      Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  slots       CourtSlot[]
+  bookings    CourtBooking[]
+}
+
+/// One fixed time slot of a court, e.g. 17:00-18:00 ("HH:mm" strings).
+model CourtSlot {
+  id        String         @id @default(cuid())
+  courtId   String
+  court     Court          @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  startTime String
+  endTime   String
+  active    Boolean        @default(true)
+  bookings  CourtBooking[]
+
+  @@unique([courtId, startTime])
+}
+
+/// A booking of one slot on one day. A student's booking waits for the student union (PENDING); other roles are
+/// approved at once. The database also holds a partial unique index (slotId, date) over PENDING/APPROVED rows
+/// (see the migration), so a slot cannot be double booked.
+model CourtBooking {
+  id           String             @id @default(cuid())
+  courtId      String
+  court        Court              @relation(fields: [courtId], references: [id])
+  slotId       String
+  slot         CourtSlot          @relation(fields: [slotId], references: [id])
+  date         DateTime
+  userId       String
+  user         User               @relation("CourtBookings", fields: [userId], references: [id])
+  status       CourtBookingStatus @default(PENDING)
+  note         String?
+  decidedById  String?
+  decidedBy    User?              @relation("CourtDecisions", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  cancelledAt  DateTime?
+  createdAt    DateTime           @default(now())
+
+  @@index([date])
+  @@index([userId])
 }
 
 /// The "Giá vốn" (Cost Ly) notebook: ingredients, semi-finished products ("batches") and recipes, kept as small
