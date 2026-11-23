@@ -5,7 +5,7 @@ import { localDateKey } from "@/lib/client-session-rules";
 
 type Mode = "approval" | "instant" | null;
 type Tab = "board" | "mine" | "approve" | "manage";
-type Status = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+type Status = "PENDING" | "UNION_APPROVED" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 type BoardSlot = {
   id: string;
@@ -14,7 +14,15 @@ type BoardSlot = {
   past: boolean;
   booking: { id: string; status: Status; mine: boolean; who: string | null; note: string | null } | null;
 };
-type BoardCourt = { id: string; name: string; description: string | null; slots: BoardSlot[] };
+type BoardCourt = {
+  id: string;
+  name: string;
+  description: string | null;
+  managerName: string | null;
+  /** What happens to a booking made now: approved at once, or it waits (for the union, then the court manager). */
+  startsAs: "PENDING" | "UNION_APPROVED" | "APPROVED";
+  slots: BoardSlot[];
+};
 
 type MyBooking = {
   id: string;
@@ -22,7 +30,7 @@ type MyBooking = {
   status: Status;
   note: string | null;
   decisionNote: string | null;
-  court: { name: string };
+  court: { name: string; managerId: string | null; manager: { name: string } | null };
   slot: { startTime: string; endTime: string };
 };
 type PendingBooking = MyBooking & { user: { name: string; phone: string; major: string | null; className: string | null } };
@@ -32,19 +40,22 @@ type ManageCourt = {
   name: string;
   description: string | null;
   active: boolean;
+  manager: { id: string; name: string } | null;
   slots: { id: string; startTime: string; endTime: string; active: boolean }[];
 };
 
 const DAYS_SHOWN = 15;
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const STATUS_LABEL: Record<Status, string> = {
-  PENDING: "Chờ duyệt",
+  PENDING: "Chờ Liên chi đoàn duyệt",
+  UNION_APPROVED: "Chờ quản lý sân duyệt",
   APPROVED: "Đã duyệt",
   REJECTED: "Bị từ chối",
   CANCELLED: "Đã hủy",
 };
 const STATUS_STYLE: Record<Status, string> = {
   PENDING: "bg-amber-50 text-amber-700",
+  UNION_APPROVED: "bg-blue-50 text-blue-700",
   APPROVED: "bg-green-50 text-green-700",
   REJECTED: "bg-red-50 text-red-700",
   CANCELLED: "bg-slate-100 text-slate-500",
@@ -77,7 +88,17 @@ const post = (path: string, body: unknown) =>
 const patch = (path: string, body: unknown) =>
   call(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export default function CourtsApp({ mode, canApprove, canManage }: { mode: Mode; canApprove: boolean; canManage: boolean }) {
+export default function CourtsApp({
+  mode,
+  canApprove,
+  canManage,
+  canAddCourt,
+}: {
+  mode: Mode;
+  canApprove: boolean;
+  canManage: boolean;
+  canAddCourt: boolean;
+}) {
   const tabs: { key: Tab; label: string }[] = [
     ...(mode ? [{ key: "board" as Tab, label: "Đặt sân" }, { key: "mine" as Tab, label: "Lịch của tôi" }] : []),
     ...(canApprove ? [{ key: "approve" as Tab, label: "Duyệt đặt sân" }] : []),
@@ -90,7 +111,7 @@ export default function CourtsApp({ mode, canApprove, canManage }: { mode: Mode;
       <div>
         <h1 className="text-xl font-bold text-slate-800">Đặt sân</h1>
         {mode === "approval" && (
-          <p className="text-sm text-slate-500">Lượt đặt của sinh viên được gửi cho Liên chi đoàn duyệt trước khi có hiệu lực.</p>
+          <p className="text-sm text-slate-500">Lượt đặt của sinh viên được gửi Liên chi đoàn duyệt. Sân có quản lý riêng (như sân bóng đá) thì Liên chi đoàn chuyển tiếp cho quản lý sân duyệt lần cuối.</p>
         )}
       </div>
       {tabs.length > 1 && (
@@ -113,7 +134,7 @@ export default function CourtsApp({ mode, canApprove, canManage }: { mode: Mode;
       {tab === "board" && <Board mode={mode} />}
       {tab === "mine" && <Mine />}
       {tab === "approve" && <Approvals />}
-      {tab === "manage" && <Manage />}
+      {tab === "manage" && <Manage canAddCourt={canAddCourt} />}
     </div>
   );
 }
@@ -159,7 +180,9 @@ function Board({ mode }: { mode: Mode }) {
     setNotice(
       r.data.status === "PENDING"
         ? "Đã gửi yêu cầu đặt sân. Lượt đặt có hiệu lực sau khi Liên chi đoàn duyệt."
-        : "Đã đặt sân thành công.",
+        : r.data.status === "UNION_APPROVED"
+          ? "Đã gửi quản lý sân để duyệt."
+          : "Đã đặt sân thành công.",
     );
     setPick(null);
     setNote("");
@@ -202,6 +225,11 @@ function Board({ mode }: { mode: Mode }) {
         <section key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="font-semibold text-slate-800">{c.name}</h2>
           {c.description && <p className="text-xs text-slate-500">{c.description}</p>}
+          {c.managerName && (
+            <p className="text-xs text-slate-500">
+              Quản lý sân: {c.managerName}. Đặt sân phải qua Liên chi đoàn, rồi quản lý sân duyệt.
+            </p>
+          )}
           {c.slots.length === 0 && <p className="mt-2 text-sm text-slate-400">Sân chưa có ca nào.</p>}
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {c.slots.map((s) => {
@@ -264,7 +292,12 @@ function Board({ mode }: { mode: Mode }) {
           <p className="text-sm text-slate-700">
             Đặt <b>{pick.court.name}</b>, {pick.slot.startTime} – {pick.slot.endTime}, {fmtKey(day)}
           </p>
-          {mode === "approval" && <p className="text-xs text-amber-700">Lượt đặt sẽ được gửi Liên chi đoàn duyệt.</p>}
+          {pick.court.startsAs === "PENDING" && (
+            <p className="text-xs text-amber-700">
+              Lượt đặt sẽ được gửi Liên chi đoàn duyệt{pick.court.managerName ? `, rồi chuyển ${pick.court.managerName} (quản lý sân) duyệt lần cuối` : ""}.
+            </p>
+          )}
+          {pick.court.startsAs === "UNION_APPROVED" && <p className="text-xs text-amber-700">Lượt đặt sẽ được gửi quản lý sân duyệt.</p>}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <input
               value={note}
@@ -274,7 +307,7 @@ function Board({ mode }: { mode: Mode }) {
               className={`${input} min-w-52 flex-1`}
             />
             <button onClick={book} disabled={busy} className={btnPrimary}>
-              {busy ? "Đang đặt..." : mode === "approval" ? "Gửi yêu cầu" : "Đặt sân"}
+              {busy ? "Đang đặt..." : pick.court.startsAs === "APPROVED" ? "Đặt sân" : "Gửi yêu cầu"}
             </button>
             <button onClick={() => setPick(null)} className={btnGhost}>
               Thôi
@@ -374,9 +407,12 @@ function Approvals() {
             <b>{b.court.name}</b> · {fmtIso(b.date)} · {b.slot.startTime} – {b.slot.endTime}
             {b.note ? <span className="text-slate-500"> · {b.note}</span> : null}
           </p>
+          <p className="mt-1">
+            <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[b.status]}`}>{STATUS_LABEL[b.status]}</span>
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button onClick={() => decide(b.id, "approve")} disabled={busyId === b.id} className={btnPrimary}>
-              Duyệt
+              {b.status === "PENDING" && b.court.managerId ? "Duyệt & chuyển quản lý sân" : "Duyệt"}
             </button>
             <input
               value={reasons[b.id] ?? ""}
@@ -396,8 +432,11 @@ function Approvals() {
 }
 
 // ------------------------------------------------------------------ set up courts and slots (admin)
-function Manage() {
+function Manage({ canAddCourt }: { canAddCourt: boolean }) {
   const [courts, setCourts] = useState<ManageCourt[] | null>(null);
+  const [managers, setManagers] = useState<{ id: string; name: string }[]>([]);
+  const [canAssign, setCanAssign] = useState(false);
+  const [newManager, setNewManager] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -406,7 +445,11 @@ function Manage() {
 
   const load = useCallback(async () => {
     const r = await call("/api/courts/manage");
-    if (r.ok) setCourts(r.data);
+    if (r.ok) {
+      setCourts(r.data.courts);
+      setManagers(r.data.managers);
+      setCanAssign(r.data.canAssign);
+    }
     else setError(r.data.error ?? "Không tải được.");
   }, []);
   useEffect(() => {
@@ -430,7 +473,7 @@ function Manage() {
         const [startTime, endTime] = t.split("-").map((x) => x.trim());
         return { startTime, endTime };
       });
-    const ok = await act(post("/api/courts/manage", { name, description: description || undefined, slots }));
+    const ok = await act(post("/api/courts/manage", { name, description: description || undefined, managerId: newManager || null, slots }));
     if (ok) {
       setName("");
       setDescription("");
@@ -441,12 +484,26 @@ function Manage() {
     <div className="space-y-4">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
+      {canAddCourt && (
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-800">Thêm sân</h2>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên sân (VD: Sân cầu lông số 1)" maxLength={80} className={input} />
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả (không bắt buộc)" maxLength={200} className={input} />
         </div>
+        {canAssign && (
+          <label className="mt-2 block text-xs font-medium text-slate-600">
+            Người quản lý sân (để trống nếu do Liên chi đoàn quản lý)
+            <select value={newManager} onChange={(e) => setNewManager(e.target.value)} className={`${input} mt-1 block w-full sm:w-72`}>
+              <option value="">Liên chi đoàn quản lý</option>
+              {managers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="mt-2 block text-xs font-medium text-slate-600">
           Các ca (giờ bắt đầu-giờ kết thúc, cách nhau bằng dấu phẩy)
           <input value={slotText} onChange={(e) => setSlotText(e.target.value)} className={`${input} mt-1 block w-full`} />
@@ -455,6 +512,7 @@ function Manage() {
           Thêm sân
         </button>
       </section>
+      )}
 
       {courts === null && !error && <p className="text-sm text-slate-400">Đang tải...</p>}
       {courts?.map((c) => {
@@ -465,6 +523,23 @@ function Manage() {
               <h2 className="font-semibold text-slate-800">{c.name}</h2>
               {!c.active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">Tạm ngưng</span>}
               <span className="text-xs text-slate-500">{c.description}</span>
+              {canAssign ? (
+                <select
+                  value={c.manager?.id ?? ""}
+                  onChange={(e) => act(patch(`/api/courts/manage/${c.id}`, { managerId: e.target.value || null }))}
+                  className={input}
+                  aria-label="Người quản lý sân"
+                >
+                  <option value="">Liên chi đoàn quản lý</option>
+                  {managers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      Quản lý: {m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                c.manager && <span className="text-xs text-slate-500">Quản lý: {c.manager.name}</span>
+              )}
               <span className="ml-auto flex gap-2">
                 <button onClick={() => act(patch(`/api/courts/manage/${c.id}`, { active: !c.active }))} className={btnGhost}>
                   {c.active ? "Tạm ngưng" : "Mở lại"}

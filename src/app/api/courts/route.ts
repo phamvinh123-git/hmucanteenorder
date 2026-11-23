@@ -4,9 +4,10 @@ import { getSession } from "@/lib/auth";
 import {
   bookableRange,
   canApproveCourts,
-  canManageCourts,
   canUseCourts,
   courtBookingMode,
+  initialBookingStatus,
+  LIVE_STATUSES,
   parseDayKey,
   slotStartsAt,
 } from "@/lib/courts";
@@ -26,10 +27,10 @@ export async function GET(req: NextRequest) {
     prisma.court.findMany({
       where: { active: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      include: { slots: { where: { active: true }, orderBy: { startTime: "asc" } } },
+      include: { slots: { where: { active: true }, orderBy: { startTime: "asc" } }, manager: { select: { name: true } } },
     }),
     prisma.courtBooking.findMany({
-      where: { date: day, status: { in: ["PENDING", "APPROVED"] } },
+      where: { date: day, status: { in: LIVE_STATUSES } },
       include: { user: { select: { name: true } } },
     }),
   ]);
@@ -39,12 +40,13 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     mode: courtBookingMode(session.role),
-    canApprove: approver,
-    canManage: canManageCourts(session.role),
     courts: courts.map((c) => ({
       id: c.id,
       name: c.name,
       description: c.description,
+      managerName: c.manager?.name ?? null,
+      // What happens to a booking made now: approved at once, or it waits for the union (and the court's manager).
+      startsAs: initialBookingStatus(session.role, c),
       slots: c.slots.map((s) => {
         const b = bySlot.get(s.id);
         const mine = b?.userId === session.userId;

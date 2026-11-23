@@ -3,7 +3,16 @@ import { z } from "zod";
 import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { bookableRange, canApproveCourts, courtBookingMode, parseDayKey, slotStartsAt } from "@/lib/courts";
+import {
+  bookableRange,
+  canApproveCourts,
+  canDecideStep,
+  courtBookingMode,
+  initialBookingStatus,
+  LIVE_STATUSES,
+  parseDayKey,
+  slotStartsAt,
+} from "@/lib/courts";
 import { localDateKey } from "@/lib/client-session-rules";
 import { logActivity } from "@/lib/log";
 
@@ -14,11 +23,12 @@ const bookingSelect = {
   note: true,
   decisionNote: true,
   createdAt: true,
-  court: { select: { name: true } },
+  court: { select: { name: true, managerId: true, manager: { select: { name: true } } } },
   slot: { select: { startTime: true, endTime: true } },
 } as const;
 
-// scope=mine: my bookings (recent and coming). scope=pending: bookings waiting for approval (union and admin).
+// scope=mine: my bookings (recent and coming). scope=pending: bookings waiting for my decision (union, court
+// manager, admin).
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
@@ -28,11 +38,11 @@ export async function GET(req: NextRequest) {
   if (scope === "pending") {
     if (!canApproveCourts(session.role)) return NextResponse.json({ error: "Không có quyền duyệt." }, { status: 403 });
     const rows = await prisma.courtBooking.findMany({
-      where: { status: "PENDING", date: { gte: today } },
+      where: { status: { in: ["PENDING", "UNION_APPROVED"] }, date: { gte: today } },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       select: { ...bookingSelect, user: { select: { name: true, phone: true, major: true, className: true } } },
     });
-    return NextResponse.json(rows);
+    return NextResponse.json(rows.filter((r) => canDecideStep(session, r.court, r.status)));
   }
 
   const rows = await prisma.courtBooking.findMany({
@@ -52,8 +62,7 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
-  const mode = courtBookingMode(session.role);
-  if (!mode) return NextResponse.json({ error: "Tài khoản này không đặt sân được." }, { status: 403 });
+  if (!courtBookingMode(session.role)) return NextResponse.json({ error: "Tài khoản này không đặt sân được." }, { status: 403 });
 
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
@@ -70,11 +79,12 @@ export async function POST(req: NextRequest) {
   if (slotStartsAt(day, slot.startTime) <= new Date()) return NextResponse.json({ error: "Ca này đã bắt đầu hoặc đã qua." }, { status: 400 });
 
   const taken = await prisma.courtBooking.findFirst({
-    where: { slotId: slot.id, date: day, status: { in: ["PENDING", "APPROVED"] } },
+    where: { slotId: slot.id, date: day, status: { in: LIVE_STATUSES } },
     select: { id: true },
   });
   if (taken) return NextResponse.json({ error: "Ca này đã có người đặt." }, { status: 409 });
 
+  const status = initialBookingStatus(session.role, slot.court);
   try {
     const booking = await prisma.courtBooking.create({
       data: {
@@ -83,15 +93,15 @@ export async function POST(req: NextRequest) {
         date: day,
         userId: session.userId,
         note: parsed.data.note || null,
-        status: mode === "instant" ? "APPROVED" : "PENDING",
-        ...(mode === "instant" ? { decidedAt: new Date() } : {}),
+        status,
+        ...(status === "APPROVED" ? { decidedAt: new Date() } : {}),
       },
       select: { id: true, status: true },
     });
     await logActivity(
       session.userId,
       "COURT_BOOK",
-      `Đặt ${slot.court.name} ${slot.startTime}-${slot.endTime} ngày ${localDateKey(day)}${mode === "approval" ? " (chờ duyệt)" : ""}`,
+      `Đặt ${slot.court.name} ${slot.startTime}-${slot.endTime} ngày ${localDateKey(day)}${status === "APPROVED" ? "" : " (chờ duyệt)"}`,
     );
     return NextResponse.json(booking);
   } catch (err) {

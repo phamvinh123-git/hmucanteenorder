@@ -1,14 +1,20 @@
 import { addDays, startOfDay } from "date-fns";
 import { Role } from "@prisma/client";
 import { localDateKey } from "@/lib/client-session-rules";
+import { isTopRole } from "@/lib/auth";
 
 /** How far ahead a court can be booked, in days from today. */
 export const COURT_BOOK_DAYS_AHEAD = 14;
 
-/**
- * How an account books a court: "approval" (the booking waits for the student union), "instant" (approved at
- * once), or null (no access). One place to change who may book.
- */
+export type CourtStatus = "PENDING" | "UNION_APPROVED" | "APPROVED" | "REJECTED" | "CANCELLED";
+/** Statuses that hold a slot: waiting for the union, passed on to the court's manager, approved. */
+export const LIVE_STATUSES: CourtStatus[] = ["PENDING", "UNION_APPROVED", "APPROVED"];
+
+type Actor = { userId: string; role: Role };
+/** A court has its own manager (e.g. the football pitch) or none (the student union manages it). */
+type CourtRef = { managerId: string | null };
+
+/** Who may book courts at all ("approval" / "instant" only hint at the usual path; see initialBookingStatus). */
 export function courtBookingMode(role: Role): "approval" | "instant" | null {
   switch (role) {
     case "STUDENT":
@@ -25,14 +31,53 @@ export function courtBookingMode(role: Role): "approval" | "instant" | null {
   }
 }
 
-/** The student union and the court managers (admin, head of the service team, court manager) approve or reject students' bookings. */
-export function canApproveCourts(role: Role) {
-  return role === "UNION" || canManageCourts(role);
+/**
+ * Where a new booking starts. Admin, the head of the service team and court managers are approved at once. The
+ * student union's own booking skips its own step. A student (and, on a court that has a manager, anyone else)
+ * waits for the student union.
+ */
+export function initialBookingStatus(role: Role, court: CourtRef): "PENDING" | "UNION_APPROVED" | "APPROVED" {
+  if (isTopRole(role) || role === "COURT_MANAGER") return "APPROVED";
+  if (role === "UNION") return court.managerId ? "UNION_APPROVED" : "APPROVED";
+  if (role === "STUDENT") return "PENDING";
+  return court.managerId ? "PENDING" : "APPROVED";
 }
 
-/** Whoever manages courts sets up the courts and their slots. */
+/** The status a booking takes when the current step approves it: the union passes it on to the court's manager. */
+export function statusAfterApproval(status: "PENDING" | "UNION_APPROVED", court: CourtRef): "UNION_APPROVED" | "APPROVED" {
+  return status === "PENDING" && court.managerId ? "UNION_APPROVED" : "APPROVED";
+}
+
+/** Can this person decide the booking in its current step? Union: waiting bookings. Court manager: passed-on ones. */
+export function canDecideStep(actor: Actor, court: CourtRef, status: CourtStatus) {
+  if (isTopRole(actor.role)) return status === "PENDING" || status === "UNION_APPROVED";
+  if (status === "PENDING") return actor.role === "UNION";
+  if (status === "UNION_APPROVED") return !!court.managerId && court.managerId === actor.userId;
+  return false;
+}
+
+/**
+ * Who sets up a court's slots and can cancel its bookings: admin and the head of the service team (all courts),
+ * the student union (courts without a manager) and a court manager (the courts they manage).
+ */
+export function canManageCourt(actor: Actor, court: CourtRef) {
+  if (isTopRole(actor.role)) return true;
+  if (actor.role === "UNION") return !court.managerId;
+  return actor.role === "COURT_MANAGER" && court.managerId === actor.userId;
+}
+
+/** Has a court-related duty (shows the approvals and set-up tabs). */
+export function canApproveCourts(role: Role) {
+  return role === "UNION" || role === "COURT_MANAGER" || isTopRole(role);
+}
+
 export function canManageCourts(role: Role) {
-  return role === "ADMIN" || role === "SERVICE_HEAD" || role === "COURT_MANAGER";
+  return canApproveCourts(role);
+}
+
+/** Admin and the head of the service team add courts and choose each court's manager. */
+export function canAssignCourtManagers(role: Role) {
+  return isTopRole(role);
 }
 
 export function canUseCourts(role: Role) {

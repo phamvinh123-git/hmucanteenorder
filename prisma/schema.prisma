@@ -73,10 +73,12 @@ model User {
   logs              ActivityLog[]
   courtBookings     CourtBooking[] @relation("CourtBookings")
   courtDecisions    CourtBooking[] @relation("CourtDecisions")
+  managedCourts     Court[]        @relation("CourtManager")
 }
 
 enum CourtBookingStatus {
   PENDING
+  UNION_APPROVED
   APPROVED
   REJECTED
   CANCELLED
@@ -89,6 +91,10 @@ model Court {
   description String?
   active      Boolean        @default(true)
   sortOrder   Int            @default(0)
+  /// The court's own manager (e.g. for the football pitch). With one, a booking goes student union, then this
+  /// manager; without, the student union alone decides.
+  managerId   String?
+  manager     User?          @relation("CourtManager", fields: [managerId], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())
   slots       CourtSlot[]
   bookings    CourtBooking[]
@@ -107,8 +113,9 @@ model CourtSlot {
   @@unique([courtId, startTime])
 }
 
-/// A booking of one slot on one day. A student's booking waits for the student union (PENDING); other roles are
-/// approved at once. The database also holds a partial unique index (slotId, date) over PENDING/APPROVED rows
+/// A booking of one slot on one day. A student's booking waits for the student union (PENDING); on a court that has
+/// its own manager the union then passes it on (UNION_APPROVED) and the manager approves it. The database also holds a
+/// partial unique index (slotId, date) over PENDING/UNION_APPROVED/APPROVED rows
 /// (see the migration), so a slot cannot be double booked.
 model CourtBooking {
   id           String             @id @default(cuid())

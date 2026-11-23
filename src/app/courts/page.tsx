@@ -15,6 +15,7 @@ export default async function CourtsPage() {
         mode={courtBookingMode(user.role)}
         canApprove={canApproveCourts(user.role)}
         canManage={canManageCourts(user.role)}
+        canAddCourt={user.role !== "COURT_MANAGER"}
       />
     </AppShell>
   );

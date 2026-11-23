@@ -1,4 +1,4 @@
-// Adds the standard courts of "Đặt sân" (football, basketball, pickleball, badminton, table tennis) and their time slots.
+// Adds the standard courts of "Đặt sân" (football, basketball, badminton, table tennis) and their time slots.
 //
 //   node prisma/seed-courts.mjs            show what would be added (changes nothing)
 //   node prisma/seed-courts.mjs --apply    really add it
@@ -14,12 +14,12 @@ const SLOTS = [
   ["19:00", "20:00"],
 ];
 // The indoor basketball court is not lent out yet: it is added switched off (turn it on in "Quản lý sân").
+// Pickleball is booked freely for now, so it is not here. The football pitch has its own manager: choose that person
+// in "Quản lý sân" once their account (role Quản lý đặt sân) exists, and its bookings then go union -> manager.
 const COURTS = [
   { name: "Sân bóng đá", description: "Bóng đá" },
   { name: "Sân bóng rổ ngoài trời", description: "Bóng rổ" },
   { name: "Sân bóng rổ trong nhà", description: "Bóng rổ, chưa cho mượn", active: false },
-  { name: "Sân pickleball 1", description: "Pickleball" },
-  { name: "Sân pickleball 2", description: "Pickleball" },
   { name: "Sân cầu lông 1", description: "Cầu lông" },
   { name: "Sân cầu lông 2", description: "Cầu lông" },
   { name: "Sân bóng bàn 1", description: "Bóng bàn" },
@@ -45,7 +45,7 @@ try {
     }
   }
   if (apply) {
-    await prisma.activityLog.create({ data: { userId: null, action: "COURT_MANAGE", detail: "Thêm các sân chuẩn (bóng đá, bóng rổ, pickleball, cầu lông, bóng bàn) và ca giờ" } });
+    await prisma.activityLog.create({ data: { userId: null, action: "COURT_MANAGE", detail: "Thêm các sân chuẩn (bóng đá, bóng rổ, cầu lông, bóng bàn) và ca giờ" } });
     console.log("Done.");
   }
 } finally {
