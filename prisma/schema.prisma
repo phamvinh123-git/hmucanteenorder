@@ -96,6 +96,10 @@ model Court {
   sortOrder   Int            @default(0)
   /// The court's own manager (e.g. for the football pitch). With one, a booking goes student union, then this
   /// manager; without, the student union alone decides.
+  /// BADMINTON, TABLE_TENNIS, FOOTBALL, BASKETBALL, PICKLEBALL or OTHER (see src/lib/court-kinds.ts).
+  kind        String         @default("OTHER")
+  /// Weekdays the court is lent out, JavaScript style: 0 = Sunday ... 6 = Saturday.
+  openDays    Int[]          @default([0, 1, 2, 3, 4, 5, 6])
   managerId   String?
   manager     User?          @relation("CourtManager", fields: [managerId], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())

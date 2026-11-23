@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAddCourts, canAssignCourtManagers, canManageCourt, canManageCourts, TIME_RE } from "@/lib/courts";
 import { logActivity } from "@/lib/log";
+import { COURT_KIND_KEYS } from "@/lib/court-kinds";
 
 async function requireStaff() {
   const session = await getSession();
@@ -36,6 +37,8 @@ const createSchema = z.object({
   name: z.string().trim().min(1, "Nhập tên sân.").max(80),
   description: z.string().trim().max(200).optional(),
   managerId: z.string().nullable().optional(),
+  kind: z.enum(COURT_KIND_KEYS).optional(),
+  openDays: z.array(z.number().int().min(0).max(6)).min(1, "Chọn ít nhất một ngày trong tuần.").optional(),
   slots: z.array(slotSchema).max(40).optional(),
 });
 
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!canAddCourts(session.roles)) return NextResponse.json({ error: "Quản lý sân không tự thêm sân." }, { status: 403 });
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." }, { status: 400 });
-  const { name, description, slots, managerId } = parsed.data;
+  const { name, description, slots, managerId, kind, openDays } = parsed.data;
   if (managerId && !canAssignCourtManagers(session.roles)) {
     return NextResponse.json({ error: "Chỉ Admin hoặc Tổ trưởng chọn được người quản lý sân." }, { status: 403 });
   }
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
   const count = await prisma.court.count();
   const court = await prisma.court.create({
-    data: { name, description: description || null, managerId: managerId || null, sortOrder: count, slots: { create: slots ?? [] } },
+    data: { name, description: description || null, managerId: managerId || null, kind: kind ?? "OTHER", ...(openDays ? { openDays: Array.from(new Set(openDays)) } : {}), sortOrder: count, slots: { create: slots ?? [] } },
     select: { id: true },
   });
   await logActivity(session.userId, "COURT_MANAGE", `Thêm sân "${name}" (${slots?.length ?? 0} ca)`);

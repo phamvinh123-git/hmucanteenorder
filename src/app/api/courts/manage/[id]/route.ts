@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAssignCourtManagers, canManageCourt } from "@/lib/courts";
 import { logActivity } from "@/lib/log";
+import { COURT_KIND_KEYS } from "@/lib/court-kinds";
 
 /** The signed-in person and the court, when they may manage that court. */
 async function requireCourt(id: string) {
@@ -20,6 +21,8 @@ const patchSchema = z.object({
   description: z.string().trim().max(200).nullable().optional(),
   active: z.boolean().optional(),
   managerId: z.string().nullable().optional(),
+  kind: z.enum(COURT_KIND_KEYS).optional(),
+  openDays: z.array(z.number().int().min(0).max(6)).min(1, "Chọn ít nhất một ngày trong tuần.").optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) return error;
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." }, { status: 400 });
-  const { name, description, active, managerId } = parsed.data;
+  const { name, description, active, managerId, kind, openDays } = parsed.data;
   if (name && name !== court.name && (await prisma.court.findUnique({ where: { name }, select: { id: true } }))) {
     return NextResponse.json({ error: "Đã có sân tên này." }, { status: 409 });
   }
@@ -47,9 +50,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(description !== undefined ? { description: description || null } : {}),
       ...(active !== undefined ? { active } : {}),
       ...(managerId !== undefined ? { managerId: managerId || null } : {}),
+      ...(kind ? { kind } : {}),
+      ...(openDays ? { openDays: Array.from(new Set(openDays)).sort() } : {}),
     },
   });
-  const note = active !== undefined ? (active ? ": mở lại" : ": tạm ngưng") : managerId !== undefined ? ": đổi người quản lý" : "";
+  const note = active !== undefined ? (active ? ": mở lại" : ": tạm ngưng") : managerId !== undefined ? ": đổi người quản lý" : openDays ? ": đổi ngày cho thuê" : "";
   await logActivity(session.userId, "COURT_MANAGE", `Sửa sân "${court.name}"${note}`);
   return NextResponse.json({ ok: true });
 }

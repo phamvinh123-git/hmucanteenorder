@@ -45,6 +45,10 @@ export async function GET(req: NextRequest) {
       name: c.name,
       description: c.description,
       managerName: c.manager?.name ?? null,
+      kind: c.kind,
+      openDays: c.openDays,
+      // Lent out on this weekday (e.g. badminton and table tennis only on Tuesday, Thursday and Saturday).
+      open: c.openDays.includes(day.getDay()),
       // What happens to a booking made now: approved at once, or it waits for the union (and the court's manager).
       startsAs: initialBookingStatus(session.roles, c),
       slots: c.slots.map((s) => {

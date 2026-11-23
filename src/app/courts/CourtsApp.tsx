@@ -1,28 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { localDateKey } from "@/lib/client-session-rules";
+import { useCallback, useEffect, useState } from "react";
+import { ALL_DAYS, COURT_KINDS, openDaysLabel, WEEKDAYS, type CourtKind } from "@/lib/court-kinds";
+import CourtBoard from "./CourtBoard";
+import { btnGhost, btnPrimary, call, fmtIso, input, patch, post, STATUS_LABEL, STATUS_STYLE, type Mode, type Status } from "./shared";
 
-type Mode = "approval" | "instant" | null;
 type Tab = "board" | "mine" | "approve" | "manage";
-type Status = "PENDING" | "UNION_APPROVED" | "APPROVED" | "REJECTED" | "CANCELLED";
-
-type BoardSlot = {
-  id: string;
-  startTime: string;
-  endTime: string;
-  past: boolean;
-  booking: { id: string; status: Status; mine: boolean; who: string | null; note: string | null } | null;
-};
-type BoardCourt = {
-  id: string;
-  name: string;
-  description: string | null;
-  managerName: string | null;
-  /** What happens to a booking made now: approved at once, or it waits (for the union, then the court manager). */
-  startsAs: "PENDING" | "UNION_APPROVED" | "APPROVED";
-  slots: BoardSlot[];
-};
 
 type MyBooking = {
   id: string;
@@ -40,53 +23,11 @@ type ManageCourt = {
   name: string;
   description: string | null;
   active: boolean;
+  kind: CourtKind;
+  openDays: number[];
   manager: { id: string; name: string } | null;
   slots: { id: string; startTime: string; endTime: string; active: boolean }[];
 };
-
-const DAYS_SHOWN = 15;
-const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const STATUS_LABEL: Record<Status, string> = {
-  PENDING: "Chờ Liên chi đoàn duyệt",
-  UNION_APPROVED: "Chờ quản lý sân duyệt",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Bị từ chối",
-  CANCELLED: "Đã hủy",
-};
-const STATUS_STYLE: Record<Status, string> = {
-  PENDING: "bg-amber-50 text-amber-700",
-  UNION_APPROVED: "bg-blue-50 text-blue-700",
-  APPROVED: "bg-green-50 text-green-700",
-  REJECTED: "bg-red-50 text-red-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
-};
-
-const input =
-  "rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100";
-const btnPrimary = "rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50";
-const btnGhost = "rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50";
-
-function fmtKey(key: string) {
-  const [y, m, d] = key.split("-").map(Number);
-  return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
-}
-function fmtIso(iso: string) {
-  return fmtKey(localDateKey(new Date(iso)));
-}
-
-async function call(path: string, init?: RequestInit) {
-  try {
-    const res = await fetch(path, init);
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, data } as { ok: boolean; data: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
-  } catch {
-    return { ok: false, data: { error: "Không kết nối được máy chủ, thử lại." } } as { ok: boolean; data: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
-  }
-}
-const post = (path: string, body: unknown) =>
-  call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-const patch = (path: string, body: unknown) =>
-  call(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 export default function CourtsApp({
   mode,
@@ -109,7 +50,7 @@ export default function CourtsApp({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-slate-800">Đặt sân</h1>
+        <h1 className="sr-only">Đặt sân</h1>
         {mode === "approval" && (
           <p className="text-sm text-slate-500">Lượt đặt của sinh viên được gửi Liên chi đoàn duyệt. Sân có quản lý riêng (như sân bóng đá) thì Liên chi đoàn chuyển tiếp cho quản lý sân duyệt lần cuối.</p>
         )}
@@ -131,190 +72,10 @@ export default function CourtsApp({
           ))}
         </div>
       )}
-      {tab === "board" && <Board mode={mode} />}
+      {tab === "board" && <CourtBoard mode={mode} />}
       {tab === "mine" && <Mine />}
       {tab === "approve" && <Approvals />}
       {tab === "manage" && <Manage canAddCourt={canAddCourt} />}
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ the booking board of one day
-function Board({ mode }: { mode: Mode }) {
-  const days = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: DAYS_SHOWN }, (_, i) => localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)));
-  }, []);
-  const [day, setDay] = useState(days[0]);
-  const [courts, setCourts] = useState<BoardCourt[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [pick, setPick] = useState<{ court: BoardCourt; slot: BoardSlot } | null>(null);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    const r = await call(`/api/courts?date=${day}`);
-    if (r.ok) {
-      setCourts(r.data.courts);
-      setError(null);
-    } else setError(r.data.error ?? "Không tải được lịch sân.");
-  }, [day]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
-
-  async function book() {
-    if (!pick) return;
-    setBusy(true);
-    setError(null);
-    const r = await post("/api/courts/bookings", { slotId: pick.slot.id, date: day, note: note.trim() || undefined });
-    setBusy(false);
-    if (!r.ok) {
-      setError(r.data.error ?? "Không đặt được.");
-      load();
-      return;
-    }
-    setNotice(
-      r.data.status === "PENDING"
-        ? "Đã gửi yêu cầu đặt sân. Lượt đặt có hiệu lực sau khi Liên chi đoàn duyệt."
-        : r.data.status === "UNION_APPROVED"
-          ? "Đã gửi quản lý sân để duyệt."
-          : "Đã đặt sân thành công.",
-    );
-    setPick(null);
-    setNote("");
-    load();
-  }
-
-  async function cancel(id: string) {
-    const r = await call(`/api/courts/bookings/${id}`, { method: "DELETE" });
-    if (!r.ok) setError(r.data.error ?? "Không hủy được.");
-    else setNotice("Đã hủy lượt đặt.");
-    load();
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-        {days.map((k) => (
-          <button
-            key={k}
-            onClick={() => {
-              setDay(k);
-              setPick(null);
-              setNotice(null);
-            }}
-            className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm ${
-              day === k ? "bg-red-600 font-semibold text-white shadow-sm" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-red-50"
-            }`}
-          >
-            {fmtKey(k)}
-          </button>
-        ))}
-      </div>
-
-      {notice && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{notice}</p>}
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      {courts === null && !error && <p className="text-sm text-slate-400">Đang tải...</p>}
-      {courts?.length === 0 && <p className="text-sm text-slate-500">Chưa có sân nào mở đặt.</p>}
-
-      {courts?.map((c) => (
-        <section key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-800">{c.name}</h2>
-          {c.description && <p className="text-xs text-slate-500">{c.description}</p>}
-          {c.managerName && (
-            <p className="text-xs text-slate-500">
-              Quản lý sân: {c.managerName}. Đặt sân phải qua Liên chi đoàn, rồi quản lý sân duyệt.
-            </p>
-          )}
-          {c.slots.length === 0 && <p className="mt-2 text-sm text-slate-400">Sân chưa có ca nào.</p>}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {c.slots.map((s) => {
-              const label = `${s.startTime} – ${s.endTime}`;
-              if (s.booking) {
-                const b = s.booking;
-                return (
-                  <div
-                    key={s.id}
-                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${
-                      b.mine ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50 text-slate-400"
-                    }`}
-                  >
-                    <span>
-                      <span className="font-medium">{label}</span>
-                      <span className="block text-xs">
-                        {b.mine ? `Của bạn · ${STATUS_LABEL[b.status]}` : b.who ? `${b.who} · ${STATUS_LABEL[b.status]}` : "Đã có người đặt"}
-                      </span>
-                    </span>
-                    {b.mine && !s.past && (
-                      <button onClick={() => cancel(b.id)} className="text-xs font-medium text-red-600 underline">
-                        Hủy
-                      </button>
-                    )}
-                  </div>
-                );
-              }
-              if (s.past || !mode) {
-                return (
-                  <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
-                    <span className="font-medium">{label}</span>
-                    <span className="block text-xs">{s.past ? "Đã qua" : "Trống"}</span>
-                  </div>
-                );
-              }
-              const on = pick?.slot.id === s.id;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    setPick({ court: c, slot: s });
-                    setNotice(null);
-                    setError(null);
-                  }}
-                  className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
-                    on ? "border-red-500 bg-red-600 text-white shadow-sm" : "border-green-200 bg-green-50 text-green-800 hover:border-green-400"
-                  }`}
-                >
-                  <span className="font-medium">{label}</span>
-                  <span className="block text-xs">Trống</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-
-      {pick && (
-        <div className="sticky bottom-3 rounded-2xl border border-red-200 bg-white p-4 shadow-lg animate-pop-in">
-          <p className="text-sm text-slate-700">
-            Đặt <b>{pick.court.name}</b>, {pick.slot.startTime} – {pick.slot.endTime}, {fmtKey(day)}
-          </p>
-          {pick.court.startsAs === "PENDING" && (
-            <p className="text-xs text-amber-700">
-              Lượt đặt sẽ được gửi Liên chi đoàn duyệt{pick.court.managerName ? `, rồi chuyển ${pick.court.managerName} (quản lý sân) duyệt lần cuối` : ""}.
-            </p>
-          )}
-          {pick.court.startsAs === "UNION_APPROVED" && <p className="text-xs text-amber-700">Lượt đặt sẽ được gửi quản lý sân duyệt.</p>}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={200}
-              placeholder="Ghi chú / mục đích (không bắt buộc)"
-              className={`${input} min-w-52 flex-1`}
-            />
-            <button onClick={book} disabled={busy} className={btnPrimary}>
-              {busy ? "Đang đặt..." : pick.court.startsAs === "APPROVED" ? "Đặt sân" : "Gửi yêu cầu"}
-            </button>
-            <button onClick={() => setPick(null)} className={btnGhost}>
-              Thôi
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -437,6 +198,8 @@ function Manage({ canAddCourt }: { canAddCourt: boolean }) {
   const [managers, setManagers] = useState<{ id: string; name: string }[]>([]);
   const [canAssign, setCanAssign] = useState(false);
   const [newManager, setNewManager] = useState("");
+  const [newKind, setNewKind] = useState<CourtKind>("BADMINTON");
+  const [newDays, setNewDays] = useState<number[]>(ALL_DAYS);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -473,7 +236,7 @@ function Manage({ canAddCourt }: { canAddCourt: boolean }) {
         const [startTime, endTime] = t.split("-").map((x) => x.trim());
         return { startTime, endTime };
       });
-    const ok = await act(post("/api/courts/manage", { name, description: description || undefined, managerId: newManager || null, slots }));
+    const ok = await act(post("/api/courts/manage", { name, description: description || undefined, managerId: newManager || null, kind: newKind, openDays: newDays, slots }));
     if (ok) {
       setName("");
       setDescription("");
@@ -490,6 +253,19 @@ function Manage({ canAddCourt }: { canAddCourt: boolean }) {
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên sân (VD: Sân cầu lông số 1)" maxLength={80} className={input} />
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả (không bắt buộc)" maxLength={200} className={input} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-end gap-3">
+          <label className="text-xs font-medium text-slate-600">
+            Loại sân
+            <select value={newKind} onChange={(e) => setNewKind(e.target.value as CourtKind)} className={`${input} mt-1 block`}>
+              {COURT_KINDS.map((k) => (
+                <option key={k.key} value={k.key}>
+                  {k.icon} {k.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <DayPicker value={newDays} onChange={setNewDays} />
         </div>
         {canAssign && (
           <label className="mt-2 block text-xs font-medium text-slate-600">
@@ -552,6 +328,24 @@ function Manage({ canAddCourt }: { canAddCourt: boolean }) {
                 </button>
               </span>
             </div>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-xs font-medium text-slate-600">
+                Loại sân
+                <select
+                  value={c.kind}
+                  onChange={(e) => act(patch(`/api/courts/manage/${c.id}`, { kind: e.target.value }))}
+                  className={`${input} mt-1 block`}
+                >
+                  {COURT_KINDS.map((k) => (
+                    <option key={k.key} value={k.key}>
+                      {k.icon} {k.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <DayPicker value={c.openDays} onChange={(days) => act(patch(`/api/courts/manage/${c.id}`, { openDays: days }))} />
+              <span className="text-xs text-slate-400">Cho thuê: {openDaysLabel(c.openDays)}</span>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {c.slots.length === 0 && <span className="text-sm text-slate-400">Chưa có ca nào.</span>}
               {c.slots.map((s) => (
@@ -596,6 +390,37 @@ function Manage({ canAddCourt }: { canAddCourt: boolean }) {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/** Tick the weekdays a court is lent out. */
+function DayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-600">Ngày cho thuê</p>
+      <div className="mt-1 flex gap-1">
+        {WEEKDAYS.map((w) => {
+          const on = value.includes(w.day);
+          return (
+            <button
+              key={w.day}
+              type="button"
+              onClick={() => {
+                const next = on ? value.filter((d) => d !== w.day) : [...value, w.day];
+                if (next.length > 0) onChange(next);
+              }}
+              aria-pressed={on}
+              title={w.label}
+              className={`h-8 w-9 rounded-lg text-xs font-semibold transition-colors ${
+                on ? "bg-red-600 text-white" : "bg-white text-slate-500 ring-1 ring-slate-300 hover:ring-red-300"
+              }`}
+            >
+              {w.short}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

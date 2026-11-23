@@ -14,6 +14,7 @@ import {
   slotStartsAt,
 } from "@/lib/courts";
 import { localDateKey } from "@/lib/client-session-rules";
+import { openDaysLabel } from "@/lib/court-kinds";
 import { logActivity } from "@/lib/log";
 
 const bookingSelect = {
@@ -76,6 +77,9 @@ export async function POST(req: NextRequest) {
 
   const slot = await prisma.courtSlot.findUnique({ where: { id: parsed.data.slotId }, include: { court: true } });
   if (!slot || !slot.active || !slot.court.active) return NextResponse.json({ error: "Ca này không còn mở." }, { status: 404 });
+  if (!slot.court.openDays.includes(day.getDay())) {
+    return NextResponse.json({ error: `${slot.court.name} chỉ cho thuê vào ${openDaysLabel(slot.court.openDays)}.` }, { status: 400 });
+  }
   if (slotStartsAt(day, slot.startTime) <= new Date()) return NextResponse.json({ error: "Ca này đã bắt đầu hoặc đã qua." }, { status: 400 });
 
   const taken = await prisma.courtBooking.findFirst({

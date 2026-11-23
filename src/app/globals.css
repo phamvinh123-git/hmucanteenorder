@@ -338,3 +338,137 @@ select,
 input {
   max-width: 100%;
 }
+
+/* ---------- Đặt sân: 3D courts and booking animations ---------- */
+.court3d {
+  perspective: 620px;
+  height: 150px;
+  display: grid;
+  place-items: center;
+}
+.court3d-stage {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(58deg) rotateZ(-30deg);
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.court3d-plane {
+  position: relative;
+  transform-style: preserve-3d;
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+}
+.court3d-surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+/* The net stands up from the middle line of the floor. */
+.court3d-net {
+  position: absolute;
+  left: -3%;
+  width: 106%;
+  top: calc(50% - 24px);
+  height: 24px;
+  transform-origin: 50% 100%;
+  transform: rotateX(-90deg);
+  background:
+    linear-gradient(#fff 0 3px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(rgba(255, 255, 255, 0.8) 0 1px, transparent 1px 5px);
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.court3d-shadow {
+  position: absolute;
+  inset: 6% -6% -6% 6%;
+  background: rgba(15, 23, 42, 0.35);
+  filter: blur(10px);
+  border-radius: 8px;
+  transform: translateZ(-6px);
+}
+.court-card:hover .court3d-stage {
+  transform: rotateX(50deg) rotateZ(-18deg) translateZ(10px) scale(1.05);
+}
+.court3d.is-selected .court3d-stage {
+  animation: court-sway 4.5s ease-in-out infinite;
+}
+.court3d.is-closed {
+  filter: grayscale(0.85) opacity(0.55);
+}
+@keyframes court-sway {
+  0%,
+  100% {
+    transform: rotateX(52deg) rotateZ(-26deg) translateZ(14px);
+  }
+  50% {
+    transform: rotateX(46deg) rotateZ(-8deg) translateZ(24px);
+  }
+}
+
+.court-hero {
+  background: linear-gradient(120deg, #be1651, #ea6f9a, #7c3aed, #be1651);
+  background-size: 300% 300%;
+  animation: hero-shift 12s ease infinite;
+}
+@keyframes hero-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.slot-pulse {
+  animation: ring-pulse 1.6s ease-out infinite;
+}
+@keyframes ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(190, 22, 81, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(190, 22, 81, 0);
+  }
+}
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+}
+.confetti span {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--c);
+  opacity: 0;
+  animation: confetti-burst 1.4s ease-out forwards;
+  animation-delay: var(--d);
+}
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .court3d-stage,
+  .court3d.is-selected .court3d-stage,
+  .court-hero,
+  .slot-pulse,
+  .confetti span {
+    animation: none;
+    transition: none;
+  }
+}
