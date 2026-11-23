@@ -1,46 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
-import NavLinks from "./NavLinks";
+import AppNav, { MobileTabs, type NavGroup } from "./AppNav";
 import UserMenu from "./UserMenu";
 import IdleScreen from "./IdleScreen";
 import { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
-  { role: "STUDENT", href: "/student", label: "Đặt suất ăn" },
-  { role: "STUDENT", href: "/courts", label: "Đặt sân" },
-  { role: "OFFICER", href: "/officer", label: "Đặt cơm trưa" },
-  { role: "OFFICER", href: "/courts", label: "Đặt sân" },
-  { role: "SALES", href: "/sales", label: "Bán hàng" },
-  { role: "SALES", href: "/schedule", label: "Lịch tuần" },
-  { role: "SALES", href: "/report", label: "Báo cáo" },
-  { role: "MANAGER", href: "/manager", label: "Bán hàng" },
-  { role: "MANAGER", href: "/schedule", label: "Lịch tuần" },
-  { role: "MANAGER", href: "/manager/stats", label: "Thống kê" },
-  { role: "MANAGER", href: "/report", label: "Báo cáo" },
-  { role: "MANAGER", href: "/courts", label: "Đặt sân" },
-  { role: "CANTEEN_SUPPORT", href: "/costly", label: "Giá vốn" },
-  { role: "UNION", href: "/courts", label: "Đặt sân" },
-  { role: "SERVICE_HEAD", href: "/sales", label: "Bán hàng" },
-  { role: "SERVICE_HEAD", href: "/schedule", label: "Lịch tuần" },
-  { role: "SERVICE_HEAD", href: "/manager/stats", label: "Thống kê" },
-  { role: "SERVICE_HEAD", href: "/report", label: "Báo cáo" },
-  { role: "SERVICE_HEAD", href: "/costly", label: "Giá vốn" },
-  { role: "SERVICE_HEAD", href: "/courts", label: "Đặt sân" },
-  { role: "SERVICE_HEAD", href: "/admin/archives", label: "Lưu trữ" },
-  { role: "SERVICE_HEAD", href: "/admin/logs", label: "Nhật ký" },
-  { role: "COURT_MANAGER", href: "/courts", label: "Đặt sân" },
-  { role: "ADMIN", href: "/sales", label: "Bán hàng" },
-  { role: "ADMIN", href: "/schedule", label: "Lịch tuần" },
-  { role: "ADMIN", href: "/manager/stats", label: "Thống kê" },
-  { role: "ADMIN", href: "/report", label: "Báo cáo" },
-  { role: "ADMIN", href: "/costly", label: "Giá vốn" },
-  { role: "ADMIN", href: "/courts", label: "Đặt sân" },
-  { role: "ADMIN", href: "/admin", label: "Tài khoản" },
-  { role: "ADMIN", href: "/admin/archives", label: "Lưu trữ" },
-  { role: "ADMIN", href: "/admin/logs", label: "Nhật ký" },
-];
+import { servicesFor } from "@/lib/services";
 
 const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị viên",
@@ -63,8 +29,6 @@ export default async function AppShell({
   name: string;
   children: React.ReactNode;
 }) {
-  const items = NAV_ITEMS.filter((i) => i.role === role);
-
   // A manager, salesperson or admin who is also an officer (cán bộ) keeps their own menu and gets the
   // lunch-ordering page as one more entry.
   const session = await getSession();
@@ -73,7 +37,16 @@ export default async function AppShell({
     role !== "STUDENT" &&
     !!session &&
     !!(await prisma.user.findUnique({ where: { id: session.userId }, select: { isOfficer: true } }))?.isOfficer;
-  if (officerToo) items.push({ role, href: "/officer", label: "Đặt cơm trưa" });
+  // The services this account uses; the menu (and the tabs inside the current service) is built from them.
+  const groups: NavGroup[] = servicesFor(role).map((svc) => ({
+    key: svc.key,
+    title: svc.title,
+    icon: svc.icon,
+    href: svc.href,
+    paths: svc.paths,
+    items:
+      svc.key === "canteen" && officerToo ? [...svc.items, { href: "/officer", label: "Đặt cơm trưa" }] : svc.items,
+  }));
 
   return (
     <div className="min-h-screen">
@@ -94,12 +67,12 @@ export default async function AppShell({
               <span className="block text-xs text-slate-500">ĐHYHN Thanh Hóa</span>
             </span>
           </Link>
-          <NavLinks items={items} className="ml-2 hidden flex-1 md:flex" />
-          <div className="ml-auto md:ml-0">
+          <AppNav groups={groups} />
+          <div className="ml-auto">
             <UserMenu name={name} roleLabel={ROLE_LABEL[role]} />
           </div>
         </div>
-        <NavLinks items={items} className="no-scrollbar mx-auto max-w-6xl overflow-x-auto px-4 pb-2 md:hidden" />
+        <MobileTabs groups={groups} />
       </header>
       <main className="max-w-6xl mx-auto px-4 py-6 animate-rise-in">
         {children}

@@ -6,6 +6,7 @@ import { localDateKey, LOW_MEAL_THRESHOLD } from "@/lib/client-session-rules";
 import { classLevelsFor, MAJORS } from "@/lib/student-info";
 import { foldText } from "@/lib/text";
 import ConfirmModal from "@/components/ConfirmModal";
+import ActionMenu from "@/components/ActionMenu";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 
@@ -1114,7 +1115,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
           <h2 className="text-sm font-semibold text-slate-700">Danh sách sinh viên</h2>
           <div className="flex items-center gap-2">
-            {confirmingReset ? (
+            {confirmingReset && (
               <>
                 <span className="text-xs text-red-600">Xóa mã số của tất cả sinh viên?</span>
                 <button
@@ -1131,36 +1132,22 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                   Thôi
                 </button>
               </>
-            ) : (
-              <button
-                onClick={() => setConfirmingReset(true)}
-                className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                title="Xóa mã thứ tự của tất cả sinh viên để bắt đầu kỳ học mới"
-              >
-                Reset mã thứ tự
-              </button>
             )}
-            <button
-              onClick={backfillOrderCodes}
-              disabled={backfilling}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-              title="Gán mã thứ tự cho các sinh viên hiện chưa có mã (tài khoản tạo trước khi có tính năng này)"
-            >
-              {backfilling ? "Đang gán..." : "Gán mã cho SV chưa có mã"}
-            </button>
-            {canResetAll && (
-              <button
-                onClick={() => {
-                  setResetAllError(null);
-                  setResetAllMessage(null);
-                  setShowResetAll(true);
-                }}
-                className="text-xs px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                title="Chuyển toàn bộ sinh viên vào bản lưu trữ để bắt đầu lại (Admin có thể khôi phục)"
-              >
-                Reset toàn bộ sinh viên
-              </button>
-            )}
+            <ActionMenu
+              label="Công cụ"
+              items={[
+                { section: "Mã thứ tự", label: "Gán mã cho SV chưa có mã", onClick: backfillOrderCodes, disabled: backfilling, hint: "Gán mã thứ tự cho các sinh viên hiện chưa có mã (tài khoản tạo trước khi có tính năng này)" },
+                { section: "Mã thứ tự", label: "Reset mã thứ tự", onClick: () => setConfirmingReset(true), hint: "Xóa mã thứ tự của tất cả sinh viên để bắt đầu kỳ học mới" },
+                ...(canResetAll
+                  ? [
+                      { section: "Kiểm tra lịch ăn", label: scanBusy ? "Đang quét..." : "Quét trùng buổi", onClick: () => { setScanMessage(null); runScan(); }, disabled: scanBusy, hint: "Quét tất cả sinh viên xem còn bạn nào có hai suất cùng ngày và cùng bữa" },
+                      { section: "Kiểm tra lịch ăn", label: auditBusy ? "Đang rà soát..." : "Rà soát hệ thống", onClick: runAudit, disabled: auditBusy, hint: "Kiểm tra toàn bộ sinh viên: buổi trùng, gói không khớp số buổi, khoảng trống trong lịch bù, bù sai thứ tự, ngày bắt đầu lệch. Chỉ xem, không sửa gì." },
+                      { section: "Kiểm tra lịch ăn", label: compactBusy ? "Đang dồn..." : "Dồn lịch bù liền ngày", onClick: compactMakeups, disabled: compactBusy, hint: "Dồn các buổi bù về cho liền ngày, lấp các ngày trống. Chỉ đổi ngày, không thêm hay bớt buổi nào." },
+                      { section: "Nguy hiểm", label: "Reset toàn bộ sinh viên", danger: true, onClick: () => { setResetAllError(null); setResetAllMessage(null); setShowResetAll(true); }, hint: "Chuyển toàn bộ sinh viên vào bản lưu trữ để bắt đầu lại (Admin có thể khôi phục)" },
+                    ]
+                  : []),
+              ]}
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -1193,39 +1180,6 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
           >
             Lệch buổi ({students.filter((x) => x.missing !== 0).length})
           </button>
-          )}
-          {canResetAll && (
-            <button
-              onClick={() => {
-                setScanMessage(null);
-                runScan();
-              }}
-              disabled={scanBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-              title="Quét tất cả sinh viên xem còn bạn nào có hai suất cùng ngày và cùng bữa"
-            >
-              {scanBusy ? "Đang quét..." : "Quét trùng buổi"}
-            </button>
-          )}
-          {canResetAll && (
-            <button
-              onClick={runAudit}
-              disabled={auditBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-              title="Kiểm tra toàn bộ sinh viên: buổi trùng, gói không khớp số buổi, khoảng trống trong lịch bù, bù sai thứ tự, ngày bắt đầu lệch. Chỉ xem, không sửa gì."
-            >
-              {auditBusy ? "Đang rà soát..." : "Rà soát hệ thống"}
-            </button>
-          )}
-          {canResetAll && (
-            <button
-              onClick={compactMakeups}
-              disabled={compactBusy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-              title="Dồn các buổi bù về cho liền ngày, lấp các ngày trống. Chỉ đổi ngày, không thêm hay bớt buổi nào."
-            >
-              {compactBusy ? "Đang dồn..." : "Dồn lịch bù liền ngày"}
-            </button>
           )}
           {priceOptions.length > 1 && (
             <>
