@@ -28,7 +28,7 @@ export default async function SchedulePrintPage({
 }: {
   searchParams: Promise<{ date?: string; mealType?: string; group?: string }>;
 }) {
-  await requireUser({ roles: ["SALES", "MANAGER", "ADMIN"] });
+  await requireUser({ roles: ["SALES", "MANAGER", "ADMIN", "SERVICE_HEAD"] });
 
   const { date: dateParam, mealType: mealTypeParam, group: groupParam } = await searchParams;
   // group=OFFICER: staff only; group=ALL: students and staff together; otherwise students only.

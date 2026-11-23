@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canAccessAdmin, getSession } from "@/lib/auth";
+import { canAccessOversight, getSession } from "@/lib/auth";
 
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessOversight(session.role)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

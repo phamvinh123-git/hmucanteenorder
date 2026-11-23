@@ -10,7 +10,7 @@ export type Service = { key: string; title: string; description: string; icon: s
  */
 export function servicesFor(role: Role): Service[] {
   const services: Service[] = [];
-  if (role !== "CANTEEN_SUPPORT" && role !== "UNION") {
+  if (role !== "CANTEEN_SUPPORT" && role !== "UNION" && role !== "COURT_MANAGER") {
     services.push({
       key: "canteen",
       title: "Căng tin",
@@ -23,7 +23,7 @@ export function servicesFor(role: Role): Service[] {
     services.push({
       key: "courts",
       title: "Đặt sân",
-      description: role === "UNION" ? "Duyệt lượt đặt sân của sinh viên." : "Đặt lịch sân theo ca, xem sân còn trống.",
+      description: role === "UNION" || role === "COURT_MANAGER" ? "Duyệt lượt đặt sân, quản lý sân và các ca." : "Đặt lịch sân theo ca, xem sân còn trống.",
       icon: "🏸",
       href: "/courts",
     });

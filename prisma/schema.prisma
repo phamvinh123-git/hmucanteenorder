@@ -15,6 +15,8 @@ enum Role {
   OFFICER
   CANTEEN_SUPPORT
   UNION
+  SERVICE_HEAD
+  COURT_MANAGER
 }
 
 enum MealPattern {
@@ -50,8 +52,8 @@ model User {
   /// allowed values live in src/lib/student-info.ts.
   major             String?
   className         String?
-  /// Fixed staff code ("mã cán bộ", upper case) of an OFFICER, imported with the staff list and never
-  /// edited by the officer. It is a second way to log in; `phone` stays the officer's own, editable
+  /// Fixed login code, upper case: the "mã cán bộ" of an OFFICER or the "mã sinh viên" of a STUDENT, imported
+  /// with the lists and never edited by the person. It is a second way to log in; `phone` stays the officer's own, editable
   /// number (set equal to the code as a placeholder until they enter one).
   staffCode         String?  @unique
   /// True for every OFFICER, and also for a manager/sales/admin who is an officer too (same login, both

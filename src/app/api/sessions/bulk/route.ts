@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getSession, isTopRole } from "@/lib/auth";
 import { cancelSessionAndExtend, restoreSession } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
   const { action, ids } = parsed.data;
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = isTopRole(session.role);
   const targets = await prisma.mealSession.findMany({ where: { id: { in: ids } } });
   if (targets.length !== new Set(ids).size) {
     return NextResponse.json({ error: "Có buổi ăn không tồn tại." }, { status: 404 });

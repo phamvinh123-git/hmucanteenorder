@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import StatsView from "./StatsView";
 
 export default async function StatsPage() {
-  const user = await requireUser({ roles: ["MANAGER", "ADMIN"] });
+  const user = await requireUser({ roles: ["MANAGER", "ADMIN", "SERVICE_HEAD"] });
 
   return (
     <AppShell role={user.role} name={user.name}>

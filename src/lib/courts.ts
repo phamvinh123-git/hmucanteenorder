@@ -16,6 +16,8 @@ export function courtBookingMode(role: Role): "approval" | "instant" | null {
     case "OFFICER":
     case "MANAGER":
     case "ADMIN":
+    case "SERVICE_HEAD":
+    case "COURT_MANAGER":
     case "UNION":
       return "instant";
     default:
@@ -23,14 +25,14 @@ export function courtBookingMode(role: Role): "approval" | "instant" | null {
   }
 }
 
-/** The student union (and admins) approve or reject students' bookings. */
+/** The student union and the court managers (admin, head of the service team, court manager) approve or reject students' bookings. */
 export function canApproveCourts(role: Role) {
-  return role === "UNION" || role === "ADMIN";
+  return role === "UNION" || canManageCourts(role);
 }
 
-/** Admins set up the courts and their slots. */
+/** Whoever manages courts sets up the courts and their slots. */
 export function canManageCourts(role: Role) {
-  return role === "ADMIN";
+  return role === "ADMIN" || role === "SERVICE_HEAD" || role === "COURT_MANAGER";
 }
 
 export function canUseCourts(role: Role) {

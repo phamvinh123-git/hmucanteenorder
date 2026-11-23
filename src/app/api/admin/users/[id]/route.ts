@@ -8,7 +8,7 @@ import { addDaysLocal, openWeekMondays } from "@/lib/officer-rules";
 
 const schema = z.object({
   active: z.boolean().optional(),
-  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION"]).optional(),
+  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER"]).optional(),
   // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
   isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
@@ -55,14 +55,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // An empty code means "leave the code alone". Giving a code to a manager / sales / admin account
     // also makes them an officer (one login, both roles), so no separate toggle is needed first.
     if (data.staffCode !== undefined && data.staffCode !== "") {
-      if (target.role === "STUDENT") {
-        return NextResponse.json({ error: "Sinh viên không có mã cán bộ." }, { status: 400 });
-      }
       if (!CODE_RE.test(data.staffCode)) {
-        return NextResponse.json({ error: "Mã cán bộ gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." }, { status: 400 });
+        return NextResponse.json({ error: "Mã gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." }, { status: 400 });
       }
       nextCode = data.staffCode.toUpperCase();
-      becomesOfficer = !target.isOfficer && target.role !== "OFFICER";
+      // (A student's code is the student code, which does not make the student an officer.)
+      becomesOfficer = !target.isOfficer && target.role !== "OFFICER" && target.role !== "STUDENT";
       if (hadPlaceholder && data.phone === undefined) nextPhone = nextCode;
     }
 

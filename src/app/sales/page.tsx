@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import SalesTools from "@/components/SalesTools";
 
 export default async function SalesPage() {
-  const user = await requireUser({ roles: ["SALES", "MANAGER", "ADMIN"] });
+  const user = await requireUser({ roles: ["SALES", "MANAGER", "ADMIN", "SERVICE_HEAD"] });
 
   return (
     <AppShell role={user.role} name={user.name}>

@@ -6,7 +6,7 @@ import LogsView from "./LogsView";
 const LOG_LIMIT = 5000;
 
 export default async function LogsPage() {
-  const user = await requireUser({ roles: ["ADMIN"] });
+  const user = await requireUser({ roles: ["ADMIN", "SERVICE_HEAD"] });
 
   const logs = await prisma.activityLog.findMany({
     orderBy: { createdAt: "desc" },

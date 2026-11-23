@@ -55,21 +55,35 @@ export async function getSession(): Promise<SessionPayload | null> {
   }
 }
 
+/**
+ * The two top roles: admin, and the head of the service team (tổ trưởng tổ dịch vụ), who runs every service. They
+ * differ in one thing only: handing out and changing accounts is for admins (see canAccessAdmin).
+ */
+export function isTopRole(role: Role) {
+  return role === "ADMIN" || role === "SERVICE_HEAD";
+}
+
 export function canAccessSalesTools(role: Role) {
-  return role === "SALES" || role === "MANAGER" || role === "ADMIN";
+  return role === "SALES" || role === "MANAGER" || isTopRole(role);
 }
 
 export function canAccessStats(role: Role) {
-  return role === "MANAGER" || role === "ADMIN";
+  return role === "MANAGER" || isTopRole(role);
 }
 
-/** The "Giá vốn" notebook: admins and the canteen-support staff who fill it in. */
+/** The "Giá vốn" notebook: the top roles and the canteen-support staff who fill it in. */
 export function canAccessCostly(role: Role) {
-  return role === "ADMIN" || role === "CANTEEN_SUPPORT";
+  return role === "CANTEEN_SUPPORT" || isTopRole(role);
 }
 
+/** Accounts: creating, changing roles, locking, resetting passwords. Admin only. */
 export function canAccessAdmin(role: Role) {
   return role === "ADMIN";
+}
+
+/** The activity log and the archives of reset data. */
+export function canAccessOversight(role: Role) {
+  return isTopRole(role);
 }
 
 /** Roles that order meals for themselves (students by package, officers week by week). */
@@ -84,6 +98,7 @@ export function homePathForRole(role: Role) {
     case "ADMIN":
       return "/admin";
     case "MANAGER":
+    case "SERVICE_HEAD":
       return "/manager";
     case "SALES":
       return "/sales";
@@ -94,6 +109,7 @@ export function homePathForRole(role: Role) {
     case "CANTEEN_SUPPORT":
       return "/costly";
     case "UNION":
+    case "COURT_MANAGER":
       return "/courts";
   }
 }

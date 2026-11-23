@@ -22,6 +22,15 @@ const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
   { role: "MANAGER", href: "/courts", label: "Đặt sân" },
   { role: "CANTEEN_SUPPORT", href: "/costly", label: "Giá vốn" },
   { role: "UNION", href: "/courts", label: "Đặt sân" },
+  { role: "SERVICE_HEAD", href: "/sales", label: "Bán hàng" },
+  { role: "SERVICE_HEAD", href: "/schedule", label: "Lịch tuần" },
+  { role: "SERVICE_HEAD", href: "/manager/stats", label: "Thống kê" },
+  { role: "SERVICE_HEAD", href: "/report", label: "Báo cáo" },
+  { role: "SERVICE_HEAD", href: "/costly", label: "Giá vốn" },
+  { role: "SERVICE_HEAD", href: "/courts", label: "Đặt sân" },
+  { role: "SERVICE_HEAD", href: "/admin/archives", label: "Lưu trữ" },
+  { role: "SERVICE_HEAD", href: "/admin/logs", label: "Nhật ký" },
+  { role: "COURT_MANAGER", href: "/courts", label: "Đặt sân" },
   { role: "ADMIN", href: "/sales", label: "Bán hàng" },
   { role: "ADMIN", href: "/schedule", label: "Lịch tuần" },
   { role: "ADMIN", href: "/manager/stats", label: "Thống kê" },
@@ -35,12 +44,14 @@ const NAV_ITEMS: { role: Role; href: string; label: string }[] = [
 
 const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị viên",
-  MANAGER: "Quản lý",
+  MANAGER: "Quản lý căng tin",
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
   OFFICER: "Cán bộ",
   CANTEEN_SUPPORT: "Hỗ trợ căng tin",
   UNION: "Liên chi đoàn",
+  SERVICE_HEAD: "Tổ trưởng tổ dịch vụ",
+  COURT_MANAGER: "Quản lý đặt sân",
 };
 
 export default async function AppShell({

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canAccessAdmin, getSession } from "@/lib/auth";
+import { canAccessOversight, getSession } from "@/lib/auth";
 import { restoreArchive } from "@/lib/archive";
 import { logActivity } from "@/lib/log";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessOversight(session.role)) {
     return NextResponse.json({ error: "Chỉ Admin mới được khôi phục bản lưu trữ." }, { status: 403 });
   }
   const { id } = await params;

@@ -55,7 +55,7 @@ export default function LoginForm() {
       style={{ animationDelay: "80ms" }}
     >
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại / Mã cán bộ</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại / Mã cán bộ / Mã sinh viên</label>
         <input
           type="text"
           autoComplete="username"
@@ -66,7 +66,7 @@ export default function LoginForm() {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
-          placeholder="09xxxxxxxx hoặc mã cán bộ"
+          placeholder="09xxxxxxxx, mã cán bộ hoặc mã sinh viên"
         />
       </div>
       <div>

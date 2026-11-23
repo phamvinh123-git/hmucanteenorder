@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { foldText } from "@/lib/text";
 
-type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION";
+type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER";
 
 type UserRow = {
   id: string;
@@ -22,15 +22,17 @@ type UserRow = {
 
 const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Quản trị viên",
-  MANAGER: "Quản lý",
+  MANAGER: "Quản lý căng tin",
   SALES: "Bán hàng",
   STUDENT: "Sinh viên",
   OFFICER: "Cán bộ",
   CANTEEN_SUPPORT: "Hỗ trợ căng tin",
   UNION: "Liên chi đoàn",
+  SERVICE_HEAD: "Tổ trưởng tổ dịch vụ",
+  COURT_MANAGER: "Quản lý đặt sân",
 };
 
-const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" };
+const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER" };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -113,7 +115,7 @@ export default function AdminUsers() {
     setEditError(null);
     try {
       const body: Record<string, string> = { phone: editPhone.trim() };
-      if (u.role !== "STUDENT") body.staffCode = editCode.trim();
+      body.staffCode = editCode.trim();
       // Anyone who is an officer already can have a department.
       if (u.isOfficer || u.role === "OFFICER") body.department = editDepartment.trim();
       const res = await fetch(`/api/admin/users/${u.id}`, {
@@ -330,11 +332,13 @@ export default function AdminUsers() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
             >
               <option value="ADMIN">Quản trị viên</option>
-              <option value="MANAGER">Quản lý</option>
+              <option value="MANAGER">Quản lý căng tin</option>
               <option value="SALES">Bán hàng</option>
               <option value="OFFICER">Cán bộ</option>
               <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
               <option value="UNION">Liên chi đoàn</option>
+              <option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
+              <option value="COURT_MANAGER">Quản lý đặt sân</option>
             </select>
             {form.role !== "OFFICER" && (
               <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
@@ -382,12 +386,14 @@ export default function AdminUsers() {
           >
             <option value="ALL">Tất cả vai trò</option>
             <option value="ADMIN">Quản trị viên</option>
-            <option value="MANAGER">Quản lý</option>
+            <option value="MANAGER">Quản lý căng tin</option>
             <option value="SALES">Bán hàng</option>
             <option value="STUDENT">Sinh viên</option>
 <option value="OFFICER">Cán bộ</option>
 <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
 <option value="UNION">Liên chi đoàn</option>
+<option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
+<option value="COURT_MANAGER">Quản lý đặt sân</option>
           </select>
           {departments.length > 0 && (
             <select
@@ -421,7 +427,7 @@ export default function AdminUsers() {
               <div className="sm:w-44 sm:flex-shrink-0">
                 <p className="text-sm font-medium text-slate-800">{u.name}</p>
                 <p className="text-xs text-slate-400">
-                  {u.staffCode ? `Mã CB: ${u.staffCode}${u.phone !== u.staffCode ? ` · ${u.phone}` : ""}` : u.phone}
+                  {u.staffCode ? `${u.role === "STUDENT" ? "Mã SV" : "Mã CB"}: ${u.staffCode}${u.phone !== u.staffCode ? ` · ${u.phone}` : ""}` : u.phone}
                 </p>
                 {u.department && <p className="text-xs text-slate-500">{u.department}</p>}
               </div>
@@ -532,18 +538,20 @@ export default function AdminUsers() {
                   className="text-xs rounded-lg border border-slate-300 px-2 py-1.5 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
                 >
                   <option value="ADMIN">Quản trị viên</option>
-                  <option value="MANAGER">Quản lý</option>
+                  <option value="MANAGER">Quản lý căng tin</option>
                   <option value="SALES">Bán hàng</option>
                   <option value="STUDENT">Sinh viên</option>
 <option value="OFFICER">Cán bộ</option>
 <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
 <option value="UNION">Liên chi đoàn</option>
+<option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
+<option value="COURT_MANAGER">Quản lý đặt sân</option>
                 </select>
               </div>
               {editingId === u.id && (
                 <div className="basis-full rounded-xl bg-red-50/60 p-3 animate-pop-in">
                   <p className="mb-2 text-xs text-slate-500">
-                    Sửa thông tin dùng để đăng nhập của <b>{u.name}</b>. Số điện thoại và mã cán bộ đều đăng nhập được, nên
+                    Sửa thông tin dùng để đăng nhập của <b>{u.name}</b>. Số điện thoại và mã (cán bộ / sinh viên) đều đăng nhập được, nên
                     không được trùng với tài khoản khác.
                   </p>
                   <div className="flex flex-wrap items-end gap-3">
@@ -557,9 +565,9 @@ export default function AdminUsers() {
                         className="mt-1 block w-44 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
                       />
                     </label>
-                    {u.role !== "STUDENT" && (
+                    {(
                       <label className="text-xs font-medium text-slate-600">
-                        Mã cán bộ{u.isOfficer || u.role === "OFFICER" ? "" : " (nhập để đặt làm cán bộ)"}
+                        {u.role === "STUDENT" ? "Mã sinh viên" : `Mã cán bộ${u.isOfficer || u.role === "OFFICER" ? "" : " (nhập để đặt làm cán bộ)"}`}
                         <input
                           value={editCode}
                           onChange={(e) => setEditCode(e.target.value)}
