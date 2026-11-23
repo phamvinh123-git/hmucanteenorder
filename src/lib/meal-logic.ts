@@ -184,7 +184,7 @@ function nextFreeSlot(from: { date: Date; mealType: MealType }, pattern: MealPat
  * Cancels a session (after deadline validation by the caller) and appends a
  * compensating slot so the student still receives their full purchased count.
  */
-export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDeadline?: boolean } = {}) {
+export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDeadline?: boolean; avoidDays?: string[] } = {}) {
   const session = await prisma.mealSession.findUniqueOrThrow({
     where: { id: sessionId },
     include: { registration: true },
@@ -213,10 +213,16 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
   // pattern) that can still be booked: a gap in the student's schedule when there is one, otherwise the day
   // right after everything they already have, so the schedule stays unbroken. Slots held by a live meal of any
   // package — or cancelled by the student — are skipped: two meals never share a day and meal.
+  // `avoidDays` ("YYYY-MM-DD" keys) are days nobody eats (a school closure): both meals count as taken.
+  const occupied = blockedSlotKeys(studentSlots);
+  for (const day of opts.avoidDays ?? []) {
+    occupied.add(`${day}-LUNCH`);
+    occupied.add(`${day}-DINNER`);
+  }
   const appended = nextFreeSlot(
     { date: session.date, mealType: session.mealType },
     session.registration.mealPattern,
-    blockedSlotKeys(studentSlots),
+    occupied,
     true,
   );
 
@@ -1580,4 +1586,53 @@ export async function restoreOfficerSession(sessionId: string, opts: { bypassDea
     where: { id: sessionId },
     data: { status: "SCHEDULED", cancelledAt: null },
   });
+}
+
+/**
+ * The school is closed on `day` (a public holiday): every meal booked for that day is cancelled. A student gets a
+ * make-up meal for each one (added after their schedule, never on the closed day), an officer simply loses the
+ * lunch (officers order week by week, nothing is owed). Meals already cancelled, eaten or picked up are left alone.
+ * With `apply: false` nothing changes and the counts show what would happen.
+ */
+export async function closeMealDay(params: { day: Date; apply: boolean }) {
+  const day = startOfDay(params.day);
+  const dayKey = localDateKey(day);
+  const rows = await prisma.mealSession.findMany({
+    where: { date: { gte: day, lt: addDays(day, 1) }, status: "SCHEDULED", pickedUp: false },
+    include: { student: { select: { name: true, role: true, isOfficer: true } } },
+    orderBy: [{ studentId: "asc" }, { mealType: "asc" }],
+  });
+
+  const isOfficer = (r: (typeof rows)[number]) => r.student.isOfficer || r.student.role === "OFFICER";
+  const officerRows = rows.filter(isOfficer);
+  const studentRows = rows.filter((r) => !isOfficer(r));
+  const summary = {
+    day: dayKey,
+    officerMeals: officerRows.length,
+    officers: new Set(officerRows.map((r) => r.studentId)).size,
+    studentMeals: studentRows.length,
+    students: new Set(studentRows.map((r) => r.studentId)).size,
+  };
+  if (!params.apply) return { ...summary, applied: false as const, cancelledOfficer: 0, cancelledStudent: 0, makeups: 0, failed: [] as { name: string; error: string }[] };
+
+  let cancelledOfficer = 0;
+  let cancelledStudent = 0;
+  let makeups = 0;
+  const failed: { name: string; error: string }[] = [];
+  // Lunch before dinner (the query order), so the make-up meals follow the same order.
+  for (const r of rows) {
+    try {
+      if (isOfficer(r)) {
+        await cancelOfficerSession(r.id, { bypassDeadline: true });
+        cancelledOfficer++;
+      } else {
+        const res = await cancelSessionAndExtend(r.id, { bypassDeadline: true, avoidDays: [dayKey] });
+        cancelledStudent++;
+        if (res.newSession) makeups++;
+      }
+    } catch (err) {
+      failed.push({ name: r.student.name, error: err instanceof Error ? err.message : "Không hủy được." });
+    }
+  }
+  return { ...summary, applied: true as const, cancelledOfficer, cancelledStudent, makeups, failed };
 }

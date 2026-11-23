@@ -7,6 +7,7 @@ import { classLevelsFor, MAJORS } from "@/lib/student-info";
 import { foldText } from "@/lib/text";
 import ConfirmModal from "@/components/ConfirmModal";
 import ActionMenu from "@/components/ActionMenu";
+import CloseDayTool from "@/components/CloseDayTool";
 
 type MealPattern = "LUNCH" | "DINNER" | "BOTH";
 
@@ -1133,6 +1134,7 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                 </button>
               </>
             )}
+            {canResetAll && <CloseDayTool onDone={loadStudents} />}
             <ActionMenu
               label="Công cụ"
               items={[
