@@ -6,7 +6,7 @@ export default async function ArchivesPage() {
   const user = await requireUser({ roles: ["ADMIN", "SERVICE_HEAD"] });
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <ArchivesView />
     </AppShell>
   );

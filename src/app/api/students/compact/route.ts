@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/log";
 // Only days move; nobody gains or loses a meal.
 export async function POST() {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được dồn lịch bù." }, { status: 403 });
   }
 

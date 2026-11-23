@@ -15,7 +15,7 @@ import { dinerWhere, parseGroup } from "@/lib/groups";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

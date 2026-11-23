@@ -13,7 +13,7 @@ const schema = z.object({
 // on the schedule's per-meal list, so marking a full sitting doesn't take one request per student.
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

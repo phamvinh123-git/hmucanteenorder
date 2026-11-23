@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Anyone may cancel their own meal: a student, an officer, or a manager who is also an officer.
   const isOwner = target.studentId === session.userId;
   // Managers and admins can also cancel a student's meal for them (the student asked, or missed the cutoff).
-  const isAdmin = canAccessStats(session.role);
+  const isAdmin = canAccessStats(session.roles);
   if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: "Không có quyền hủy buổi ăn này." }, { status: 403 });
   }

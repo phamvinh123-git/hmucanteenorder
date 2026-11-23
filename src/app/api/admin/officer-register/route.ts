@@ -19,7 +19,7 @@ const parse = (key: string) => {
 // deadline. See registerOfficerLunchesFor.
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được đăng ký cơm hộ cán bộ." }, { status: 403 });
   }
   const parsed = schema.safeParse(await req.json().catch(() => ({})));

@@ -5,7 +5,7 @@ import { canAccessSalesTools, getSession } from "@/lib/auth";
 // Used by the registration form: an existing phone number returns the stored student info.
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

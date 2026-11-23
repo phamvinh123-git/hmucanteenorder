@@ -1,5 +1,4 @@
 import { requireUser } from "@/lib/guard";
-import { homePathForRole } from "@/lib/auth";
 import ChangePasswordForm from "./ChangePasswordForm";
 
 export default async function ChangePasswordPage() {
@@ -16,7 +15,7 @@ export default async function ChangePasswordPage() {
             </p>
           )}
         </div>
-        <ChangePasswordForm redirectTo={homePathForRole(user.role)} />
+        <ChangePasswordForm redirectTo="/" />
       </div>
     </div>
   );

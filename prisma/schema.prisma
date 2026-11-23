@@ -41,7 +41,10 @@ model User {
   phone             String   @unique
   name              String
   passwordHash      String
+  /// The account's main role (a student account is always STUDENT). Everything it may do is the union of this,
+  /// `extraRoles`, and OFFICER when `isOfficer` is set.
   role              Role
+  extraRoles        Role[]   @default([])
   mustChangePassword Boolean @default(false)
   active            Boolean  @default(true)
   /// Fixed sequential number for a STUDENT, shown on printed meal lists.

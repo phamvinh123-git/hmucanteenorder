@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/log";
 // Manager/admin: gives one registration the meals it is short of compared with what the student bought.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const { id } = await params;

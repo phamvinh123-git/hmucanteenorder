@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   const today = startOfDay(new Date());
 
   if (scope === "pending") {
-    if (!canApproveCourts(session.role)) return NextResponse.json({ error: "Không có quyền duyệt." }, { status: 403 });
+    if (!canApproveCourts(session.roles)) return NextResponse.json({ error: "Không có quyền duyệt." }, { status: 403 });
     const rows = await prisma.courtBooking.findMany({
       where: { status: { in: ["PENDING", "UNION_APPROVED"] }, date: { gte: today } },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
@@ -62,7 +62,7 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
-  if (!courtBookingMode(session.role)) return NextResponse.json({ error: "Tài khoản này không đặt sân được." }, { status: 403 });
+  if (!courtBookingMode(session.roles)) return NextResponse.json({ error: "Tài khoản này không đặt sân được." }, { status: 403 });
 
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   });
   if (taken) return NextResponse.json({ error: "Ca này đã có người đặt." }, { status: 409 });
 
-  const status = initialBookingStatus(session.role, slot.court);
+  const status = initialBookingStatus(session.roles, slot.court);
   try {
     const booking = await prisma.courtBooking.create({
       data: {

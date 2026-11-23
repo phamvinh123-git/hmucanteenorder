@@ -6,7 +6,7 @@ export default async function ManagerPage() {
   const user = await requireUser({ roles: ["MANAGER", "ADMIN", "SERVICE_HEAD"] });
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <SalesTools canResetAll />
     </AppShell>
   );

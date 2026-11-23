@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { createSessionCookie, getSession } from "@/lib/auth";
+import { createSessionCookie, getSession, effectiveRoles, hasRole } from "@/lib/auth";
 import { logActivity } from "@/lib/log";
 import { isMajor, isValidClassFor } from "@/lib/student-info";
 
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest) {
   if (body.name !== undefined) data.name = body.name;
 
   if (body.phone !== undefined && body.phone !== user.phone) {
-    if (user.role !== "ADMIN" && user.role !== "OFFICER") {
+    if (!hasRole(effectiveRoles(user), "ADMIN", "OFFICER")) {
       return NextResponse.json({ error: "Bạn không thể tự đổi số điện thoại." }, { status: 403 });
     }
     // A phone number must not equal anyone else's phone or staff code, since both are logins.

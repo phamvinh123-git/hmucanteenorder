@@ -6,7 +6,7 @@ export default async function ProfilePage() {
   const user = await requireUser();
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <ProfileForm
         role={user.role}
         initial={{

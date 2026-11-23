@@ -9,7 +9,7 @@ export const COSTLY_COLLECTIONS = new Set(["ingredients", "batches", "recipes"])
 export async function requireCostlySession() {
   const session = await getSession();
   if (!session) return { error: NextResponse.json({ error: "unauthenticated" }, { status: 401 }) };
-  if (!canAccessCostly(session.role)) return { error: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
+  if (!canAccessCostly(session.roles)) return { error: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
   return { session };
 }
 

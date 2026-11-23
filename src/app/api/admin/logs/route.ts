@@ -4,7 +4,7 @@ import { canAccessOversight, getSession } from "@/lib/auth";
 
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessOversight(session.role)) {
+  if (!session || !canAccessOversight(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

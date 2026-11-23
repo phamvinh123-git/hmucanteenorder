@@ -40,7 +40,7 @@ export default async function StudentPage() {
   const patternById = new Map(registrations.map((r) => [r.id, r.mealPattern]));
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <StudentDashboard
         studentName={user.name}
         orderCode={user.orderCode}

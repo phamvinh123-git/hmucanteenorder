@@ -15,7 +15,7 @@ const schema = z.object({
 // got entered (e.g. "start from dinner" was picked although lunch that day was already served).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const { id } = await params;

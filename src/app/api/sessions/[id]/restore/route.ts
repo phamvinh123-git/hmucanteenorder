@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const isOwner = target.studentId === session.userId;
   // Staff acting on someone else's meal skip the cutoff; restoring one's own meal never does.
-  const isStaff = canAccessSalesTools(session.role) && !isOwner;
+  const isStaff = canAccessSalesTools(session.roles) && !isOwner;
   if (!isOwner && !isStaff) {
     return NextResponse.json({ error: "Không có quyền khôi phục buổi ăn này." }, { status: 403 });
   }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: true });
     }
     // Staff acting on a student's behalf (e.g. the student missed the self-service cutoff) skip the deadline check.
-    const result = await restoreSession(id, { bypassDeadline: isStaff, allowUnremove: isStaff && canAccessStats(session.role) });
+    const result = await restoreSession(id, { bypassDeadline: isStaff, allowUnremove: isStaff && canAccessStats(session.roles) });
     await logActivity(
       session.userId,
       "RESTORE_SESSION",

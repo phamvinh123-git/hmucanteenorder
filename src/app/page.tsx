@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/guard";
-import { COMING_SOON, servicesFor } from "@/lib/services";
+import { comingSoonFor, servicesFor } from "@/lib/services";
 import AppShell from "@/components/AppShell";
 
 export const metadata = { title: "Dịch vụ - Phân hiệu ĐHYHN Thanh Hóa" };
@@ -10,16 +10,18 @@ export const metadata = { title: "Dịch vụ - Phân hiệu ĐHYHN Thanh Hóa" 
 // that only has one service goes straight into it.
 export default async function Home() {
   const user = await requireUser();
-  const services = servicesFor(user.role);
-  const diner = user.role === "STUDENT" || user.role === "OFFICER";
-  if (services.length === 0) redirect("/login");
-  if (services.length === 1 && !diner) redirect(services[0].href);
+  const services = servicesFor(user.roles);
+  const soon = comingSoonFor(user.roles);
+  // One service and nothing coming: go straight in. Otherwise show the whole picture.
+  if (services.length === 1 && soon.length === 0) redirect(services[0].href);
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-slate-800">Xin chào, {user.name}</h1>
-        <p className="text-sm text-slate-500">Chọn dịch vụ bạn muốn dùng.</p>
+        <p className="text-sm text-slate-500">
+          {services.length + soon.length > 0 ? "Chọn dịch vụ bạn muốn dùng." : "Tài khoản của bạn chưa được cấp dịch vụ nào. Hãy liên hệ quản trị viên."}
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {services.map((s) => (
@@ -35,7 +37,7 @@ export default async function Home() {
             <p className="mt-1 hidden text-xs text-slate-500 sm:block">{s.description}</p>
           </Link>
         ))}
-        {COMING_SOON.map((s) => (
+        {soon.map((s) => (
           <div
             key={s.key}
             aria-disabled

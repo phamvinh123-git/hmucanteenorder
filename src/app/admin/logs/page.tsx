@@ -15,7 +15,7 @@ export default async function LogsPage() {
   });
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <LogsView
         limit={LOG_LIMIT}
         logs={logs.map((log) => ({

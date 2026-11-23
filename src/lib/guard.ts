@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { getSession, homePathForRole } from "@/lib/auth";
+import { effectiveRoles, getSession } from "@/lib/auth";
+import { homeFor } from "@/lib/services";
 import { Role } from "@prisma/client";
 
-export async function requireUser(options?: {
-  roles?: Role[];
-  allowPendingPasswordChange?: boolean;
-  /** Also let through anyone flagged as an officer, whatever their role (a manager who is also a cán bộ). */
-  allowOfficer?: boolean;
-}) {
+/**
+ * The signed-in account for a page, with `roles` (everything it holds). With `roles` in the options the page is
+ * for accounts holding at least one of them; anyone else is sent to the first service they do have.
+ */
+export async function requireUser(options?: { roles?: Role[]; allowPendingPasswordChange?: boolean }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -19,9 +19,10 @@ export async function requireUser(options?: {
     redirect("/change-password");
   }
 
-  if (options?.roles && !options.roles.includes(user.role) && !(options.allowOfficer && user.isOfficer)) {
-    redirect(homePathForRole(user.role));
+  const roles = effectiveRoles(user);
+  if (options?.roles && !options.roles.some((r) => roles.includes(r))) {
+    redirect(homeFor(roles));
   }
 
-  return user;
+  return { ...user, roles };
 }

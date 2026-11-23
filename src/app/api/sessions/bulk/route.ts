@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getSession, isTopRole } from "@/lib/auth";
+import { getSession, hasRole, isTopRole } from "@/lib/auth";
 import { cancelSessionAndExtend, restoreSession } from "@/lib/meal-logic";
 import { logActivity } from "@/lib/log";
 
@@ -22,12 +22,12 @@ export async function POST(req: NextRequest) {
   }
   const { action, ids } = parsed.data;
 
-  const isAdmin = isTopRole(session.role);
+  const isAdmin = isTopRole(session.roles);
   const targets = await prisma.mealSession.findMany({ where: { id: { in: ids } } });
   if (targets.length !== new Set(ids).size) {
     return NextResponse.json({ error: "Có buổi ăn không tồn tại." }, { status: 404 });
   }
-  if (!targets.every((t) => isAdmin || (t.studentId === session.userId && session.role === "STUDENT"))) {
+  if (!targets.every((t) => isAdmin || (t.studentId === session.userId && hasRole(session.roles, "STUDENT")))) {
     return NextResponse.json({ error: "Không có quyền thao tác các buổi ăn này." }, { status: 403 });
   }
 

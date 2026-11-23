@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/log";
 
 export async function POST() {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

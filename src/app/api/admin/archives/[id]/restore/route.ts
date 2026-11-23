@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/log";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessOversight(session.role)) {
+  if (!session || !canAccessOversight(session.roles)) {
     return NextResponse.json({ error: "Chỉ Admin mới được khôi phục bản lưu trữ." }, { status: 403 });
   }
   const { id } = await params;

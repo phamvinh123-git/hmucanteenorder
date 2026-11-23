@@ -15,7 +15,7 @@ const schema = z.object({
 // make-up meal is added only when the package is short of meals. See addCancelledWithMakeup.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được thêm buổi hủy." }, { status: 403 });
   }
   const { id } = await params;

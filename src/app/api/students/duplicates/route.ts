@@ -9,7 +9,7 @@ import { logActivity } from "@/lib/log";
 // anyone is double-booked. Merging them (POST below) is for managers and admins.
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 
@@ -76,7 +76,7 @@ function countStudents() {
 // everyone. See mergeDuplicateSessions.
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được gộp buổi trùng." }, { status: 403 });
   }
   const body = (await req.json().catch(() => ({}))) as { studentId?: unknown };

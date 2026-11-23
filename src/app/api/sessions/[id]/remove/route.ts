@@ -9,7 +9,7 @@ import { logActivity } from "@/lib/log";
 // added. Used to fix an accidental over-count or a wrongly recorded/duplicated meal.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được xóa buổi ăn." }, { status: 403 });
   }
   const { id } = await params;

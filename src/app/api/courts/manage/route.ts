@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAssignCourtManagers, canManageCourt, canManageCourts, TIME_RE } from "@/lib/courts";
+import { canAddCourts, canAssignCourtManagers, canManageCourt, canManageCourts, TIME_RE } from "@/lib/courts";
 import { logActivity } from "@/lib/log";
 
 async function requireStaff() {
   const session = await getSession();
   if (!session) return { error: NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 }) };
-  if (!canManageCourts(session.role)) return { error: NextResponse.json({ error: "Không có quyền quản lý sân." }, { status: 403 }) };
+  if (!canManageCourts(session.roles)) return { error: NextResponse.json({ error: "Không có quyền quản lý sân." }, { status: 403 }) };
   return { session };
 }
 
@@ -21,9 +21,9 @@ export async function GET() {
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: { slots: { orderBy: { startTime: "asc" } }, manager: { select: { id: true, name: true } } },
   });
-  const assign = canAssignCourtManagers(session.role);
+  const assign = canAssignCourtManagers(session.roles);
   const managers = assign
-    ? await prisma.user.findMany({ where: { role: "COURT_MANAGER", active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    ? await prisma.user.findMany({ where: { OR: [{ role: "COURT_MANAGER" }, { extraRoles: { has: "COURT_MANAGER" } }], active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
     : [];
   return NextResponse.json({ courts: courts.filter((c) => canManageCourt(session, c)), managers, canAssign: assign });
 }
@@ -43,14 +43,14 @@ export async function POST(req: NextRequest) {
   const { session, error } = await requireStaff();
   if (error) return error;
   // Only the student union, admin and the head of the service team add courts.
-  if (session.role === "COURT_MANAGER") return NextResponse.json({ error: "Quản lý sân không tự thêm sân." }, { status: 403 });
+  if (!canAddCourts(session.roles)) return NextResponse.json({ error: "Quản lý sân không tự thêm sân." }, { status: 403 });
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ." }, { status: 400 });
   const { name, description, slots, managerId } = parsed.data;
-  if (managerId && !canAssignCourtManagers(session.role)) {
+  if (managerId && !canAssignCourtManagers(session.roles)) {
     return NextResponse.json({ error: "Chỉ Admin hoặc Tổ trưởng chọn được người quản lý sân." }, { status: 403 });
   }
-  if (managerId && !(await prisma.user.findFirst({ where: { id: managerId, role: "COURT_MANAGER", active: true }, select: { id: true } }))) {
+  if (managerId && !(await prisma.user.findFirst({ where: { id: managerId, OR: [{ role: "COURT_MANAGER" }, { extraRoles: { has: "COURT_MANAGER" } }], active: true }, select: { id: true } }))) {
     return NextResponse.json({ error: "Người quản lý sân không hợp lệ." }, { status: 400 });
   }
   if (await prisma.court.findUnique({ where: { name }, select: { id: true } })) {

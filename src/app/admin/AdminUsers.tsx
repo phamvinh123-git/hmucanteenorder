@@ -3,8 +3,10 @@
 import PageHeader from "@/components/PageHeader";
 import { useEffect, useState } from "react";
 import { foldText } from "@/lib/text";
+import type { Role } from "@prisma/client";
+import { ASSIGNABLE_ROLES, ROLE_HINT, ROLE_LABEL } from "@/lib/roles";
 
-type Role = "ADMIN" | "MANAGER" | "SALES" | "STUDENT" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER";
+type MatrixRow = { role: Role; services: string[] };
 
 type UserRow = {
   id: string;
@@ -15,26 +17,29 @@ type UserRow = {
   department: string | null;
   autoRegister: boolean;
   role: Role;
+  extraRoles: Role[];
   active: boolean;
   mustChangePassword: boolean;
   createdAt: string;
 };
 
-const ROLE_LABEL: Record<Role, string> = {
-  ADMIN: "Quản trị viên",
-  MANAGER: "Quản lý căng tin",
-  SALES: "Bán hàng",
-  STUDENT: "Sinh viên",
-  OFFICER: "Cán bộ",
-  CANTEEN_SUPPORT: "Hỗ trợ căng tin",
-  UNION: "Liên chi đoàn",
-  SERVICE_HEAD: "Tổ trưởng tổ dịch vụ",
-  COURT_MANAGER: "Quản lý đặt sân",
-};
+/** Every role an account holds: the main one, the extra ones, and officer when flagged. */
+function rolesOf(u: UserRow): Role[] {
+  return Array.from(new Set<Role>([u.role, ...u.extraRoles, ...(u.isOfficer ? (["OFFICER"] as Role[]) : [])]));
+}
+
+const SERVICE_COLUMNS: { key: string; label: string }[] = [
+  { key: "canteen", label: "Căng tin" },
+  { key: "courts", label: "Đặt sân" },
+  { key: "costly", label: "Giá vốn" },
+  { key: "admin", label: "Quản trị" },
+  { key: "transport", label: "Đặt xe, phòng (sắp có)" },
+  { key: "dorm", label: "Ký túc xá (sắp có)" },
+];
 
 const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER" };
 
-export default function AdminUsers() {
+export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
@@ -93,6 +98,17 @@ export default function AdminUsers() {
     load();
   }
 
+  // Ticking the roles of an account ("Phân quyền"): one person may hold several.
+  const [rolesOpenId, setRolesOpenId] = useState<string | null>(null);
+  const [roleDraft, setRoleDraft] = useState<Role[]>([]);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+
+  function openRoles(u: UserRow) {
+    setRolesOpenId(u.id);
+    setRoleDraft(rolesOf(u));
+    setEditingId(null);
+  }
+
   // Correcting a wrong phone number or staff code (shown under the row when "Sửa đăng nhập" is pressed).
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPhone, setEditPhone] = useState("");
@@ -103,6 +119,7 @@ export default function AdminUsers() {
 
   function startEdit(u: UserRow) {
     setEditingId(u.id);
+    setRolesOpenId(null);
     // An officer without a phone of their own has the code as a placeholder: show the phone blank.
     setEditPhone(u.staffCode && u.phone === u.staffCode ? "" : u.phone);
     setEditCode(u.staffCode ?? "");
@@ -186,7 +203,7 @@ export default function AdminUsers() {
   const visible = users.filter(
     (u) =>
       // The "Cán bộ" filter also lists managers/sales/admins who are officers too (one login, two roles).
-      (roleFilter === "ALL" || u.role === roleFilter || (roleFilter === "OFFICER" && u.isOfficer)) &&
+      (roleFilter === "ALL" || rolesOf(u).includes(roleFilter)) &&
       (departmentFilter === "ALL" || u.department === departmentFilter) &&
       (!q ||
         foldText(u.name).includes(q) ||
@@ -198,6 +215,43 @@ export default function AdminUsers() {
   return (
     <div className="space-y-8">
       <PageHeader title="Quản lý tài khoản" subtitle="Toàn quyền tạo, khóa và phân quyền tài khoản trong hệ thống." />
+
+      <section>
+        <button onClick={() => setMatrixOpen((v) => !v)} className="text-sm font-semibold text-slate-700 hover:text-red-700">
+          {matrixOpen ? "▾" : "▸"} Bảng phân quyền: mỗi vai trò mở những màn hình nào
+        </button>
+        {matrixOpen && (
+          <div className="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm animate-rise-in">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                  <th className="px-4 py-2 font-medium">Vai trò</th>
+                  {SERVICE_COLUMNS.map((c) => (
+                    <th key={c.key} className="px-3 py-2 text-center font-medium">
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.map((m) => (
+                  <tr key={m.role} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-2 font-medium text-slate-700">{ROLE_LABEL[m.role]}</td>
+                    {SERVICE_COLUMNS.map((c) => (
+                      <td key={c.key} className="px-3 py-2 text-center">
+                        {m.services.includes(c.key) ? <span className="text-green-600">✓</span> : <span className="text-slate-300">–</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+              Một tài khoản có nhiều vai trò thì thấy các màn hình của tất cả vai trò đó. Quản lý đặt sân chỉ thấy và duyệt các sân được giao.
+            </p>
+          </div>
+        )}
+      </section>
 
       <section>
         <button
@@ -431,12 +485,14 @@ export default function AdminUsers() {
                 </p>
                 {u.department && <p className="text-xs text-slate-500">{u.department}</p>}
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit whitespace-nowrap sm:flex-shrink-0">{ROLE_LABEL[u.role]}</span>
-              {u.isOfficer && u.role !== "OFFICER" && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 w-fit whitespace-nowrap sm:flex-shrink-0" title="Tài khoản này cũng đặt cơm trưa như cán bộ">
-                  + Cán bộ
+              {rolesOf(u).map((r, i) => (
+                <span
+                  key={r}
+                  className={`text-xs px-2 py-0.5 rounded-full w-fit whitespace-nowrap sm:flex-shrink-0 ${i === 0 ? "bg-slate-100 text-slate-600" : "bg-red-50 text-red-700"}`}
+                >
+                  {ROLE_LABEL[r]}
                 </span>
-              )}
+              ))}
               {u.isOfficer && u.autoRegister && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 w-fit whitespace-nowrap sm:flex-shrink-0" title="Cơm trưa thứ 2 đến thứ 6 được đăng ký tự động mỗi tuần">
                   Tự động ĐK
@@ -491,23 +547,6 @@ export default function AdminUsers() {
                     Reset mật khẩu
                   </button>
                 )}
-                {(u.role === "ADMIN" || u.role === "MANAGER" || u.role === "SALES") && (
-                  <button
-                    onClick={() => patchUser(u.id, { isOfficer: !u.isOfficer })}
-                    title={
-                      u.isOfficer
-                        ? "Bỏ quyền đặt cơm trưa như cán bộ của tài khoản này"
-                        : "Cho tài khoản này đặt cơm trưa như cán bộ (vẫn dùng chung một đăng nhập)"
-                    }
-                    className={`whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border ${
-                      u.isOfficer
-                        ? "border-red-300 bg-red-50 text-red-700"
-                        : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                    }`}
-                  >
-                    {u.isOfficer ? "Bỏ cán bộ" : "Đặt làm cán bộ"}
-                  </button>
-                )}
                 {u.isOfficer && (
                   <button
                     onClick={() => patchUser(u.id, { autoRegister: !u.autoRegister })}
@@ -532,22 +571,55 @@ export default function AdminUsers() {
                 >
                   {editingId === u.id ? "Đóng" : "Sửa đăng nhập"}
                 </button>
-                <select
-                  value={u.role}
-                  onChange={(e) => patchUser(u.id, { role: e.target.value })}
-                  className="text-xs rounded-lg border border-slate-300 px-2 py-1.5 outline-none transition-colors focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                <button
+                  onClick={() => (rolesOpenId === u.id ? setRolesOpenId(null) : openRoles(u))}
+                  title="Tích các vai trò của tài khoản này: một người có thể đảm nhận nhiều vai trò"
+                  className={`whitespace-nowrap text-xs px-2.5 py-1.5 rounded-lg border ${
+                    rolesOpenId === u.id ? "border-red-300 bg-red-50 text-red-700" : "border-slate-300 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  }`}
                 >
-                  <option value="ADMIN">Quản trị viên</option>
-                  <option value="MANAGER">Quản lý căng tin</option>
-                  <option value="SALES">Bán hàng</option>
-                  <option value="STUDENT">Sinh viên</option>
-<option value="OFFICER">Cán bộ</option>
-<option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
-<option value="UNION">Liên chi đoàn</option>
-<option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
-<option value="COURT_MANAGER">Quản lý đặt sân</option>
-                </select>
+                  {rolesOpenId === u.id ? "Đóng" : "Phân quyền"}
+                </button>
               </div>
+              {rolesOpenId === u.id && (
+                <div className="basis-full rounded-xl bg-red-50/60 p-3 animate-pop-in">
+                  <p className="mb-2 text-xs text-slate-500">
+                    Tích các vai trò của <b>{u.name}</b>. Tài khoản thấy các màn hình của tất cả vai trò đã tích cùng lúc.
+                    {u.role === "STUDENT" && " Tài khoản sinh viên luôn là sinh viên và có thể thêm vai trò như Liên chi đoàn."}
+                  </p>
+                  <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {(u.role === "STUDENT" ? ASSIGNABLE_ROLES.filter((r) => r !== "OFFICER") : ASSIGNABLE_ROLES).map((r) => (
+                      <label key={r} className="flex items-start gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={roleDraft.includes(r)}
+                          onChange={(e) => setRoleDraft(e.target.checked ? [...roleDraft, r] : roleDraft.filter((x) => x !== r))}
+                          className="mt-0.5 h-4 w-4 accent-red-600"
+                        />
+                        <span>
+                          {ROLE_LABEL[r]}
+                          <span className="block text-xs text-slate-400">{ROLE_HINT[r]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        await patchUser(u.id, { roles: u.role === "STUDENT" ? ["STUDENT", ...roleDraft.filter((r) => r !== "STUDENT")] : roleDraft });
+                        setRolesOpenId(null);
+                      }}
+                      disabled={u.role !== "STUDENT" && roleDraft.length === 0}
+                      className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Lưu vai trò
+                    </button>
+                    <button onClick={() => setRolesOpenId(null)} className="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-xs hover:bg-slate-50">
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              )}
               {editingId === u.id && (
                 <div className="basis-full rounded-xl bg-red-50/60 p-3 animate-pop-in">
                   <p className="mb-2 text-xs text-slate-500">

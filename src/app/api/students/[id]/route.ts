@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const isSelf = session.userId === id;
-  if (!isSelf && !canAccessSalesTools(session.role)) {
+  if (!isSelf && !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // The balance of each package (bought vs eaten, remaining, cancelled) is for managers and admins.
-  const balances = canAccessStats(session.role) ? await registrationBalances(student.registrations) : new Map();
+  const balances = canAccessStats(session.roles) ? await registrationBalances(student.registrations) : new Map();
 
   return NextResponse.json({
     id: student.id,
@@ -70,7 +70,7 @@ const patchSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const { id } = await params;
@@ -150,7 +150,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 // Permanently removes one student with their registrations and meal sessions (managers and admins only).
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được xóa sinh viên." }, { status: 403 });
   }
   const { id } = await params;

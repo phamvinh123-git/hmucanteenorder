@@ -1,4 +1,5 @@
-import { getSession, homePathForRole } from "@/lib/auth";
+import { effectiveRoles, getSession } from "@/lib/auth";
+import { homeFor } from "@/lib/services";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Image from "next/image";
@@ -16,7 +17,7 @@ export default async function LoginPage() {
     // and the protected-page guard would redirect to each other forever.
     // The cookie itself is harmless; it gets overwritten on the next login.
     if (user && user.active) {
-      redirect(homePathForRole(user.role));
+      redirect(homeFor(effectiveRoles(user)));
     }
   }
 

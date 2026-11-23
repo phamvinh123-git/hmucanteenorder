@@ -6,7 +6,7 @@ import { auditSystem, syncCompletedSessions } from "@/lib/meal-logic";
 // make-up meals out of order, start dates). Changes nothing.
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được rà soát." }, { status: 403 });
   }
   await syncCompletedSessions();

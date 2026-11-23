@@ -6,5 +6,5 @@ import { requireCostlySession } from "@/lib/costly";
 export async function GET() {
   const { session, error } = await requireCostlySession();
   if (error) return error;
-  return NextResponse.json({ username: session.name, role: "owner", canDeleteShop: isTopRole(session.role) });
+  return NextResponse.json({ username: session.name, role: "owner", canDeleteShop: isTopRole(session.roles) });
 }

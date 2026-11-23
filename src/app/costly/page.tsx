@@ -8,7 +8,7 @@ export default async function CostlyPage() {
   const user = await requireUser({ roles: ["CANTEEN_SUPPORT", "ADMIN", "SERVICE_HEAD"] });
 
   return (
-    <AppShell role={user.role} name={user.name}>
+    <AppShell roles={user.roles} name={user.name}>
       <iframe
         src="/costly-app/index.html"
         title="Giá vốn (Cost Ly)"

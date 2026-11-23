@@ -17,7 +17,7 @@ const schema = z.object({
 // Manager/admin: edit a meal package (meal pattern, number of meals, price per meal, note).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được chỉnh sửa gói ăn." }, { status: 403 });
   }
   const { id } = await params;

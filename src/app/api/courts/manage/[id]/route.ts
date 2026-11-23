@@ -33,10 +33,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Đã có sân tên này." }, { status: 409 });
   }
   if (managerId !== undefined) {
-    if (!canAssignCourtManagers(session.role)) {
+    if (!canAssignCourtManagers(session.roles)) {
       return NextResponse.json({ error: "Chỉ Admin hoặc Tổ trưởng chọn được người quản lý sân." }, { status: 403 });
     }
-    if (managerId && !(await prisma.user.findFirst({ where: { id: managerId, role: "COURT_MANAGER", active: true }, select: { id: true } }))) {
+    if (managerId && !(await prisma.user.findFirst({ where: { id: managerId, OR: [{ role: "COURT_MANAGER" }, { extraRoles: { has: "COURT_MANAGER" } }], active: true }, select: { id: true } }))) {
       return NextResponse.json({ error: "Người quản lý sân không hợp lệ." }, { status: 400 });
     }
   }

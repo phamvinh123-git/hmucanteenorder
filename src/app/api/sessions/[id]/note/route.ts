@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { canAccessSalesTools, getSession } from "@/lib/auth";
+import { canAccessSalesTools, getSession, hasRole } from "@/lib/auth";
 
 const schema = z.object({ note: z.string().max(500) });
 
@@ -17,8 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Không tìm thấy buổi ăn." }, { status: 404 });
   }
 
-  const isOwner = target.studentId === session.userId && session.role === "STUDENT";
-  if (!isOwner && !canAccessSalesTools(session.role)) {
+  const isOwner = target.studentId === session.userId && hasRole(session.roles, "STUDENT");
+  if (!isOwner && !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền chỉnh sửa." }, { status: 403 });
   }
 

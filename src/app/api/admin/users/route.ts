@@ -37,7 +37,7 @@ const schema = z
 
 export async function GET() {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessAdmin(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const users = await prisma.user.findMany({
@@ -48,6 +48,7 @@ export async function GET() {
       phone: true,
       staffCode: true,
       role: true,
+      extraRoles: true,
       isOfficer: true,
       department: true,
       autoRegister: true,
@@ -61,7 +62,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessAdmin(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 

@@ -3,12 +3,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { canAccessAdmin, DEFAULT_STUDENT_PASSWORD, getSession, hashPassword } from "@/lib/auth";
 import { logActivity } from "@/lib/log";
+import { ROLE_LABEL, ROLE_PRIORITY } from "@/lib/roles";
 import { registerOfficerLunchesFor } from "@/lib/meal-logic";
 import { addDaysLocal, openWeekMondays } from "@/lib/officer-rules";
 
 const schema = z.object({
   active: z.boolean().optional(),
-  role: z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER"]).optional(),
+  // Every role the account should hold (it can hold several). A student account stays a student.
+  roles: z.array(z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER"])).min(1, "Chọn ít nhất một vai trò.").optional(),
   // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
   isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
@@ -25,7 +27,7 @@ const CODE_RE = /^[A-Za-z0-9._-]{3,30}$/;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessAdmin(session.role)) {
+  if (!session || !canAccessAdmin(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
   const { id } = await params;
@@ -36,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const data = parsed.data;
 
-  if (id === session.userId && (data.active === false || (data.role && data.role !== "ADMIN"))) {
+  if (id === session.userId && (data.active === false || (data.roles && !data.roles.includes("ADMIN")))) {
     return NextResponse.json({ error: "Không thể tự khóa hoặc hạ quyền tài khoản của chính mình." }, { status: 400 });
   }
 
@@ -99,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (data.department !== undefined || data.autoRegister !== undefined) {
     const target = await prisma.user.findUnique({ where: { id }, select: { name: true, isOfficer: true, role: true, department: true } });
     if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
-    if (!(target.isOfficer || target.role === "OFFICER" || data.isOfficer || data.role === "OFFICER")) {
+    if (!(target.isOfficer || target.role === "OFFICER" || data.isOfficer || data.roles?.includes("OFFICER"))) {
       return NextResponse.json({ error: "Chỉ tài khoản cán bộ mới có phòng ban và tự động đăng ký." }, { status: 400 });
     }
     if (data.department !== undefined) {
@@ -115,14 +117,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (typeof data.active === "boolean") updateData.active = data.active;
-  if (data.role) {
-    updateData.role = data.role;
-    // OFFICER accounts are officers by definition; a student never is. Other roles keep their flag.
-    if (data.role === "OFFICER") updateData.isOfficer = true;
-    else if (data.role === "STUDENT") updateData.isOfficer = false;
+  if (data.roles) {
+    const target = await prisma.user.findUnique({ where: { id }, select: { name: true, role: true } });
+    if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
+    const wanted = Array.from(new Set(data.roles));
+    const student = target.role === "STUDENT";
+    if (wanted.includes("STUDENT") !== student) {
+      return NextResponse.json({ error: "Không đổi được giữa tài khoản sinh viên và tài khoản nhân viên." }, { status: 400 });
+    }
+    if (student && wanted.includes("OFFICER")) {
+      return NextResponse.json({ error: "Sinh viên không thể đồng thời là cán bộ." }, { status: 400 });
+    }
+    // The main role stays when it is still ticked; otherwise the highest ticked one takes over. "Cán bộ" on a
+    // non-officer main role is the officer flag, so it is not kept in the list of extra roles.
+    const main = wanted.includes(target.role) ? target.role : ROLE_PRIORITY.find((r) => wanted.includes(r))!;
+    updateData.role = main;
+    updateData.extraRoles = wanted.filter((r) => r !== main && r !== "OFFICER");
+    updateData.isOfficer = wanted.includes("OFFICER");
+    await logActivity(session.userId, "UPDATE_USER", `Đặt vai trò của ${target.name}: ${wanted.map((r) => ROLE_LABEL[r]).join(", ")}`);
   }
-  if (typeof data.isOfficer === "boolean" && data.role !== "OFFICER" && data.role !== "STUDENT") {
-    updateData.isOfficer = data.isOfficer;
+  if (typeof data.isOfficer === "boolean" && !data.roles) {
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+    if (target && target.role !== "OFFICER" && target.role !== "STUDENT") updateData.isOfficer = data.isOfficer;
   }
   if (data.resetPassword) {
     updateData.passwordHash = await hashPassword(DEFAULT_STUDENT_PASSWORD);

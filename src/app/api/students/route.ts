@@ -33,7 +33,7 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session || !canAccessSalesTools(session.role)) {
+  if (!session || !canAccessSalesTools(session.roles)) {
     return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 403 });
   }
 
@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
     select: { id: true, studentId: true, totalSessions: true },
   });
   // Only managers and admins see how meals add up against the package, so only they pay for working it out.
-  const balances = canAccessStats(session.role) ? await registrationBalances(allRegistrations) : new Map<string, { missing: number }>();
+  const balances = canAccessStats(session.roles) ? await registrationBalances(allRegistrations) : new Map<string, { missing: number }>();
   const missingByStudent = new Map<string, number>();
   for (const r of allRegistrations) {
     missingByStudent.set(r.studentId, (missingByStudent.get(r.studentId) ?? 0) + (balances.get(r.id)?.missing ?? 0));

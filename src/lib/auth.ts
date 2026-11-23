@@ -2,15 +2,31 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 const COOKIE_NAME = "canteen_session";
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? "dev-secret");
 
+/** What the login cookie holds. */
 export type SessionPayload = {
   userId: string;
   role: Role;
   name: string;
 };
+
+/** The signed-in person as the rest of the site sees them: `roles` is everything they hold, read fresh from the database. */
+export type Session = SessionPayload & { roles: Role[] };
+
+export type Roles = readonly Role[];
+
+/** Every role an account holds: its main role, the extra ones, and officer when it is flagged as one. */
+export function effectiveRoles(user: { role: Role; extraRoles: Role[]; isOfficer: boolean }): Role[] {
+  return Array.from(new Set<Role>([user.role, ...user.extraRoles, ...(user.isOfficer ? (["OFFICER"] as Role[]) : [])]));
+}
+
+export function hasRole(roles: Roles, ...wanted: Role[]) {
+  return wanted.some((r) => roles.includes(r));
+}
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -43,73 +59,57 @@ export async function clearSessionCookie() {
   store.delete(COOKIE_NAME);
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+/**
+ * The signed-in person, or null. The cookie only says who it is; the roles and whether the account is still active
+ * are read from the database on each call, so a role ticked or an account locked takes effect at once.
+ */
+export async function getSession(): Promise<Session | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
+  let payload: SessionPayload;
   try {
-    const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as SessionPayload;
+    payload = (await jwtVerify(token, secret)).payload as unknown as SessionPayload;
   } catch {
     return null;
   }
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: { id: true, name: true, role: true, extraRoles: true, isOfficer: true, active: true },
+  });
+  if (!user || !user.active) return null;
+  return { userId: user.id, role: user.role, name: user.name, roles: effectiveRoles(user) };
 }
 
 /**
  * The two top roles: admin, and the head of the service team (tổ trưởng tổ dịch vụ), who runs every service. They
  * differ in one thing only: handing out and changing accounts is for admins (see canAccessAdmin).
  */
-export function isTopRole(role: Role) {
-  return role === "ADMIN" || role === "SERVICE_HEAD";
+export function isTopRole(roles: Roles) {
+  return hasRole(roles, "ADMIN", "SERVICE_HEAD");
 }
 
-export function canAccessSalesTools(role: Role) {
-  return role === "SALES" || role === "MANAGER" || isTopRole(role);
+export function canAccessSalesTools(roles: Roles) {
+  return hasRole(roles, "SALES", "MANAGER") || isTopRole(roles);
 }
 
-export function canAccessStats(role: Role) {
-  return role === "MANAGER" || isTopRole(role);
+export function canAccessStats(roles: Roles) {
+  return hasRole(roles, "MANAGER") || isTopRole(roles);
 }
 
 /** The "Giá vốn" notebook: the top roles and the canteen-support staff who fill it in. */
-export function canAccessCostly(role: Role) {
-  return role === "CANTEEN_SUPPORT" || isTopRole(role);
+export function canAccessCostly(roles: Roles) {
+  return hasRole(roles, "CANTEEN_SUPPORT") || isTopRole(roles);
 }
 
 /** Accounts: creating, changing roles, locking, resetting passwords. Admin only. */
-export function canAccessAdmin(role: Role) {
-  return role === "ADMIN";
+export function canAccessAdmin(roles: Roles) {
+  return hasRole(roles, "ADMIN");
 }
 
 /** The activity log and the archives of reset data. */
-export function canAccessOversight(role: Role) {
-  return isTopRole(role);
-}
-
-/** Roles that order meals for themselves (students by package, officers week by week). */
-export function isDiner(role: Role) {
-  return role === "STUDENT" || role === "OFFICER";
+export function canAccessOversight(roles: Roles) {
+  return isTopRole(roles);
 }
 
 export const DEFAULT_STUDENT_PASSWORD = "123";
-
-export function homePathForRole(role: Role) {
-  switch (role) {
-    case "ADMIN":
-      return "/admin";
-    case "MANAGER":
-    case "SERVICE_HEAD":
-      return "/manager";
-    case "SALES":
-      return "/sales";
-    case "STUDENT":
-      return "/student";
-    case "OFFICER":
-      return "/officer";
-    case "CANTEEN_SUPPORT":
-      return "/costly";
-    case "UNION":
-    case "COURT_MANAGER":
-      return "/courts";
-  }
-}

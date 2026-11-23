@@ -1,7 +1,6 @@
 import { addDays, startOfDay } from "date-fns";
-import { Role } from "@prisma/client";
 import { localDateKey } from "@/lib/client-session-rules";
-import { isTopRole } from "@/lib/auth";
+import { hasRole, isTopRole, type Roles } from "@/lib/auth";
 
 /** How far ahead a court can be booked, in days from today. */
 export const COURT_BOOK_DAYS_AHEAD = 14;
@@ -10,37 +9,28 @@ export type CourtStatus = "PENDING" | "UNION_APPROVED" | "APPROVED" | "REJECTED"
 /** Statuses that hold a slot: waiting for the union, passed on to the court's manager, approved. */
 export const LIVE_STATUSES: CourtStatus[] = ["PENDING", "UNION_APPROVED", "APPROVED"];
 
-type Actor = { userId: string; role: Role };
+type Actor = { userId: string; roles: Roles };
 /** A court has its own manager (e.g. the football pitch) or none (the student union manages it). */
 type CourtRef = { managerId: string | null };
 
-/** Who may book courts at all ("approval" / "instant" only hint at the usual path; see initialBookingStatus). */
-export function courtBookingMode(role: Role): "approval" | "instant" | null {
-  switch (role) {
-    case "STUDENT":
-      return "approval";
-    case "OFFICER":
-    case "MANAGER":
-    case "ADMIN":
-    case "SERVICE_HEAD":
-    case "COURT_MANAGER":
-    case "UNION":
-      return "instant";
-    default:
-      return null;
-  }
+/**
+ * Who may book courts: students (their bookings wait for approval), the student union, court managers, and the top
+ * roles. Officers and the other roles do not use this service.
+ */
+export function courtBookingMode(roles: Roles): "approval" | "instant" | null {
+  if (isTopRole(roles) || hasRole(roles, "COURT_MANAGER", "UNION")) return "instant";
+  if (hasRole(roles, "STUDENT")) return "approval";
+  return null;
 }
 
 /**
- * Where a new booking starts. Admin, the head of the service team and court managers are approved at once. The
- * student union's own booking skips its own step. A student (and, on a court that has a manager, anyone else)
- * waits for the student union.
+ * Where a new booking starts. The top roles and court managers are approved at once. The student union's own
+ * booking skips its own step. Everyone else waits for the student union.
  */
-export function initialBookingStatus(role: Role, court: CourtRef): "PENDING" | "UNION_APPROVED" | "APPROVED" {
-  if (isTopRole(role) || role === "COURT_MANAGER") return "APPROVED";
-  if (role === "UNION") return court.managerId ? "UNION_APPROVED" : "APPROVED";
-  if (role === "STUDENT") return "PENDING";
-  return court.managerId ? "PENDING" : "APPROVED";
+export function initialBookingStatus(roles: Roles, court: CourtRef): "PENDING" | "UNION_APPROVED" | "APPROVED" {
+  if (isTopRole(roles) || hasRole(roles, "COURT_MANAGER")) return "APPROVED";
+  if (hasRole(roles, "UNION")) return court.managerId ? "UNION_APPROVED" : "APPROVED";
+  return "PENDING";
 }
 
 /** The status a booking takes when the current step approves it: the union passes it on to the court's manager. */
@@ -50,38 +40,42 @@ export function statusAfterApproval(status: "PENDING" | "UNION_APPROVED", court:
 
 /** Can this person decide the booking in its current step? Union: waiting bookings. Court manager: passed-on ones. */
 export function canDecideStep(actor: Actor, court: CourtRef, status: CourtStatus) {
-  if (isTopRole(actor.role)) return status === "PENDING" || status === "UNION_APPROVED";
-  if (status === "PENDING") return actor.role === "UNION";
+  if (isTopRole(actor.roles)) return status === "PENDING" || status === "UNION_APPROVED";
+  if (status === "PENDING") return hasRole(actor.roles, "UNION");
   if (status === "UNION_APPROVED") return !!court.managerId && court.managerId === actor.userId;
   return false;
 }
 
 /**
- * Who sets up a court's slots and can cancel its bookings: admin and the head of the service team (all courts),
- * the student union (courts without a manager) and a court manager (the courts they manage).
+ * Who sets up a court's slots and can cancel its bookings: the top roles (all courts), the student union (courts
+ * without a manager) and a court manager (the courts they manage).
  */
 export function canManageCourt(actor: Actor, court: CourtRef) {
-  if (isTopRole(actor.role)) return true;
-  if (actor.role === "UNION") return !court.managerId;
-  return actor.role === "COURT_MANAGER" && court.managerId === actor.userId;
+  if (isTopRole(actor.roles)) return true;
+  if (hasRole(actor.roles, "UNION") && !court.managerId) return true;
+  return hasRole(actor.roles, "COURT_MANAGER") && court.managerId === actor.userId;
 }
 
 /** Has a court-related duty (shows the approvals and set-up tabs). */
-export function canApproveCourts(role: Role) {
-  return role === "UNION" || role === "COURT_MANAGER" || isTopRole(role);
+export function canApproveCourts(roles: Roles) {
+  return hasRole(roles, "UNION", "COURT_MANAGER") || isTopRole(roles);
 }
 
-export function canManageCourts(role: Role) {
-  return canApproveCourts(role);
+export function canManageCourts(roles: Roles) {
+  return canApproveCourts(roles);
 }
 
-/** Admin and the head of the service team add courts and choose each court's manager. */
-export function canAssignCourtManagers(role: Role) {
-  return isTopRole(role);
+/** The top roles and the student union add courts; the top roles also choose each court's manager. */
+export function canAddCourts(roles: Roles) {
+  return hasRole(roles, "UNION") || isTopRole(roles);
 }
 
-export function canUseCourts(role: Role) {
-  return courtBookingMode(role) !== null || canApproveCourts(role);
+export function canAssignCourtManagers(roles: Roles) {
+  return isTopRole(roles);
+}
+
+export function canUseCourts(roles: Roles) {
+  return courtBookingMode(roles) !== null || canApproveCourts(roles);
 }
 
 /** "2026-11-23" (a day as the website shows it everywhere) to that local day's midnight, or null if invalid. */

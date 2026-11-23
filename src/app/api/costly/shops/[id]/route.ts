@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/log";
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireCostlySession();
   if (error) return error;
-  if (!isTopRole(session.role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!isTopRole(session.roles)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id } = await params;
   const shop = await prisma.costShop.findUnique({ where: { id }, select: { name: true } });
   if (!shop) return NextResponse.json({ error: "unknown shop" }, { status: 404 });

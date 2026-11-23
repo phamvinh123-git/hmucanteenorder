@@ -4,48 +4,26 @@ import AppNav, { MobileTabs, type NavGroup } from "./AppNav";
 import UserMenu from "./UserMenu";
 import IdleScreen from "./IdleScreen";
 import { Role } from "@prisma/client";
-import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { servicesFor } from "@/lib/services";
-
-const ROLE_LABEL: Record<Role, string> = {
-  ADMIN: "Quản trị viên",
-  MANAGER: "Quản lý căng tin",
-  SALES: "Bán hàng",
-  STUDENT: "Sinh viên",
-  OFFICER: "Cán bộ",
-  CANTEEN_SUPPORT: "Hỗ trợ căng tin",
-  UNION: "Liên chi đoàn",
-  SERVICE_HEAD: "Tổ trưởng tổ dịch vụ",
-  COURT_MANAGER: "Quản lý đặt sân",
-};
+import { ROLE_LABEL } from "@/lib/roles";
 
 export default async function AppShell({
-  role,
+  roles,
   name,
   children,
 }: {
-  role: Role;
+  roles: Role[];
   name: string;
   children: React.ReactNode;
 }) {
-  // A manager, salesperson or admin who is also an officer (cán bộ) keeps their own menu and gets the
-  // lunch-ordering page as one more entry.
-  const session = await getSession();
-  const officerToo =
-    role !== "OFFICER" &&
-    role !== "STUDENT" &&
-    !!session &&
-    !!(await prisma.user.findUnique({ where: { id: session.userId }, select: { isOfficer: true } }))?.isOfficer;
   // The services this account uses; the menu (and the tabs inside the current service) is built from them.
-  const groups: NavGroup[] = servicesFor(role).map((svc) => ({
+  const groups: NavGroup[] = servicesFor(roles).map((svc) => ({
     key: svc.key,
     title: svc.title,
     icon: svc.icon,
     href: svc.href,
     paths: svc.paths,
-    items:
-      svc.key === "canteen" && officerToo ? [...svc.items, { href: "/officer", label: "Đặt cơm trưa" }] : svc.items,
+    items: svc.items,
   }));
 
   return (
@@ -69,7 +47,7 @@ export default async function AppShell({
           </Link>
           <AppNav groups={groups} />
           <div className="ml-auto">
-            <UserMenu name={name} roleLabel={ROLE_LABEL[role]} />
+            <UserMenu name={name} roleLabel={roles.map((r) => ROLE_LABEL[r]).slice(0, 2).join(" · ")} />
           </div>
         </div>
         <MobileTabs groups={groups} />

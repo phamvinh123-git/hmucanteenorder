@@ -14,7 +14,7 @@ const schema = z.object({
 // Manager/admin: moves a meal that is still to come to another day and meal (see moveSessionTo).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !canAccessStats(session.role)) {
+  if (!session || !canAccessStats(session.roles)) {
     return NextResponse.json({ error: "Chỉ Quản lý hoặc Admin mới được đổi ngày buổi ăn." }, { status: 403 });
   }
   const { id } = await params;
