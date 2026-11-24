@@ -21,7 +21,7 @@ pg_dump "${DATABASE_URL%%\?*}" -Fc -f backups/truoc-cap-nhat-$(date +%F-%H%M).du
 cd /opt/canteen && git pull && sh deploy/update-any.sh
 ```
 
-Script tự làm: lấy mã mới, `npm ci`, `prisma generate`, `prisma migrate deploy` (thêm các cột và bảng mới), `npm run build`, khởi động lại pm2 `canteen`. Cuối cùng in dòng `Done: bb10b2d ...`. Muốn chỉ xem server chạy kiểu gì mà chưa đổi gì: `sh deploy/update-any.sh --check`.
+Script tự làm: lấy mã mới, `npm ci --include=dev`, `prisma generate`, `prisma migrate deploy` (thêm các cột và bảng mới), `npm run build`, khởi động lại pm2 `canteen`. Cuối cùng in dòng `Done: bb10b2d ...`. Muốn chỉ xem server chạy kiểu gì mà chưa đổi gì: `sh deploy/update-any.sh --check`.
 
 ## 3. Cơ sở dữ liệu thêm gì (tự áp dụng)
 
@@ -71,4 +71,4 @@ Cả hai chạy ngầm ở lần truy cập đầu tiên sau khi khởi động,
 ## 8. Khi có sự cố
 
 - Chạy `sh deploy/diagnose.sh` (chỉ đọc, không đổi gì) rồi gửi kết quả.
-- Quay lại bản cũ: lệnh cập nhật in dòng `<mã cũ> -> <mã mới>`. Chạy `git reset --hard <mã cũ>`, rồi `npm ci && npx prisma generate && npm run build && pm2 restart canteen`. Các thay đổi cơ sở dữ liệu ở mục 3 chỉ thêm nên bản cũ vẫn chạy được; nếu cần quay cả dữ liệu thì khôi phục file sao lưu ở mục 1 (`pg_restore`).
+- Quay lại bản cũ: lệnh cập nhật in dòng `<mã cũ> -> <mã mới>`. Chạy `git reset --hard <mã cũ>`, rồi `npm ci --include=dev && npx prisma generate && npm run build && pm2 restart canteen`. Các thay đổi cơ sở dữ liệu ở mục 3 chỉ thêm nên bản cũ vẫn chạy được; nếu cần quay cả dữ liệu thì khôi phục file sao lưu ở mục 1 (`pg_restore`).

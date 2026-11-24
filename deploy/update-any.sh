@@ -66,7 +66,8 @@ if [ "$RUNNER" = "docker" ]; then
 fi
 
 say "Installing packages"
-npm ci
+# --include=dev: the build needs tailwind and typescript, which are dev packages (a server with NODE_ENV=production would skip them).
+npm ci --include=dev
 
 say "Generating the database client and applying migrations"
 npx prisma generate
