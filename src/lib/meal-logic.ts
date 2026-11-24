@@ -79,6 +79,8 @@ export async function syncCompletedSessions(studentId?: string) {
   await syncOfficerAutoRegistrations();
   // In the background: closes gaps in make-up meals once, the first time this version runs.
   void syncOneTimeCompaction();
+  // In the background: cancels the meals of school-closure days (CLOSED_DAYS) once each.
+  void syncClosedDays();
   const now = new Date();
   const today = startOfDay(now);
   const hour = now.getHours();
@@ -1637,4 +1639,48 @@ export async function closeMealDay(params: { day: Date; apply: boolean }) {
     }
   }
   return { ...summary, applied: true as const, cancelledOfficer, cancelledStudent, makeups, failed };
+}
+
+/**
+ * Days the school is closed (public holidays): the first time this code runs on or before such a day, every meal booked
+ * on it is cancelled, students get a make-up meal each and officers just lose the lunch (see closeMealDay). Add a day
+ * here to have it done automatically; the "Nghỉ cả ngày" button does the same by hand. Each day is done once: it is
+ * remembered in the activity log (action CLOSE_MEAL_DAY, same wording as the button), so a meal an admin later puts
+ * back is left alone.
+ */
+const CLOSED_DAYS = [{ day: "2026-11-24", reason: "Ngày Văn hóa Việt Nam, trường nghỉ" }];
+
+// Next time the closure check may run: every few minutes while something is left, never again once all is done.
+let closedDaysNextTry = 0;
+
+export async function syncClosedDays() {
+  if (Date.now() < closedDaysNextTry) return;
+  closedDaysNextTry = Date.now() + 5 * 60_000;
+  try {
+    const todayKey = localDateKey(new Date());
+    let pendingClosure = false;
+    for (const { day, reason } of CLOSED_DAYS) {
+      if (day < todayKey) continue;
+      const label = day.split("-").reverse().join("/");
+      const done = await prisma.activityLog.findFirst({ where: { action: "CLOSE_MEAL_DAY", detail: { startsWith: `Hủy cơm ngày ${label}` } } });
+      if (done) continue;
+      const [y, m, d] = day.split("-").map(Number);
+      const result = await closeMealDay({ day: new Date(y, m - 1, d), apply: true });
+      if (result.failed.length > 0) {
+        // Not marked as done: the next start tries again for the meals that are left.
+        console.error("Closing", day, "left", result.failed.length, "meals", result.failed.slice(0, 5));
+        pendingClosure = true;
+        continue;
+      }
+      await logActivity(
+        null,
+        "CLOSE_MEAL_DAY",
+        `Hủy cơm ngày ${label} (${reason}), tự động: ${result.cancelledStudent} buổi của sinh viên (bù ${result.makeups} buổi), ${result.cancelledOfficer} buổi của cán bộ`,
+      );
+    }
+    // Every day is done (or already past): stop checking until the server restarts.
+    if (!pendingClosure) closedDaysNextTry = Infinity;
+  } catch (err) {
+    console.error("Closing the school days failed", err);
+  }
 }
