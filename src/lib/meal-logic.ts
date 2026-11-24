@@ -1562,7 +1562,8 @@ export async function syncOfficerAutoRegistrations() {
 export async function cancelOfficerSession(sessionId: string, opts: { bypassDeadline?: boolean } = {}) {
   const session = await prisma.mealSession.findUniqueOrThrow({ where: { id: sessionId } });
   if (opts.bypassDeadline) {
-    if (session.status !== "SCHEDULED") throw new Error("Buổi ăn này không còn ở trạng thái có thể hủy.");
+    const open = session.status === "SCHEDULED" || (session.status === "COMPLETED" && !session.pickedUp);
+    if (!open) throw new Error("Buổi ăn này không còn ở trạng thái có thể hủy.");
   } else {
     const check = officerCanCancel(session);
     if (!check.ok) throw new Error(check.reason ?? "Không thể hủy buổi ăn này.");
@@ -1598,7 +1599,8 @@ export async function closeMealDay(params: { day: Date; apply: boolean }) {
   const day = startOfDay(params.day);
   const dayKey = localDateKey(day);
   const rows = await prisma.mealSession.findMany({
-    where: { date: { gte: day, lt: addDays(day, 1) }, status: "SCHEDULED", pickedUp: false },
+    // A meal whose time has passed is already marked finished by the clock: still cancelled unless it was picked up.
+    where: { date: { gte: day, lt: addDays(day, 1) }, status: { in: ["SCHEDULED", "COMPLETED"] }, pickedUp: false },
     include: { student: { select: { name: true, role: true, isOfficer: true } } },
     orderBy: [{ studentId: "asc" }, { mealType: "asc" }],
   });
