@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { syncCourtKinds } from "@/lib/court-setup";
 import {
   bookableRange,
   canApproveCourts,
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
   if (!day) return NextResponse.json({ error: "Ngày không hợp lệ." }, { status: 400 });
   const { first, last } = bookableRange();
   if (day < first || day > last) return NextResponse.json({ error: "Chỉ xem được các ngày từ hôm nay trở đi." }, { status: 400 });
+
+  // Courts still marked "other" get their kind (and lending days) from their name, once.
+  await syncCourtKinds();
 
   const [courts, bookings] = await Promise.all([
     prisma.court.findMany({
