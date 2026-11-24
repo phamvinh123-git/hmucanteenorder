@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
 import { COURT_KINDS, openDaysLabel, WEEKDAYS, type CourtKind } from "@/lib/court-kinds";
 import Court3D from "./Court3D";
+import HallMap from "./HallMap";
 import { btnGhost, btnPrimary, call, dayOfKey, fmtKey, input, post, STATUS_LABEL, type Mode, type Status } from "./shared";
 
 type BoardSlot = {
@@ -28,6 +29,16 @@ type BoardCourt = {
 };
 
 const DAYS_SHOWN = 15;
+
+/** The courts inside the indoor hall are chosen on one floor plan ("HALL"); every other sport has its own group. */
+const HALL_KINDS: CourtKind[] = ["TABLE_TENNIS", "BADMINTON"];
+type Group = "HALL" | CourtKind;
+const inGroup = (c: { kind: CourtKind }, g: Group) => (g === "HALL" ? HALL_KINDS.includes(c.kind) : c.kind === g);
+function groupsOf(list: { kind: CourtKind }[]): { key: Group; label: string; icon: string }[] {
+  const others = COURT_KINDS.filter((k) => !HALL_KINDS.includes(k.key) && list.some((c) => c.kind === k.key));
+  const hall = list.some((c) => HALL_KINDS.includes(c.kind)) ? [{ key: "HALL" as Group, label: "Nhà thi đấu", icon: "🏟️" }] : [];
+  return [...hall, ...others];
+}
 const CONFETTI_COLORS = ["#be1651", "#f59f00", "#22a085", "#3b82c4", "#7c3aed", "#ea6f9a"];
 
 /** "17:00" as "17h". */
@@ -81,7 +92,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
   }, []);
   const [day, setDay] = useState(days[0]);
   const [courts, setCourts] = useState<BoardCourt[] | null>(null);
-  const [kind, setKind] = useState<CourtKind | null>(null);
+  const [kind, setKind] = useState<Group | null>(null);
   const [courtId, setCourtId] = useState<string | null>(null);
   const [slotId, setSlotId] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -103,8 +114,8 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
     // The first time: if the sport shown is not lent out today, start on the next day it is.
     if (firstLoad.current) {
       firstLoad.current = false;
-      const first = COURT_KINDS.find((k) => list.some((c) => c.kind === k.key))?.key;
-      const ofKind = list.filter((c) => c.kind === first);
+      const first = groupsOf(list)[0]?.key;
+      const ofKind = first ? list.filter((c) => inGroup(c, first)) : [];
       if (ofKind.length > 0 && !ofKind.some((c) => c.open)) {
         const next = days.find((k) => ofKind.some((c) => c.openDays.includes(dayOfKey(k))));
         if (next && next !== day) setDay(next);
@@ -117,9 +128,9 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
     load();
   }, [load]);
 
-  const kinds = COURT_KINDS.filter((k) => courts?.some((c) => c.kind === k.key));
+  const kinds = groupsOf(courts ?? []);
   const activeKind = kind && kinds.some((k) => k.key === kind) ? kind : (kinds[0]?.key ?? null);
-  const kindCourts = (courts ?? []).filter((c) => c.kind === activeKind);
+  const kindCourts = (courts ?? []).filter((c) => activeKind !== null && inGroup(c, activeKind));
   const court = kindCourts.find((c) => c.id === courtId) ?? kindCourts.find((c) => c.open) ?? kindCourts[0] ?? null;
   const slot = court?.slots.find((s) => s.id === slotId) ?? null;
   const kindDays = Array.from(new Set(kindCourts.flatMap((c) => c.openDays)));
@@ -128,12 +139,12 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
   /** Is the chosen sport lent out on this day? (Everything is "open" until the courts have loaded.) */
   const dayOpen = (k: string) => kindCourts.length === 0 || kindCourts.some((c) => c.openDays.includes(dayOfKey(k)));
 
-  function pickKind(next: CourtKind) {
+  function pickKind(next: Group) {
     setKind(next);
     setCourtId(null);
     setSlotId(null);
     setNotice(null);
-    const ofKind = (courts ?? []).filter((c) => c.kind === next);
+    const ofKind = (courts ?? []).filter((c) => inGroup(c, next));
     // Jump to the next lending day when the sport does not run on the day being looked at.
     if (ofKind.length > 0 && !ofKind.some((c) => c.openDays.includes(dayOfKey(day)))) {
       const to = days.find((k) => ofKind.some((c) => c.openDays.includes(dayOfKey(k))));
@@ -189,7 +200,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
         <h2 className="mt-1 text-xl font-bold sm:text-2xl">Chọn sân, chọn ca, chơi thôi! 🎉</h2>
         {activeKind && kindDays.length > 0 && (
           <p className="mt-2 inline-block rounded-full bg-white/20 px-3 py-1 text-xs backdrop-blur">
-            {COURT_KINDS.find((k) => k.key === activeKind)?.label}: cho thuê <b>{openDaysLabel(kindDays)}</b>
+            {kinds.find((k) => k.key === activeKind)?.label}: cho thuê <b>{openDaysLabel(kindDays)}</b>
             {kindHours ? ` · ca ${kindHours}` : ""}
           </p>
         )}
@@ -266,7 +277,30 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
 
       {kindCourts.length > 0 && (
         <section>
-          <Step n={3} title="Chọn sân" hint={`${fmtKey(day)}`} />
+          <Step n={3} title={activeKind === "HALL" ? "Chọn sân trên sơ đồ" : "Chọn sân"} hint={`${fmtKey(day)}`} />
+          {activeKind === "HALL" ? (
+            <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-white p-3 ring-1 ring-slate-200">
+              <HallMap
+                courts={kindCourts.map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  kind: c.kind,
+                  open: c.open,
+                  free: c.slots.filter((s) => !s.booking && !s.past).length,
+                }))}
+                selectedId={court?.id ?? null}
+                onPick={(id) => {
+                  setCourtId(id);
+                  setSlotId(null);
+                  setNotice(null);
+                }}
+              />
+              <p className="px-2 pb-2 text-center text-xs text-slate-500">
+                Chạm vào một sân để chọn, sau đó chọn ca và gửi yêu cầu. <b>Liên chi đoàn</b> sẽ xét duyệt, được duyệt thì lượt đặt mới có hiệu
+                lực (xem trạng thái ở mục &quot;Của tôi&quot;).
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {kindCourts.map((c, i) => {
               const free = c.slots.filter((s) => !s.booking && !s.past).length;
@@ -298,6 +332,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
               );
             })}
           </div>
+          )}
         </section>
       )}
 

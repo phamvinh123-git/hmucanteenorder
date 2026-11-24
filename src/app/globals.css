@@ -462,8 +462,173 @@ input {
   }
 }
 
+/* The indoor hall as one tilted floor plan; each court on it is tappable. */
+.hall3d {
+  width: 100%;
+  perspective: 1000px;
+  padding: 56px 0 28px;
+}
+.hall3d-stage {
+  position: relative;
+  margin: 0 auto;
+  width: min(100%, 520px);
+  aspect-ratio: 0.95;
+  transform-style: preserve-3d;
+  transform-origin: 50% 80%;
+  transform: rotateX(40deg);
+  animation: hall-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes hall-in {
+  from {
+    opacity: 0;
+    transform: rotateX(78deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(40deg) scale(1);
+  }
+}
+.hall3d-floor {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  transform-style: preserve-3d;
+  border-radius: 10px;
+  background: repeating-linear-gradient(90deg, #d9a066 0 34px, #cf9558 34px 36px);
+  box-shadow:
+    0 0 0 3px #8a5a2b,
+    0 12px 0 #6e451f,
+    0 34px 40px rgba(15, 23, 42, 0.3);
+}
+.hall3d-row {
+  display: grid;
+  gap: 7px;
+  min-height: 0;
+  transform-style: preserve-3d;
+}
+.hall3d-zone {
+  position: relative;
+  min-height: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: visible;
+  transform-style: preserve-3d;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.35s,
+    filter 0.35s;
+  outline: none;
+}
+.hall3d-zone .court3d-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+.hall3d-zone:hover,
+.hall3d-zone:focus-visible {
+  transform: translateZ(10px);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 14px 18px rgba(15, 23, 42, 0.3);
+}
+.hall3d-zone.is-selected {
+  transform: translateZ(18px);
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px #be1651,
+    0 18px 24px rgba(190, 22, 81, 0.45);
+  animation: zone-bob 2.4s ease-in-out infinite;
+}
+@keyframes zone-bob {
+  0%,
+  100% {
+    transform: translateZ(16px);
+  }
+  50% {
+    transform: translateZ(24px);
+  }
+}
+.hall3d-zone.is-closed {
+  filter: grayscale(0.9) opacity(0.55);
+}
+.hall3d-zone.is-full {
+  filter: saturate(0.4) brightness(0.9);
+}
+/* The net across the middle of each court: a bright line with a soft shadow, and a post at each end. */
+.hall3d-net {
+  position: absolute;
+  left: calc(50% - 1.5px);
+  top: -3%;
+  height: 106%;
+  width: 3px;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    3px 0 5px rgba(15, 23, 42, 0.35),
+    0 -3px 0 1px #334155,
+    0 3px 0 1px #334155;
+}
+.hall3d-label {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 9px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+  color: #fff;
+  text-align: center;
+  line-height: 1.15;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hall3d-label b {
+  font-size: 12px;
+}
+.hall3d-label span {
+  font-size: 10px;
+  opacity: 0.9;
+}
+.hall3d-tick {
+  position: absolute;
+  right: -7px;
+  top: -9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: #be1651;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transform: translateZ(2px);
+  animation: tick-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes tick-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .court3d-stage,
+  .hall3d-stage,
+  .hall3d-zone,
+  .hall3d-zone.is-selected,
+  .hall3d-tick,
   .court3d.is-selected .court3d-stage,
   .court-hero,
   .slot-pulse,

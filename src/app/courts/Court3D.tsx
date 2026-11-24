@@ -127,6 +127,23 @@ const ART: Record<CourtKind, Art> = {
   },
 };
 
+/** The floor markings of a court as a flat picture. `landscape` turns it on its side, for a court drawn wider than tall. */
+export function CourtSurface({ kind, landscape = false }: { kind: CourtKind; landscape?: boolean }) {
+  const art = ART[kind] ?? ART.OTHER;
+  if (!landscape) {
+    return (
+      <svg viewBox={`0 0 ${art.w} ${art.h}`} className="court3d-surface" preserveAspectRatio="none">
+        {art.surface}
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox={`0 0 ${art.h} ${art.w}`} className="court3d-surface" preserveAspectRatio="none">
+      <g transform={`translate(${art.h} 0) rotate(90)`}>{art.surface}</g>
+    </svg>
+  );
+}
+
 export default function Court3D({
   kind,
   selected = false,
