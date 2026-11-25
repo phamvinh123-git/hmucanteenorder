@@ -467,16 +467,30 @@ input {
   width: 100%;
   perspective: 1000px;
   padding: 56px 0 28px;
+  cursor: grab;
+  /* Up and down still scrolls the page on a phone; sideways drags turn the plan. */
+  touch-action: pan-y;
+  user-select: none;
+}
+.hall3d.is-dragging,
+.hall3d.is-dragging .hall3d-zone {
+  cursor: grabbing;
+}
+.hall3d.is-dragging .hall3d-stage,
+.hall3d.is-dragging .hall3d-label {
+  transition: none;
 }
 .hall3d-stage {
   position: relative;
   margin: 0 auto;
-  width: min(100%, 520px);
+  width: min(92%, 440px);
   aspect-ratio: 0.95;
   transform-style: preserve-3d;
-  transform-origin: 50% 80%;
-  transform: rotateX(40deg);
-  animation: hall-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: 50% 55%;
+  transform: rotateX(var(--tilt, 40deg)) rotateZ(var(--yaw, 0deg)) scale(var(--zoom, 1));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* "backwards": once the entrance is over, the transform above (and so the turning) takes over. */
+  animation: hall-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 @keyframes hall-in {
   from {
@@ -574,8 +588,9 @@ input {
 .hall3d-label {
   position: absolute;
   left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%) translateZ(3px) rotateZ(calc(-1 * var(--yaw, 0deg)));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
