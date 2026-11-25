@@ -36,6 +36,8 @@ Script tự làm: lấy mã mới, `npm ci --include=dev`, `prisma generate`, `p
 | `20261126000100_court_manager` | Người quản lý riêng của từng sân |
 | `20261127000000_extra_roles` | Một tài khoản có nhiều vai trò |
 | `20261128000000_court_kind_days` | Loại sân và các ngày cho thuê |
+| `20261129000000_club_captain_role` | Vai trò Đội trưởng CLB |
+| `20261129000100_captain_sports` | Môn mà đội trưởng phụ trách |
 
 Các thay đổi chỉ thêm cột, bảng, giá trị mới, không xóa dữ liệu cũ.
 
@@ -56,6 +58,7 @@ Cả hai chạy ngầm ở lần truy cập đầu tiên sau khi khởi động,
 ## 6. Việc làm tay (một lần, nếu chưa làm)
 
 - **Tạo sân nếu chưa có:** `node prisma/seed-courts.mjs` (chỉ xem), rồi `node prisma/seed-courts.mjs --apply`. Tạo cầu lông 1-2, bóng bàn 1-3, bóng đá, bóng rổ với 3 ca 17h-18h, 18h-19h, 19h-20h. Chạy lại không sinh trùng.
+- **Cấp quyền đội trưởng:** **Admin > Tài khoản > Phân quyền**, tích **Đội trưởng CLB** và chọn môn. Sân cầu lông, bóng bàn, bóng rổ chỉ đội trưởng nộp đơn được, Liên chi đoàn duyệt.
 - **Gán người duyệt:** vào **Admin > Tài khoản > Phân quyền**, tích vai trò **Liên chi đoàn** cho các bạn duyệt sân; tích **Quản lý sân** rồi chọn người quản lý riêng cho sân bóng đá ở tab **Quản lý sân** của Đặt sân.
 - **Giá vốn:** `node prisma/seed-giavon.mjs --apply` (thêm `--reset` nếu muốn làm lại từ đầu), rồi nhập giá nguyên liệu. Chuyển dữ liệu Cost Ly cũ theo `deploy/CHUYEN-COST-LY.md`.
 

@@ -17,6 +17,7 @@ enum Role {
   UNION
   SERVICE_HEAD
   COURT_MANAGER
+  CLUB_CAPTAIN
 }
 
 enum MealPattern {
@@ -45,6 +46,8 @@ model User {
   /// `extraRoles`, and OFFICER when `isOfficer` is set.
   role              Role
   extraRoles        Role[]   @default([])
+  /// For a CLUB_CAPTAIN: the court kinds (BADMINTON, TABLE_TENNIS, BASKETBALL) of the clubs they lead.
+  captainSports     String[] @default([])
   mustChangePassword Boolean @default(false)
   active            Boolean  @default(true)
   /// Fixed sequential number for a STUDENT, shown on printed meal lists.

@@ -1,6 +1,7 @@
 import { addDays, startOfDay } from "date-fns";
 import { localDateKey } from "@/lib/client-session-rules";
 import { hasRole, isTopRole, type Roles } from "@/lib/auth";
+import { kindLabel, needsCaptain } from "@/lib/court-kinds";
 
 /** How far ahead a court can be booked, in days from today. */
 export const COURT_BOOK_DAYS_AHEAD = 14;
@@ -14,22 +15,41 @@ type Actor = { userId: string; roles: Roles };
 type CourtRef = { managerId: string | null };
 
 /**
- * Who may book courts: students (their bookings wait for approval), the student union, court managers, and the top
- * roles. Officers and the other roles do not use this service.
+ * Who may book courts: students and club captains (their bookings wait for approval), the student union, court
+ * managers, and the top roles. Officers and the other roles do not use this service. Which courts is `bookingBlock`.
  */
 export function courtBookingMode(roles: Roles): "approval" | "instant" | null {
   if (isTopRole(roles) || hasRole(roles, "COURT_MANAGER", "UNION")) return "instant";
-  if (hasRole(roles, "STUDENT")) return "approval";
+  if (hasRole(roles, "STUDENT", "CLUB_CAPTAIN")) return "approval";
   return null;
 }
 
 /**
- * Where a new booking starts. The top roles and court managers are approved at once. The student union's own
- * booking skips its own step. Everyone else waits for the student union.
+ * May this person book this court? null when they may, otherwise why not. Badminton, table tennis and basketball are
+ * rented only on the application of that sport's club captain; the other courts are open to students.
  */
-export function initialBookingStatus(roles: Roles, court: CourtRef): "PENDING" | "UNION_APPROVED" | "APPROVED" {
-  if (isTopRole(roles) || hasRole(roles, "COURT_MANAGER")) return "APPROVED";
-  if (hasRole(roles, "UNION")) return court.managerId ? "UNION_APPROVED" : "APPROVED";
+export function bookingBlock(
+  who: Actor & { captainSports: string[] },
+  court: CourtRef & { kind: string },
+): string | null {
+  if (isTopRole(who.roles) || hasRole(who.roles, "UNION")) return null;
+  if (!needsCaptain(court.kind)) {
+    return hasRole(who.roles, "STUDENT", "COURT_MANAGER") ? null : "Tài khoản này không đặt được sân này.";
+  }
+  if (hasRole(who.roles, "COURT_MANAGER") && court.managerId === who.userId) return null;
+  if (hasRole(who.roles, "CLUB_CAPTAIN") && who.captainSports.includes(court.kind)) return null;
+  const sport = kindLabel(court.kind).toLowerCase();
+  return `Sân ${sport} chỉ cho thuê theo đơn của đội trưởng CLB ${sport}, được Liên chi đoàn duyệt.`;
+}
+
+/**
+ * Where a new booking starts. The top roles and court managers are approved at once (on a captain-only court, only the
+ * manager of that court). The student union's own booking skips its own step. Everyone else waits for the union.
+ */
+export function initialBookingStatus(who: Actor, court: CourtRef & { kind: string }): "PENDING" | "UNION_APPROVED" | "APPROVED" {
+  if (isTopRole(who.roles)) return "APPROVED";
+  if (hasRole(who.roles, "COURT_MANAGER") && (!needsCaptain(court.kind) || court.managerId === who.userId)) return "APPROVED";
+  if (hasRole(who.roles, "UNION")) return court.managerId ? "UNION_APPROVED" : "APPROVED";
   return "PENDING";
 }
 

@@ -11,6 +11,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   SALES: "Bán hàng",
   CANTEEN_SUPPORT: "Hỗ trợ căng tin",
   UNION: "Liên chi đoàn",
+  CLUB_CAPTAIN: "Đội trưởng CLB",
   OFFICER: "Cán bộ",
   STUDENT: "Sinh viên",
 };
@@ -20,7 +21,7 @@ export const ROLE_LABEL: Record<Role, string> = {
  * often does several jobs); the screens they see are the ones their roles open together. A student account is
  * always a student; it can take extra roles like the student union but never "Cán bộ".
  */
-export const ASSIGNABLE_ROLES: Role[] = ["ADMIN", "SERVICE_HEAD", "MANAGER", "COURT_MANAGER", "SALES", "CANTEEN_SUPPORT", "UNION", "OFFICER"];
+export const ASSIGNABLE_ROLES: Role[] = ["ADMIN", "SERVICE_HEAD", "MANAGER", "COURT_MANAGER", "SALES", "CANTEEN_SUPPORT", "UNION", "CLUB_CAPTAIN", "OFFICER"];
 
 /** What each assignable role is for, shown next to its tick box. */
 export const ROLE_HINT: Partial<Record<Role, string>> = {
@@ -30,7 +31,8 @@ export const ROLE_HINT: Partial<Record<Role, string>> = {
   COURT_MANAGER: "Quản lý sân được giao (VD sân bóng đá)",
   SALES: "Bán hàng ở căng tin",
   CANTEEN_SUPPORT: "Nhập giá vốn",
-  UNION: "Duyệt đặt sân của sinh viên",
+  UNION: "Duyệt đặt sân và đơn của đội trưởng",
+  CLUB_CAPTAIN: "Nộp đơn thuê sân cầu lông, bóng bàn, bóng rổ",
   OFFICER: "Cán bộ: căng tin, đặt xe và phòng",
 };
 

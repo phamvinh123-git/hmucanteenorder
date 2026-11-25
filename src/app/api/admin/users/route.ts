@@ -13,11 +13,15 @@ const schema = z
     // Officers ("cán bộ") are identified by a fixed staff code and may also have a phone number.
     staffCode: z.string().trim().optional(),
     password: z.string().min(4),
-    role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER"]),
+    role: z.enum(["ADMIN", "MANAGER", "SALES", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER", "CLUB_CAPTAIN"]),
+    captainSports: z.array(z.enum(["BADMINTON", "TABLE_TENNIS", "BASKETBALL"])).optional(),
     // A manager / sales / admin who is also an officer: one login, both roles.
     alsoOfficer: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.role === "CLUB_CAPTAIN" && !v.captainSports?.length) {
+      ctx.addIssue({ code: "custom", path: ["captainSports"], message: "Chọn CLB (môn) mà đội trưởng phụ trách." });
+    }
     if (v.role === "OFFICER") {
       if (!v.staffCode || !/^[A-Za-z0-9._-]{3,30}$/.test(v.staffCode)) {
         ctx.addIssue({ code: "custom", path: ["staffCode"], message: "Mã cán bộ gồm 3–30 ký tự chữ, số, dấu chấm, gạch ngang hoặc gạch dưới." });
@@ -49,6 +53,7 @@ export async function GET() {
       staffCode: true,
       role: true,
       extraRoles: true,
+      captainSports: true,
       isOfficer: true,
       department: true,
       autoRegister: true,
@@ -94,6 +99,7 @@ export async function POST(req: NextRequest) {
       isOfficer,
       passwordHash,
       role: data.role,
+      captainSports: data.role === "CLUB_CAPTAIN" ? data.captainSports : [],
       mustChangePassword: true,
     },
   });

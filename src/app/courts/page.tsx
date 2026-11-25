@@ -7,7 +7,7 @@ export const metadata = { title: "Đặt sân - Phân hiệu ĐHYHN Thanh Hóa" 
 
 // "Đặt sân": book a court slot. Students' bookings wait for the student union; the union and admins approve them.
 export default async function CourtsPage() {
-  const user = await requireUser({ roles: ["STUDENT", "ADMIN", "SERVICE_HEAD", "COURT_MANAGER", "UNION"] });
+  const user = await requireUser({ roles: ["STUDENT", "ADMIN", "SERVICE_HEAD", "COURT_MANAGER", "UNION", "CLUB_CAPTAIN"] });
 
   return (
     <AppShell roles={user.roles} name={user.name}>

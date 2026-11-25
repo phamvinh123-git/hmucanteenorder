@@ -21,6 +21,11 @@ type BoardCourt = {
   managerName: string | null;
   kind: CourtKind;
   openDays: number[];
+  /** This account may book the court; otherwise `blockReason` says why not. */
+  canBook: boolean;
+  blockReason: string | null;
+  /** The booking is an application by a club captain: its content is required. */
+  needsApplication: boolean;
   /** Lent out on the day being looked at. */
   open: boolean;
   /** What happens to a booking made now: approved at once, or it waits (for the union, then the court manager). */
@@ -172,7 +177,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
     }
     setNotice(
       r.data.status === "PENDING"
-        ? "Đã gửi yêu cầu! Lượt đặt có hiệu lực sau khi Liên chi đoàn duyệt."
+        ? "Đã nộp đơn! Chỉ được dùng sân khi Liên chi đoàn duyệt, xem trạng thái ở mục \"Của tôi\"."
         : r.data.status === "UNION_APPROVED"
           ? "Đã gửi quản lý sân để duyệt."
           : "Đặt sân thành công! Hẹn gặp bạn trên sân.",
@@ -296,7 +301,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
                 }}
               />
               <p className="px-2 pb-2 text-center text-xs text-slate-500">
-                Chạm vào một sân để chọn, sau đó chọn ca và gửi yêu cầu. <b>Liên chi đoàn</b> sẽ xét duyệt, được duyệt thì lượt đặt mới có hiệu
+                Chạm vào một sân để chọn, sau đó chọn ca. Sân trong nhà thi đấu do <b>đội trưởng CLB</b> nộp đơn, <b>Liên chi đoàn</b> sẽ xét duyệt, được duyệt thì lượt đặt mới có hiệu
                 lực (xem trạng thái ở mục &quot;Của tôi&quot;).
               </p>
             </div>
@@ -339,6 +344,9 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
       {court && (
         <section>
           <Step n={4} title="Chọn ca" hint={court.name} />
+          {court.open && mode && !court.canBook && court.blockReason && (
+            <p className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 animate-pop-in">🔒 {court.blockReason}</p>
+          )}
           {!court.open ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 animate-pop-in">
               {court.name} không cho thuê vào {WEEKDAYS.find((w) => w.day === dayOfKey(day))?.label}. Sân cho thuê vào{" "}
@@ -382,7 +390,7 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
                     </div>
                   );
                 }
-                if (s.past || !mode) {
+                if (s.past || !mode || !court.canBook) {
                   return (
                     <div key={s.id} style={style} className="animate-pop-in rounded-2xl bg-slate-50 px-4 py-3 text-slate-300 ring-1 ring-slate-100">
                       <span className="text-base font-bold">{label}</span>
@@ -434,11 +442,11 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 maxLength={200}
-                placeholder="Ghi chú / mục đích (không bắt buộc)"
+                placeholder={court.needsApplication ? "Nội dung đơn: tên CLB, số người, mục đích (bắt buộc)" : "Ghi chú / mục đích (không bắt buộc)"}
                 className={`${input} min-w-48 flex-1`}
               />
-              <button onClick={book} disabled={busy} className={`${btnPrimary} rounded-full px-6 py-2`}>
-                {busy ? "Đang đặt..." : court.startsAs === "APPROVED" ? "Đặt sân ngay" : "Gửi yêu cầu"}
+              <button onClick={book} disabled={busy || (court.needsApplication && !note.trim())} className={`${btnPrimary} rounded-full px-6 py-2`}>
+                {busy ? "Đang gửi..." : court.startsAs === "APPROVED" ? "Đặt sân ngay" : court.needsApplication ? "Nộp đơn" : "Gửi yêu cầu"}
               </button>
               <button onClick={() => setSlotId(null)} className={`${btnGhost} rounded-full`}>
                 Thôi

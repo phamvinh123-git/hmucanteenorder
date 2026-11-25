@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { foldText } from "@/lib/text";
 import type { Role } from "@prisma/client";
 import { ASSIGNABLE_ROLES, ROLE_HINT, ROLE_LABEL } from "@/lib/roles";
+import { CAPTAIN_KINDS, kindLabel } from "@/lib/court-kinds";
 
 type MatrixRow = { role: Role; services: string[] };
 
@@ -18,6 +19,7 @@ type UserRow = {
   autoRegister: boolean;
   role: Role;
   extraRoles: Role[];
+  captainSports: string[];
   active: boolean;
   mustChangePassword: boolean;
   createdAt: string;
@@ -37,7 +39,7 @@ const SERVICE_COLUMNS: { key: string; label: string }[] = [
   { key: "dorm", label: "Ký túc xá (sắp có)" },
 ];
 
-const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", role: "SALES" as "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER" };
+const emptyForm = { name: "", phone: "", staffCode: "", alsoOfficer: false, password: "123", captainSports: [] as string[], role: "SALES" as "CLUB_CAPTAIN" | "ADMIN" | "MANAGER" | "SALES" | "OFFICER" | "CANTEEN_SUPPORT" | "UNION" | "SERVICE_HEAD" | "COURT_MANAGER" };
 
 export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -89,23 +91,31 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
     }
   }
 
-  async function patchUser(id: string, body: Record<string, unknown>) {
-    await fetch(`/api/admin/users/${id}`, {
+  /** Returns the error message when the change was refused. */
+  async function patchUser(id: string, body: Record<string, unknown>): Promise<string | null> {
+    const res = await fetch(`/api/admin/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     load();
+    if (res.ok) return null;
+    const data = await res.json().catch(() => ({}));
+    return data.error ?? "Không lưu được.";
   }
 
   // Ticking the roles of an account ("Phân quyền"): one person may hold several.
   const [rolesOpenId, setRolesOpenId] = useState<string | null>(null);
   const [roleDraft, setRoleDraft] = useState<Role[]>([]);
+  const [sportDraft, setSportDraft] = useState<string[]>([]);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [matrixOpen, setMatrixOpen] = useState(false);
 
   function openRoles(u: UserRow) {
     setRolesOpenId(u.id);
     setRoleDraft(rolesOf(u));
+    setSportDraft(u.captainSports);
+    setRoleError(null);
     setEditingId(null);
   }
 
@@ -391,9 +401,15 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
               <option value="OFFICER">Cán bộ</option>
               <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
               <option value="UNION">Liên chi đoàn</option>
+              <option value="CLUB_CAPTAIN">Đội trưởng CLB</option>
               <option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
               <option value="COURT_MANAGER">Quản lý đặt sân</option>
             </select>
+            {form.role === "CLUB_CAPTAIN" && (
+              <div className="mt-2">
+                <SportPicker value={form.captainSports} onChange={(captainSports) => setForm({ ...form, captainSports })} />
+              </div>
+            )}
             {form.role !== "OFFICER" && (
               <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
                 <input
@@ -446,6 +462,7 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
 <option value="OFFICER">Cán bộ</option>
 <option value="CANTEEN_SUPPORT">Hỗ trợ căng tin</option>
 <option value="UNION">Liên chi đoàn</option>
+<option value="CLUB_CAPTAIN">Đội trưởng CLB</option>
 <option value="SERVICE_HEAD">Tổ trưởng tổ dịch vụ</option>
 <option value="COURT_MANAGER">Quản lý đặt sân</option>
           </select>
@@ -491,6 +508,7 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
                   className={`text-xs px-2 py-0.5 rounded-full w-fit whitespace-nowrap sm:flex-shrink-0 ${i === 0 ? "bg-slate-100 text-slate-600" : "bg-red-50 text-red-700"}`}
                 >
                   {ROLE_LABEL[r]}
+                  {r === "CLUB_CAPTAIN" && u.captainSports.length > 0 && `: ${u.captainSports.map(kindLabel).join(", ")}`}
                 </span>
               ))}
               {u.isOfficer && u.autoRegister && (
@@ -603,13 +621,23 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
                       </label>
                     ))}
                   </div>
+                  {roleDraft.includes("CLUB_CAPTAIN") && (
+                    <div className="mt-3 rounded-lg bg-white p-2 ring-1 ring-red-200">
+                      <SportPicker value={sportDraft} onChange={setSportDraft} />
+                    </div>
+                  )}
+                  {roleError && <p className="mt-2 text-xs text-red-600">{roleError}</p>}
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       onClick={async () => {
-                        await patchUser(u.id, { roles: u.role === "STUDENT" ? ["STUDENT", ...roleDraft.filter((r) => r !== "STUDENT")] : roleDraft });
-                        setRolesOpenId(null);
+                        const error = await patchUser(u.id, {
+                          roles: u.role === "STUDENT" ? ["STUDENT", ...roleDraft.filter((r) => r !== "STUDENT")] : roleDraft,
+                          captainSports: sportDraft,
+                        });
+                        setRoleError(error);
+                        if (!error) setRolesOpenId(null);
                       }}
-                      disabled={u.role !== "STUDENT" && roleDraft.length === 0}
+                      disabled={(u.role !== "STUDENT" && roleDraft.length === 0) || (roleDraft.includes("CLUB_CAPTAIN") && sportDraft.length === 0)}
                       className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                     >
                       Lưu vai trò
@@ -679,6 +707,28 @@ export default function AdminUsers({ matrix }: { matrix: MatrixRow[] }) {
           </datalist>
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Tick the clubs (sports) a captain leads. */
+function SportPicker({ value, onChange }: { value: string[]; onChange: (sports: string[]) => void }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-slate-600">Đội trưởng CLB môn nào?</p>
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+        {CAPTAIN_KINDS.map((k) => (
+          <label key={k} className="flex items-center gap-1.5 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={value.includes(k)}
+              onChange={(e) => onChange(e.target.checked ? [...value, k] : value.filter((x) => x !== k))}
+              className="h-4 w-4 accent-red-600"
+            />
+            {kindLabel(k)}
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

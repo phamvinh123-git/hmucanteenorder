@@ -10,7 +10,9 @@ import { addDaysLocal, openWeekMondays } from "@/lib/officer-rules";
 const schema = z.object({
   active: z.boolean().optional(),
   // Every role the account should hold (it can hold several). A student account stays a student.
-  roles: z.array(z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER"])).min(1, "Chọn ít nhất một vai trò.").optional(),
+  roles: z.array(z.enum(["ADMIN", "MANAGER", "SALES", "STUDENT", "OFFICER", "CANTEEN_SUPPORT", "UNION", "SERVICE_HEAD", "COURT_MANAGER", "CLUB_CAPTAIN"])).min(1, "Chọn ít nhất một vai trò.").optional(),
+  // The clubs (sports) a club captain leads; sent together with the roles.
+  captainSports: z.array(z.enum(["BADMINTON", "TABLE_TENNIS", "BASKETBALL"])).optional(),
   // Marks a manager/sales/admin as also being an officer (cán bộ), with the same login.
   isOfficer: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
@@ -118,7 +120,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (typeof data.active === "boolean") updateData.active = data.active;
   if (data.roles) {
-    const target = await prisma.user.findUnique({ where: { id }, select: { name: true, role: true } });
+    const target = await prisma.user.findUnique({ where: { id }, select: { name: true, role: true, captainSports: true } });
     if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
     const wanted = Array.from(new Set(data.roles));
     const student = target.role === "STUDENT";
@@ -134,6 +136,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     updateData.role = main;
     updateData.extraRoles = wanted.filter((r) => r !== main && r !== "OFFICER");
     updateData.isOfficer = wanted.includes("OFFICER");
+    const sports = wanted.includes("CLUB_CAPTAIN") ? (data.captainSports ?? target.captainSports) : [];
+    if (wanted.includes("CLUB_CAPTAIN") && sports.length === 0) {
+      return NextResponse.json({ error: "Chọn CLB (môn) mà đội trưởng phụ trách." }, { status: 400 });
+    }
+    updateData.captainSports = sports;
     await logActivity(session.userId, "UPDATE_USER", `Đặt vai trò của ${target.name}: ${wanted.map((r) => ROLE_LABEL[r]).join(", ")}`);
   }
   if (typeof data.isOfficer === "boolean" && !data.roles) {

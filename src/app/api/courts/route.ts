@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { syncCourtKinds } from "@/lib/court-setup";
+import { needsCaptain } from "@/lib/court-kinds";
 import {
   bookableRange,
+  bookingBlock,
   canApproveCourts,
   canUseCourts,
   courtBookingMode,
@@ -40,6 +42,8 @@ export async function GET(req: NextRequest) {
   ]);
   const bySlot = new Map(bookings.map((b) => [b.slotId, b]));
   const approver = canApproveCourts(session.roles);
+  const me = await prisma.user.findUnique({ where: { id: session.userId }, select: { captainSports: true } });
+  const who = { ...session, captainSports: me?.captainSports ?? [] };
   const now = new Date();
 
   return NextResponse.json({
@@ -50,11 +54,15 @@ export async function GET(req: NextRequest) {
       description: c.description,
       managerName: c.manager?.name ?? null,
       kind: c.kind,
+      // May this account book this court, and if not, why (captain-only sports).
+      canBook: !bookingBlock(who, c),
+      blockReason: bookingBlock(who, c),
+      needsApplication: needsCaptain(c.kind) && initialBookingStatus(session, c) === "PENDING",
       openDays: c.openDays,
       // Lent out on this weekday (e.g. badminton and table tennis only on Tuesday, Thursday and Saturday).
       open: c.openDays.includes(day.getDay()),
       // What happens to a booking made now: approved at once, or it waits for the union (and the court's manager).
-      startsAs: initialBookingStatus(session.roles, c),
+      startsAs: initialBookingStatus(session, c),
       slots: c.slots.map((s) => {
         const b = bySlot.get(s.id);
         const mine = b?.userId === session.userId;

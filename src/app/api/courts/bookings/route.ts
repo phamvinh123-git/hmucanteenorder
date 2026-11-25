@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import {
   bookableRange,
+  bookingBlock,
   canApproveCourts,
   canDecideStep,
   courtBookingMode,
@@ -14,7 +15,7 @@ import {
   slotStartsAt,
 } from "@/lib/courts";
 import { localDateKey } from "@/lib/client-session-rules";
-import { openDaysLabel } from "@/lib/court-kinds";
+import { needsCaptain, openDaysLabel } from "@/lib/court-kinds";
 import { logActivity } from "@/lib/log";
 
 const bookingSelect = {
@@ -72,11 +73,13 @@ export async function POST(req: NextRequest) {
   const { first, last } = bookableRange();
   if (day < first || day > last) return NextResponse.json({ error: "Chỉ đặt được từ hôm nay đến 14 ngày tới." }, { status: 400 });
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { active: true } });
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { active: true, captainSports: true } });
   if (!user?.active) return NextResponse.json({ error: "Tài khoản đã bị khóa." }, { status: 403 });
 
   const slot = await prisma.courtSlot.findUnique({ where: { id: parsed.data.slotId }, include: { court: true } });
   if (!slot || !slot.active || !slot.court.active) return NextResponse.json({ error: "Ca này không còn mở." }, { status: 404 });
+  const block = bookingBlock({ ...session, captainSports: user.captainSports }, slot.court);
+  if (block) return NextResponse.json({ error: block }, { status: 403 });
   if (!slot.court.openDays.includes(day.getDay())) {
     return NextResponse.json({ error: `${slot.court.name} chỉ cho thuê vào ${openDaysLabel(slot.court.openDays)}.` }, { status: 400 });
   }
@@ -88,7 +91,11 @@ export async function POST(req: NextRequest) {
   });
   if (taken) return NextResponse.json({ error: "Ca này đã có người đặt." }, { status: 409 });
 
-  const status = initialBookingStatus(session.roles, slot.court);
+  const status = initialBookingStatus(session, slot.court);
+  // A captain applies in writing: the union decides on what the application says.
+  if (status === "PENDING" && needsCaptain(slot.court.kind) && !parsed.data.note) {
+    return NextResponse.json({ error: "Hãy ghi nội dung đơn: tên CLB, số người, mục đích." }, { status: 400 });
+  }
   try {
     const booking = await prisma.courtBooking.create({
       data: {

@@ -11,6 +11,11 @@ export const COURT_KINDS: { key: CourtKind; label: string; icon: string }[] = [
   { key: "OTHER", label: "Sân khác", icon: "🏟️" },
 ];
 
+/** Courts of these sports are rented only on the application of that sport's club captain (approved by the union). */
+export const CAPTAIN_KINDS: CourtKind[] = ["BADMINTON", "TABLE_TENNIS", "BASKETBALL"];
+export const needsCaptain = (kind: string) => (CAPTAIN_KINDS as string[]).includes(kind);
+export const kindLabel = (kind: string) => COURT_KINDS.find((k) => k.key === kind)?.label ?? "Sân khác";
+
 export const COURT_KIND_KEYS = COURT_KINDS.map((k) => k.key) as [CourtKind, ...CourtKind[]];
 
 /** Weekdays as the website names them (Monday first); the number is JavaScript's getDay(): Sunday 0 ... Saturday 6. */
