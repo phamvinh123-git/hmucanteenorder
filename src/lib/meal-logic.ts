@@ -228,7 +228,10 @@ export async function cancelSessionAndExtend(sessionId: string, opts: { bypassDe
     true,
   );
 
-  const [cancelled, newSession] = await prisma.$transaction([
+  const [, cancelled, newSession] = await prisma.$transaction([
+    // A meal can be cancelled, restored and cancelled again: an older make-up row that still points at it (only one
+    // may, the link is unique) lets go first, or creating the new make-up would fail.
+    prisma.mealSession.updateMany({ where: { compensationForId: sessionId }, data: { compensationForId: null } }),
     prisma.mealSession.update({
       where: { id: sessionId },
       data: { status: "CANCELLED", cancelledAt: new Date() },
@@ -320,12 +323,18 @@ export async function restoreSession(
     throw new Error("Sinh viên đã có một suất khác vào đúng ngày và bữa này (từ đợt đăng ký khác), không khôi phục được.");
   }
 
+  // When the make-up taken back is further down the chain, the first make-up (cancelled) no longer stands for
+  // this meal: detach it, so the restored meal can be cancelled again later.
+  const first = session.compensatedBy;
   const [restored] = await prisma.$transaction([
     prisma.mealSession.update({
       where: { id: sessionId },
       data: { status: "SCHEDULED", cancelledAt: null },
     }),
     prisma.mealSession.delete({ where: { id: compensation.id } }),
+    ...(first && first.id !== compensation.id
+      ? [prisma.mealSession.update({ where: { id: first.id }, data: { compensationForId: null } })]
+      : []),
   ]);
 
   return { restored, removedCompensationId: compensation.id };
