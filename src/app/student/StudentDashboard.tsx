@@ -58,9 +58,11 @@ function statusStyle(s: StatusInput) {
 
 /** Can this cancelled meal be restored right now, and if not, why (shown next to the button, since a tooltip does not show on a phone). */
 function restoreInfo(s: SessionDTO, all: SessionDTO[]): { ok: boolean; reason?: string } | null {
-  if (s.status !== "CANCELLED" || !s.hasCompensation) return null;
+  if (s.status !== "CANCELLED") return null;
   const rule = canRestoreSession({ date: new Date(s.date), mealType: s.mealType, status: s.status });
-  if (!rule.ok) return rule;
+  // A past meal with no make-up linked shows no button at all; the server swaps it with the last meal while it is
+  // still in time.
+  if (!rule.ok) return s.hasCompensation ? rule : null;
   if (s.compensationState === "removed") {
     return { ok: false, reason: "Suất bù của buổi này đã được nhân viên điều chỉnh. Hãy nhờ nhân viên căng tin khôi phục giúp." };
   }
@@ -556,8 +558,7 @@ export default function StudentDashboard({
                 )}
               </div>
             )}
-            {selectedSession.status === "CANCELLED" &&
-              selectedSession.hasCompensation &&
+            {restoreInfo(selectedSession, sessions) &&
               (() => {
                 const check = restoreInfo(selectedSession, sessions) ?? { ok: false };
                 return (

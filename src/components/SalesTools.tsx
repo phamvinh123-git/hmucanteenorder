@@ -1857,7 +1857,8 @@ export default function SalesTools({ canResetAll = false }: { canResetAll?: bool
                                     ? { text: "Chưa lấy", cls: "bg-amber-50 text-amber-700" }
                                     : { text: "Sắp tới", cls: "bg-red-50 text-red-700" };
                               const canRemove = canResetAll && !cancelled;
-                              const canRestore = cancelled && sx.hasCompensation;
+                              // With a make-up meal, or a plain cancellation with none linked (restored by swapping with the last meal).
+                              const canRestore = cancelled && (sx.hasCompensation || !sx.note);
                               const canMove = dup && canResetAll && !sx.pickedUp;
                               return (
                                 <li key={sx.id} className="px-3 py-2">

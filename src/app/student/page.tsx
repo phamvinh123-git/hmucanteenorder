@@ -32,7 +32,9 @@ export default async function StudentPage() {
       if (c.status === "SCHEDULED" && !c.pickedUp) return "ok";
       if (c.status !== "CANCELLED") return "used";
       if (isRemoval(c.note)) return hops === 0 ? "removed" : "used";
-      c = c.compensatedBy ? byId.get(c.compensatedBy.id) : undefined;
+      // The chain ends in a cancelled meal: nothing to take back, it is restored by swapping (like no link at all).
+      if (!c.compensatedBy) return null;
+      c = byId.get(c.compensatedBy.id);
     }
     return "used";
   }

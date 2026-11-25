@@ -40,7 +40,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await logActivity(
       session.userId,
       "RESTORE_SESSION",
-      result.removedCompensationId
+      "swapped" in result && result.swapped
+        ? `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), đổi chỗ với buổi cuối lịch${
+            isStaff ? " (nhân viên khôi phục hộ)" : ""
+          }`
+        : result.removedCompensationId
         ? `Khôi phục buổi ăn ngày ${localDateKey(target.date)} (${target.mealType}), xóa suất bù đã thêm trước đó${
             isStaff ? " (nhân viên khôi phục hộ)" : ""
           }`

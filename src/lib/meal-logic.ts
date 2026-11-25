@@ -293,18 +293,15 @@ export async function restoreSession(
     if (!link?.compensatedBy) break;
     compensation = link.compensatedBy;
   }
+  // No make-up meal to take back: none is linked to this cancellation (imported, or the link went with an earlier
+  // restore), or the chain ends in a cancelled one.
+  const noMakeup = !compensation || (compensation.status === "CANCELLED" && !isStaffRemoval(compensation.note));
   if (compensation && compensation.status === "CANCELLED" && isStaffRemoval(compensation.note)) {
     // The make-up meal was taken out by staff: restoring the original simply drops that leftover row.
     if (!opts.allowUnremove) throw new Error("Chỉ Quản lý hoặc Admin mới khôi phục được buổi bù đã xóa.");
-  } else if (!compensation) {
-    throw new Error("Không còn suất bù nào gắn với lần hủy này nên không khôi phục được.");
-  } else if (compensation.status !== "SCHEDULED" || compensation.pickedUp) {
+  } else if (!noMakeup && compensation && (compensation.status !== "SCHEDULED" || compensation.pickedUp)) {
     const day = localDateKey(compensation.date).split("-").reverse().join("/");
-    throw new Error(
-      compensation.status === "CANCELLED"
-        ? `Suất bù cho lần hủy này (ngày ${day}) cũng đã bị hủy, không còn buổi nào để lấy lại.`
-        : `Suất bù cho lần hủy này (ngày ${day}) đã được ăn, không thể khôi phục.`,
-    );
+    throw new Error(`Suất bù cho lần hủy này (ngày ${day}) đã được ăn, không thể khôi phục.`);
   }
 
   // The slot may have been taken meanwhile (a renewal that starts on that day, a make-up meal): putting this
@@ -323,6 +320,8 @@ export async function restoreSession(
     throw new Error("Sinh viên đã có một suất khác vào đúng ngày và bữa này (từ đợt đăng ký khác), không khôi phục được.");
   }
 
+  if (noMakeup || !compensation) return restoreWithoutMakeup(session);
+
   // When the make-up taken back is further down the chain, the first make-up (cancelled) no longer stands for
   // this meal: detach it, so the restored meal can be cancelled again later.
   const first = session.compensatedBy;
@@ -337,7 +336,56 @@ export async function restoreSession(
       : []),
   ]);
 
-  return { restored, removedCompensationId: compensation.id };
+  return { restored, removedCompensationId: compensation.id as string | undefined, swapped: false };
+}
+
+/**
+ * Restores a cancelled meal that has no make-up meal to take back. The student must end up with the number of meals
+ * bought: when the package is short (a meal is still owed) the meal simply comes back; otherwise it changes places
+ * with the last meal of the same package that is still to come (kept in the record as swapped, so an admin can put it
+ * back).
+ */
+async function restoreWithoutMakeup(session: {
+  id: string;
+  registrationId: string;
+  date: Date;
+  mealType: MealType;
+  compensatedBy: { id: string } | null;
+}) {
+  const registration = await prisma.mealRegistration.findUniqueOrThrow({ where: { id: session.registrationId } });
+  const balance = (await registrationBalances([registration])).get(registration.id)!;
+  let giveUp: { id: string } | null = null;
+  if (balance.missing <= 0) {
+    const upcoming = await prisma.mealSession.findMany({
+      where: { registrationId: registration.id, status: "SCHEDULED", pickedUp: false, id: { not: session.id } },
+      select: { id: true, date: true, mealType: true },
+    });
+    giveUp = upcoming.filter((u) => compareSlots(u, session) > 0).sort(compareSlots).at(-1) ?? null;
+    if (!giveUp) {
+      throw new Error("Gói này không còn buổi sắp tới nào để đổi, hãy nhờ nhân viên căng tin hỗ trợ.");
+    }
+  }
+
+  const [restored] = await prisma.$transaction([
+    prisma.mealSession.update({ where: { id: session.id }, data: { status: "SCHEDULED", cancelledAt: null } }),
+    ...(session.compensatedBy
+      ? [prisma.mealSession.update({ where: { id: session.compensatedBy.id }, data: { compensationForId: null } })]
+      : []),
+    ...(giveUp
+      ? [
+          prisma.mealSession.update({
+            where: { id: giveUp.id },
+            data: {
+              status: "CANCELLED",
+              cancelledAt: new Date(),
+              compensationForId: null,
+              note: `${SWAPPED_NOTE} để đổi chỗ khi khôi phục buổi ngày ${localDateKey(session.date).split("-").reverse().join("/")}`,
+            },
+          }),
+        ]
+      : []),
+  ]);
+  return { restored, removedCompensationId: giveUp?.id, swapped: !!giveUp };
 }
 
 /**
