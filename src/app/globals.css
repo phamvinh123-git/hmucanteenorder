@@ -565,11 +565,150 @@ input {
     transform: translateZ(24px);
   }
 }
-.hall3d-zone.is-closed {
+/* Greyed on the leaves only: a filter on the court itself would flatten what stands on it. */
+.hall3d-zone.is-closed .court3d-surface,
+.hall3d-zone.is-closed .hall3d-net,
+.hall3d-zone.is-closed .prop {
   filter: grayscale(0.9) opacity(0.55);
 }
-.hall3d-zone.is-full {
+.hall3d-zone.is-full .court3d-surface {
   filter: saturate(0.4) brightness(0.9);
+}
+
+/* Outdoor grounds around a football pitch or a basketball court. */
+.hall3d.is-grass .hall3d-stage,
+.hall3d.is-asphalt .hall3d-stage {
+  width: min(96%, 540px);
+}
+.hall3d.is-grass .hall3d-floor {
+  padding: 26px;
+  background: repeating-linear-gradient(90deg, #5c940d 0 30px, #66a80f 30px 60px);
+  box-shadow:
+    0 0 0 3px #3b5f0a,
+    0 12px 0 #5f3f1c,
+    0 34px 40px rgba(15, 23, 42, 0.3);
+}
+.hall3d.is-asphalt .hall3d-floor {
+  padding: 24px;
+  background: repeating-linear-gradient(45deg, #64748b 0 6px, #5b6b82 6px 12px);
+  box-shadow:
+    0 0 0 3px #334155,
+    0 12px 0 #1e293b,
+    0 34px 40px rgba(15, 23, 42, 0.3);
+}
+
+/* Things standing on a court. A standing plane is turned about the floor line: its width is its height. */
+.prop {
+  position: absolute;
+  pointer-events: none;
+}
+.goal-face,
+.goal-back,
+.goal-roof {
+  top: 31%;
+  height: 38%;
+  background:
+    repeating-linear-gradient(rgba(255, 255, 255, 0.7) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.7) 0 1px, transparent 1px 6px);
+}
+.goal-face,
+.goal-back {
+  width: 32px;
+  transform-origin: 0 50%;
+  transform: rotateY(-90deg);
+}
+.goal-face {
+  border: 3px solid #fff;
+  border-left: 0;
+}
+.goal-back {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+.goal-roof {
+  width: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  transform: translateZ(32px);
+}
+.goal-face.is-near {
+  left: 4%;
+}
+.goal-face.is-far {
+  left: 96%;
+}
+.goal-back.is-near,
+.goal-roof.is-near {
+  left: calc(4% - 16px);
+}
+.goal-back.is-far {
+  left: calc(96% + 16px);
+}
+.goal-roof.is-far {
+  left: 96%;
+}
+.hoop-pole-a {
+  top: calc(50% - 3px);
+  height: 6px;
+  width: 52px;
+  background: #1e293b;
+  transform-origin: 0 50%;
+  transform: rotateY(-90deg);
+}
+.hoop-pole-b {
+  top: 50%;
+  width: 6px;
+  height: 52px;
+  margin-left: -3px;
+  background: #334155;
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+}
+.hoop-pole-a.is-near,
+.hoop-pole-b.is-near {
+  left: 1.5%;
+}
+.hoop-pole-a.is-far,
+.hoop-pole-b.is-far {
+  left: 98.5%;
+}
+.hoop-board {
+  top: 33%;
+  height: 34%;
+  width: 34px;
+  border: 2px solid #fff;
+  background: rgba(226, 232, 240, 0.72);
+  transform-origin: 0 50%;
+  transform: translateZ(38px) rotateY(-90deg);
+}
+.hoop-board::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 34%;
+  height: 32%;
+  width: 14px;
+  border: 2px solid #e8590c;
+}
+.hoop-board.is-near {
+  left: 3%;
+}
+.hoop-board.is-far {
+  left: 97%;
+}
+.hoop-rim {
+  top: calc(50% - 11px);
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border: 3px solid #f76707;
+  border-radius: 9999px;
+  background: radial-gradient(rgba(255, 255, 255, 0.35), transparent 70%);
+  transform: translateZ(44px);
+}
+.hoop-rim.is-near {
+  left: 8%;
+}
+.hoop-rim.is-far {
+  left: 92%;
 }
 /* The net across the middle of each court: a bright line with a soft shadow, and a post at each end. */
 .hall3d-net {

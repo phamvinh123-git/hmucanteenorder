@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { localDateKey } from "@/lib/client-session-rules";
-import { COURT_KINDS, openDaysLabel, WEEKDAYS, type CourtKind } from "@/lib/court-kinds";
-import Court3D from "./Court3D";
+import { COURT_KINDS, openDaysLabel, WEEKDAYS, type CourtKind, needsCaptain } from "@/lib/court-kinds";
 import HallMap from "./HallMap";
 import { btnGhost, btnPrimary, call, dayOfKey, fmtKey, input, post, STATUS_LABEL, type Mode, type Status } from "./shared";
 
@@ -282,62 +281,36 @@ export default function CourtBoard({ mode }: { mode: Mode }) {
 
       {kindCourts.length > 0 && (
         <section>
-          <Step n={3} title={activeKind === "HALL" ? "Chọn sân trên sơ đồ" : "Chọn sân"} hint={`${fmtKey(day)}`} />
-          {activeKind === "HALL" ? (
-            <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-white p-3 ring-1 ring-slate-200">
-              <HallMap
-                courts={kindCourts.map((c) => ({
-                  id: c.id,
-                  name: c.name,
-                  kind: c.kind,
-                  open: c.open,
-                  free: c.slots.filter((s) => !s.booking && !s.past).length,
-                }))}
-                selectedId={court?.id ?? null}
-                onPick={(id) => {
-                  setCourtId(id);
-                  setSlotId(null);
-                  setNotice(null);
-                }}
-              />
-              <p className="px-2 pb-2 text-center text-xs text-slate-500">
-                Chạm vào một sân để chọn, sau đó chọn ca. Sân trong nhà thi đấu do <b>đội trưởng CLB</b> nộp đơn, <b>Liên chi đoàn</b> sẽ xét duyệt, được duyệt thì lượt đặt mới có hiệu
-                lực (xem trạng thái ở mục &quot;Của tôi&quot;).
-              </p>
-            </div>
-          ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {kindCourts.map((c, i) => {
-              const free = c.slots.filter((s) => !s.booking && !s.past).length;
-              const on = court?.id === c.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setCourtId(c.id);
-                    setSlotId(null);
-                    setNotice(null);
-                  }}
-                  style={{ animationDelay: `${i * 70}ms` }}
-                  className={`court-card animate-pop-in rounded-3xl bg-white p-3 text-center transition-all ${
-                    on ? "ring-2 ring-red-500 shadow-lg shadow-red-200/60" : "ring-1 ring-slate-200 hover:ring-red-300"
-                  }`}
-                >
-                  <Court3D kind={c.kind} selected={on} closed={!c.open} />
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{c.name}</p>
-                  <p
-                    className={`mx-auto mt-1 w-fit rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                      !c.open ? "bg-slate-100 text-slate-400" : free > 0 ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {!c.open ? "Nghỉ hôm nay" : free > 0 ? `${free} ca trống` : "Hết ca"}
-                  </p>
-                  {c.managerName && <p className="mt-1 text-[10px] text-slate-400">Quản lý: {c.managerName}</p>}
-                </button>
-              );
-            })}
+          <Step n={3} title="Chọn sân trên sơ đồ" hint={`${fmtKey(day)}`} />
+          <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-white p-3 ring-1 ring-slate-200">
+            <HallMap
+              // A fresh plan (and starting angle) for each place.
+              key={activeKind}
+              courts={kindCourts.map((c) => ({
+                id: c.id,
+                name: c.name,
+                kind: c.kind,
+                open: c.open,
+                free: c.slots.filter((s) => !s.booking && !s.past).length,
+              }))}
+              selectedId={court?.id ?? null}
+              onPick={(id) => {
+                setCourtId(id);
+                setSlotId(null);
+                setNotice(null);
+              }}
+            />
+            <p className="px-2 pb-2 text-center text-xs text-slate-500">
+              Chạm vào sân để chọn, sau đó chọn ca.{" "}
+              {kindCourts.some((c) => needsCaptain(c.kind)) ? (
+                <>
+                  Sân này do <b>đội trưởng CLB</b> nộp đơn,{" "}
+                </>
+              ) : null}
+              <b>Liên chi đoàn</b> xét duyệt{court?.managerName ? <>, rồi quản lý sân ({court.managerName})</> : null}; được duyệt thì lượt đặt mới có
+              hiệu lực (xem trạng thái ở mục &quot;Của tôi&quot;).
+            </p>
           </div>
-          )}
         </section>
       )}
 

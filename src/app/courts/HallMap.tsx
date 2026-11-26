@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import type { CourtKind } from "@/lib/court-kinds";
 import { CourtSurface } from "./Court3D";
 
-// The indoor hall as one tilted 3D floor plan (CSS 3D transforms, no libraries), laid out like the real hall:
-// the table tennis courts side by side along the back, then badminton court 2, then badminton court 1 in front.
+// The courts of one place as a tilted 3D plan (CSS 3D transforms, no libraries). The indoor hall is laid out like the
+// real one: the table tennis courts side by side along the back, then badminton court 2, then badminton court 1 in
+// front. Outdoor courts (football, basketball...) get their own ground, with goals or hoops standing on them.
 // Tap a court on the plan to choose it; drag the plan (or use the buttons) to turn it.
 
 export type HallCourt = {
@@ -24,16 +25,55 @@ const shortName = (name: string) => {
   return n.charAt(0).toUpperCase() + n.slice(1);
 };
 
-const HOME = { yaw: 0, tilt: 40 };
-const TOP = { yaw: 0, tilt: 0 };
+const HOME_HALL = { yaw: 0, tilt: 40 };
+/** Outdoor courts start a little turned, so what stands on them shows. */
+const HOME_FIELD = { yaw: -28, tilt: 50 };
+/** Length over width of a court drawn on its side. */
+const FIELD_RATIO: Partial<Record<CourtKind, number>> = { FOOTBALL: 1.5, BASKETBALL: 1.86, PICKLEBALL: 1.9 };
+const HAS_NET: CourtKind[] = ["BADMINTON", "TABLE_TENNIS", "PICKLEBALL"];
 /** A drag shorter than this (in pixels) is a tap on a court, not a turn. */
 const DRAG_START = 7;
 const clampTilt = (t: number) => Math.min(65, Math.max(0, t));
-/** Shrinks the turned plan so its corners stay inside the box (the plan is 1 wide and 1/0.95 deep). */
-const zoomFor = (yaw: number) => {
-  const a = (yaw * Math.PI) / 180;
-  return 1 / (Math.abs(Math.cos(a)) + Math.abs(Math.sin(a)) / 0.95);
+/** Shrinks the turned plan so its corners stay inside the box (`ratio` is the plan's width over its depth). */
+const zoomFor = (view: { yaw: number; tilt: number }, ratio: number) => {
+  const a = (view.yaw * Math.PI) / 180;
+  const c = Math.abs(Math.cos(a));
+  const s = Math.abs(Math.sin(a));
+  const across = 1 / (c + s / ratio);
+  const deep = 1.1 / ((s * ratio + c) * Math.cos((view.tilt * Math.PI) / 180));
+  return Math.min(1, across, deep);
 };
+
+/** Two football goals standing at the ends of the pitch (in fragments: a wrapping div would flatten the 3D). */
+function Goals() {
+  return (
+    <>
+      {(["near", "far"] as const).map((end) => (
+        <Fragment key={end}>
+          <div className={`prop goal-back is-${end}`} />
+          <div className={`prop goal-roof is-${end}`} />
+          <div className={`prop goal-face is-${end}`} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** A basketball post, backboard and rim at each end. */
+function Hoops() {
+  return (
+    <>
+      {(["near", "far"] as const).map((end) => (
+        <Fragment key={end}>
+          <div className={`prop hoop-pole-a is-${end}`} />
+          <div className={`prop hoop-pole-b is-${end}`} />
+          <div className={`prop hoop-board is-${end}`} />
+          <div className={`prop hoop-rim is-${end}`} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 const byName = (a: HallCourt, b: HallCourt) => a.name.localeCompare(b.name, "vi", { numeric: true });
 
@@ -49,10 +89,15 @@ export default function HallMap({
   const tableTennis = courts.filter((c) => c.kind === "TABLE_TENNIS").sort(byName);
   // Badminton court 2 sits behind court 1 on the plan, so the highest number comes first (back to front).
   const badminton = courts.filter((c) => c.kind === "BADMINTON").sort(byName).reverse();
-  const rows: HallCourt[][] = [...(tableTennis.length ? [tableTennis] : []), ...badminton.map((c) => [c])];
+  const outdoor = courts.filter((c) => c.kind !== "TABLE_TENNIS" && c.kind !== "BADMINTON").sort(byName);
+  const isHall = outdoor.length === 0;
+  const rows: HallCourt[][] = [...(tableTennis.length ? [tableTennis] : []), ...badminton.map((c) => [c]), ...outdoor.map((c) => [c])];
   const rowFr = rows.map((r) => (r.length > 1 ? "0.8fr" : "1fr")).join(" ");
+  const ratio = isHall ? 0.95 : (FIELD_RATIO[outdoor[0].kind] ?? 1.5) / rows.length;
+  const ground = isHall ? "is-wood" : outdoor[0].kind === "FOOTBALL" ? "is-grass" : "is-asphalt";
+  const home = isHall ? HOME_HALL : HOME_FIELD;
 
-  const [view, setView] = useState(HOME);
+  const [view, setView] = useState(home);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ x: number; y: number; yaw: number; tilt: number; moved: boolean } | null>(null);
   const turned = useRef(false);
@@ -88,8 +133,8 @@ export default function HallMap({
   return (
     <div>
       <div
-        className={`hall3d ${dragging ? "is-dragging" : ""}`}
-        aria-label="Sơ đồ nhà thi đấu"
+        className={`hall3d ${ground} ${dragging ? "is-dragging" : ""}`}
+        aria-label={isHall ? "Sơ đồ nhà thi đấu" : "Sơ đồ sân"}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -107,7 +152,14 @@ export default function HallMap({
       >
       <div
         className="hall3d-stage"
-        style={{ "--yaw": `${view.yaw}deg`, "--tilt": `${view.tilt}deg`, "--zoom": zoomFor(view.yaw) } as React.CSSProperties}
+        style={
+          {
+            "--yaw": `${view.yaw}deg`,
+            "--tilt": `${view.tilt}deg`,
+            "--zoom": zoomFor(view, ratio),
+            aspectRatio: ratio,
+          } as React.CSSProperties
+        }
       >
         <div className="hall3d-floor" style={{ gridTemplateRows: rowFr }}>
           {rows.map((row, ri) => (
@@ -132,7 +184,9 @@ export default function HallMap({
                     className={`hall3d-zone ${state} ${on ? "is-selected" : ""}`}
                   >
                     <CourtSurface kind={c.kind} landscape />
-                    <div className="hall3d-net" aria-hidden />
+                    {HAS_NET.includes(c.kind) && <div className="hall3d-net" aria-hidden />}
+                    {c.kind === "FOOTBALL" && <Goals />}
+                    {c.kind === "BASKETBALL" && <Hoops />}
                     <div className="hall3d-label">
                       <b>{shortName(c.name)}</b>
                       <span>{!c.open ? "Nghỉ hôm nay" : c.free > 0 ? `${c.free} ca trống` : "Hết ca"}</span>
@@ -153,10 +207,10 @@ export default function HallMap({
         <button type="button" className={tool} onClick={() => turn(45)} aria-label="Xoay sang phải">
           Xoay phải ↻
         </button>
-        <button type="button" className={tool} onClick={() => setView((v) => ({ yaw: v.yaw, tilt: isTop ? HOME.tilt : TOP.tilt }))}>
+        <button type="button" className={tool} onClick={() => setView((v) => ({ yaw: v.yaw, tilt: isTop ? home.tilt : 0 }))}>
           {isTop ? "Nhìn nghiêng 3D" : "Nhìn từ trên"}
         </button>
-        <button type="button" className={tool} onClick={() => setView(HOME)}>
+        <button type="button" className={tool} onClick={() => setView(home)}>
           Về mặc định
         </button>
       </div>
